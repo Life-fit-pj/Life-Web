@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>당신을 위한 집 · AI 주거 추천 시스템</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- 카카오 지도 SDK (https 및 autoload=false 적용) -->
+  <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=766835f4db7d7fb274504adc9e8d9f5e&libraries=services"></script>
+  <!-- 스타일시트 -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="search.css">
+</head>
+<body>
+
+  <!-- 첫 진입 검색화면. 슬라이더 UI위를 덮는다 -->
+  <div id="searchScreen">
+    <div class="ss-nav">
+      <span class="ss-logo">LIFE<i>,</i>FIT</span>
+    </div>
+
+    <!-- 떠다니는 단어가 JS 로 채워진다 (위치가 무작위라 HTML 에 못 적는다) -->
+    <div class="ss-words" id="ssWords"></div>
+
+    <div class="search-inner">
+      <h1 class="search-title"> 당신에게 딱 맞는<em>동네</em>를 찾아드려요</h1>
+      <p class="search-sub">어떤 곳에서 살고 싶은지 편하게 적어보세요</p>
+
+      <div class="search-box">
+        <input id="searchInput" type="text"
+              placeholder="예 : 애들 학원 보내기 좋은 조용한 동네"
+              autocomplete="off">
+        <button id="searchBtn">찾기</button>
+      </div>
+
+      <p id="searchStatus" class="search-status"></p>
+      <button id="skipSearch" class="search-skip">직접 설정할게요</button>
+    </div>
+  </div>
+
+  <!-- 결과 화면에서 다시 검색하러 가는 버튼 -->
+  <button id="reopenSearch" title="다시 검색">🔍</button>
+
+  <!-- 카카오 지도 영역 -->
+  <div id="map"></div>
+
+  <!-- 상단 헤더 -->
+  <div class="header">
+    <p class="eyebrow">AI Housing Recommendation</p>
+    <h1>당신에게 딱 맞는 <em>집</em>과 <em>공간</em></h1>
+    <div class="disclaimer">
+      <b>AI 주거 만족도 분석</b> — 선택하신 라이프스타일 지표를 기반으로 예상 만족도(100점 만점)와 최적의 지역, 맞춤형 LH 평면도를 매칭합니다.
+    </div>
+  </div>
+
+  <!-- 좌측 조건 설정 패널 -->
+  <div class="panel ctrl-panel">
+
+    <!-- 1. 건축 정보 -->
+    <h2>🏠 건축 (Architecture)</h2>
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">건축물 유형</span>
+      </div>
+      <select id="bldgType">
+        <option value="1" selected>아파트</option>
+        <option value="2">연립/다세대/단독주택</option>
+      </select>
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">건축 면적 (㎡)</span>
+        <span class="wval" id="areaVal">59 ㎡</span>
+      </div>
+      <input type="range" id="area" min="10" max="150" value="59" oninput="document.getElementById('areaVal').innerText = this.value + ' ㎡'">
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">건축 연도 (노후도)</span>
+        <span class="wval" id="yearVal">2015 년</span>
+      </div>
+      <input type="range" id="builtYear" min="1990" max="2024" value="2015" oninput="document.getElementById('yearVal').innerText = this.value + ' 년'">
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 2. 환경 정보 -->
+    <h2>🌳 환경 (Environment)</h2>
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">녹지 만족도</span>
+        <span class="wval" id="greenVal">3 점</span>
+      </div>
+      <input type="range" id="greenery" min="1" max="5" value="3" oninput="document.getElementById('greenVal').innerText = this.value + ' 점'">
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">안전(치안) 만족도</span>
+        <span class="wval" id="safetyVal">3 점</span>
+      </div>
+      <input type="range" id="safety" min="1" max="5" value="3" oninput="document.getElementById('safetyVal').innerText = this.value + ' 점'">
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 3. 인프라 정보 -->
+    <h2>🏥 인프라 (Infrastructure)</h2>
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">교통 만족도</span>
+        <span class="wval" id="transVal">3 점</span>
+      </div>
+      <input type="range" id="transport" min="1" max="5" value="3" oninput="document.getElementById('transVal').innerText = this.value + ' 점'">
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">상권 만족도</span>
+        <span class="wval" id="commVal">3 점</span>
+      </div>
+      <input type="range" id="commercial" min="1" max="5" value="3" oninput="document.getElementById('commVal').innerText = this.value + ' 점'">
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">의료 만족도</span>
+        <span class="wval" id="medVal">3 점</span>
+      </div>
+      <input type="range" id="medical" min="1" max="5" value="3" oninput="document.getElementById('medVal').innerText = this.value + ' 점'">
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">교육 만족도</span>
+        <span class="wval" id="eduVal">3 점</span>
+      </div>
+      <input type="range" id="education" min="1" max="5" value="3" oninput="document.getElementById('eduVal').innerText = this.value + ' 점'">
+    </div>
+
+    <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">문화 만족도</span>
+        <span class="wval" id="cultVal">3 점</span>
+      </div>
+      <input type="range" id="culture" min="1" max="5" value="3" oninput="document.getElementById('cultVal').innerText = this.value + ' 점'">
+    </div>
+
+    <!-- 실행 버튼 및 로딩 스피너 -->
+    <button class="run-btn" onclick="runSimulation()">AI 분석 실행</button>
+    <div class="loader" id="loading" style="display: none;"></div>
+
+  </div>
+
+  <!-- 우측 결과 및 평면도 패널 -->
+  <div class="panel rank-panel">
+    
+    <!-- AI 점수 박스 -->
+    <div class="main-score-box">
+      <p>AI 예측 종합 주거 만족도</p>
+      <h3 id="resScore">77.3 <span style="font-size:16px; color:var(--muted);">/ 100</span></h3>
+    </div>
+
+    <!-- LLM 설명문. 검색어로 왔을 때만 채워진다 -->
+    <div class="explain-box" id="explainBox" style="display:none;">
+      <div class="explain-head">💬 이렇게 골랐어요</div>
+      <div class="explain-body" id="explainBody"></div>
+    </div>
+
+    <!-- 추천 지역 TOP 5 -->
+    <div class="rank-head">
+      <span>👑 추천 지역 TOP 5</span>
+    </div>
+
+    <!-- 5개 지역이 들어가는 스크롤 영역 -->
+    <div class="rank-scroll" id="resTopRegions">
+      <div class="list-item"><div class="li-main"><span class="rank">1</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">2</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">3</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">4</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">5</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
+    </div>
+
+    <!-- 맞춤형 LH 평면도 매칭 -->
+    <div class="floorplan-area">
+      <h4>🏠 맞춤형 LH 평면도 매칭</h4>
+      <div class="placeholder" id="fpPlaceholder" style="display: none;">도면을 불러옵니다.</div>
+      <img id="floorplanImg" class="floorplan-img" src="LH평면도/부산울산본부_부산만덕5(06,주환1)_01BL/부산울산본부_부산만덕5(06,주환1)_01BL_12.114B-평면-01.png" alt="추천 평면도" style="display: block;" onerror="this.style.display='none';">
+      <div class="filename-text" id="fpFilename">매칭 경로: LH평면도/...</div>
+    </div>
+
+  </div>
+
+  <!-- 자바스크립트 -->
+  <script src="script.js" defer></script>
+  <script src="search.js"></script>
+
+</body>
+</html>

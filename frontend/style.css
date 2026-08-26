@@ -1,0 +1,632 @@
+:root {
+  --paper: #F7F5EF;
+  --card: rgba(255, 255, 255, 0.95);
+  --card-2: #F1EEE5;
+  --line: #DDD8C9;
+  --line-strong: #C9C2AC;
+  --navy: #14213D;
+  --amber: #C97A2B;
+  --amber-soft: #EFDCC4;
+  --ink: #22252B;
+  --muted: #7A7568;
+  --radius: 18px;
+  --shadow: 0 16px 34px rgba(20, 33, 61, 0.10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================
+   1. 카카오 지도 스타일
+   ========================================== */
+#map {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+}
+
+/* ==========================================
+   2. 상단 헤더
+   ========================================== */
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 20px 26px 56px;
+  background: linear-gradient(180deg, rgba(247, 245, 239, 0.97) 0%, rgba(247, 245, 239, 0) 100%);
+  pointer-events: none;
+}
+
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+  text-transform: uppercase;
+  margin: 0 0 7px;
+  font-weight: 600;
+}
+
+h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: clamp(19px, 2.8vw, 26px);
+  line-height: 1.25;
+  margin: 0;
+  color: var(--navy);
+}
+
+h1 em {
+  font-style: italic;
+  color: var(--amber);
+}
+
+.disclaimer {
+  pointer-events: auto;
+  margin-top: 9px;
+  max-width: 540px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.93);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.disclaimer b {
+  color: var(--ink);
+}
+
+/* ==========================================
+   3. 패널 공통
+   ========================================== */
+.panel {
+  position: absolute;
+  z-index: 6;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+}
+
+/* ==========================================
+   4. 좌측 컨트롤 패널
+   ========================================== */
+.ctrl-panel {
+  top: 150px;
+  left: 24px;
+  width: 310px;
+  padding: 20px;
+  max-height: calc(100vh - 182px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ctrl-panel h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin: 0 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+}
+
+.ctrl-panel h2::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* 입력 컨트롤 스타일 */
+.weight-row {
+  margin-bottom: 12px;
+}
+
+.weight-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.wlabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.wval {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+select#bldgType {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--ink);
+  outline: none;
+  cursor: pointer;
+}
+
+/* Range Input Cross-Browser Customization */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  outline: none;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--navy);
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform 0.1s ease;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+input[type=range]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--navy);
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.divider {
+  height: 1px;
+  background: var(--line);
+  margin: 16px 0;
+}
+
+/* AI 분석 버튼 */
+.run-btn {
+  margin-top: 16px;
+  width: 100%;
+  padding: 11px;
+  background: var(--navy);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(20, 33, 61, 0.15);
+  transition: all 0.15s ease;
+}
+
+.run-btn:hover {
+  background: var(--amber);
+  transform: translateY(-1px);
+}
+
+/* 로딩 스피너 */
+.loader {
+  width: 24px;
+  height: 24px;
+  margin: 16px auto 0;
+  border: 3px solid var(--line);
+  border-radius: 50%;
+  border-top-color: var(--amber);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================
+   5. 우측 결과 및 평면도 패널
+   ========================================== */
+.rank-panel {
+  top: 150px;
+  right: 24px;
+  width: 330px;
+  max-height: calc(100vh - 182px);
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 종합 점수 상자 */
+.main-score-box {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.main-score-box p {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.main-score-box h3 {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.rank-head {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.rank-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px; /* 5개 항목이 잘 보이도록 스크롤 영역 확보 */
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 4px;
+}
+
+.list-item {
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.list-item:hover, .list-item.active {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.li-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rank {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  width: 14px;
+}
+
+.list-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+/* 평면도 영역 */
+.floorplan-area {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.floorplan-area h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.placeholder {
+  padding: 30px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--card-2);
+  border-radius: 8px;
+  border: 1px dashed var(--line-strong);
+}
+
+.floorplan-img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.filename-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  color: var(--muted);
+  margin-top: 8px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+
+/* ==========================================
+   6. 스크롤바 & 반응형
+   ========================================== */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+
+@media (max-width: 960px) {
+  .ctrl-panel { width: 260px; left: 16px; }
+  .rank-panel { width: 270px; right: 16px; }
+}
+
+@media (max-width: 768px) {
+  body { overflow: auto; }
+  #map { position: relative; height: 45vh; min-height: 300px; }
+  .header { position: relative; padding: 16px; background: var(--paper); }
+  .ctrl-panel, .rank-panel {
+    position: relative;
+    top: auto; left: auto; right: auto;
+    width: calc(100% - 32px);
+    margin: 12px 16px;
+    max-height: none;
+  }
+}
+
+/* ===== 추천 사유 패널 ===== */
+
+.reason-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;                 /* 검색 화면(9000)보다 위 */
+  background: rgba(30, 26, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* 평소엔 숨어 있다가 .is-open 이 붙으면 나타난다 */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s;
+}
+
+.reason-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.reason-modal {
+  position: relative;
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+
+  transform: translateY(14px);
+  transition: transform 0.25s ease;
+}
+
+.reason-backdrop.is-open .reason-modal {
+  transform: translateY(0);
+}
+
+.reason-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: #b0a496;
+  cursor: pointer;
+}
+
+.reason-close:hover { color: #6b5f52; }
+
+
+/* ### 카드 머리 ### */
+
+.rc-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #c8763a;
+  margin-bottom: 6px;
+}
+
+.rc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rc-name {
+  font-family: "Fraunces", serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: #2b2723;
+}
+
+.rc-score {
+  font-size: 26px;
+  font-weight: 700;
+  color: #c8763a;
+}
+
+.rc-score span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #b0a496;
+  text-align: right;
+}
+
+
+/* ### 사유 문장 ### */
+
+.rc-reason {
+  background: #faf7f2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.rc-headline {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2b2723;
+  line-height: 1.5;
+}
+
+.rc-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6b5f52;
+  line-height: 1.5;
+}
+
+.rc-sub b { color: #c8763a; }
+
+
+/* ### 지표줄 ###*/
+
+.rc-row {
+  display: grid;
+  /* grid : 네 칸을 정해두면 지표마다 글자 길이가 달라도 세로로 줄이 맞는다. */
+  /* 이름 / 점 / 문구 / 백분위 — 네 칸으로 나눈다 */
+  grid-template-columns: 78px auto 1fr 62px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f0ebe4;
+}
+
+.rc-row:last-child { border-bottom: none; }
+
+.rc-row-name {
+  font-size: 13px;
+  color: #4a4038;
+}
+
+/* 점 5개 */
+.rc-dots { display: flex; gap: 4px; }
+
+.rc-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e3dbd0;          /* 꺼진 점 */
+}
+
+.rc-dots.over  i.on { background: #4a9d6e; }
+.rc-dots.match i.on { background: #c8763a; }
+.rc-dots.under i.on { background: #b0a496; }
+
+.rc-word { font-size: 12px; }
+.rc-word.over  { color: #4a9d6e; }
+.rc-word.match { color: #c8763a; }
+.rc-word.under { color: #a89b8c; }
+
+.rc-pct {
+  font-size: 11px;
+  color: #b0a496;
+  text-align: right;
+}
+
+.rc-source {
+  margin-top: 16px;
+  font-size: 11px;
+  color: #b0a496;
+  text-align: center;
+}
+
+
+/* LLM 설명문 영역*/
+.explain-box {
+  background: #faf7f2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 14px 0;
+}
+
+.explain-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c8763a;
+  margin-bottom: 8px;
+}
+
+.explain-body {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #4a4038;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.explain-body b { color: #2b2723; }
