@@ -1,0 +1,1 @@
+# lifefit-embed 호출 + KEY_MAP 변환
