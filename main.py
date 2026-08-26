@@ -28,7 +28,7 @@ app = FastAPI(title="LIFE,FIT")
 # ==========================================
 
 from services.coords import lookup_coords
-from services.engine import get_regions, get_facilities
+from services.engine import get_regions, get_facilities, get_region_explain
 from services.floorplan import find_floorplan
 
 
@@ -56,8 +56,10 @@ class PredictRequest(BaseModel):
 class RegionRequest(BaseModel):
     gu: str
     dong: str
-
-
+    # 설명을 만들려면 "무엇을 찾던 사람인지" 가 필요하다
+    query: str | None = None
+    weights: dict | None = None
+    scores: dict | None = None
 
 
 # ==========================================
@@ -98,6 +100,7 @@ def predict(body: PredictRequest):
 
     return {
         "score": round(min(98.5, max(30.0, base_score)), 1),
+        "query": body.query or "",
         "topRegions": top_regions,
         "floorplanPath": find_floorplan(body.area),
         "fallback": False,
@@ -115,6 +118,24 @@ def region_detail(body: RegionRequest):
         **get_facilities(body.gu, body.dong, limit=5),
     }
 
+
+@app.post("/api/region/explain")
+def region_explain_api(body: RegionRequest):
+    """동네 하나에 대한 LLM 설명을 만든다.
+
+    /api/region 과 나눈 이유 —
+    시설 정보는 즉시 나오지만 설명은 3~5초 걸린다.
+    한 요청으로 묶으면 빠른 쪽까지 기다리게 된다
+    """
+    return {
+        "explanation": get_region_explain(
+            body.gu, body.dong,
+            query=body.query or "",
+            weights=body.weights,
+            scores=body.scores,
+        )
+    }
+    
 
 # ==========================================
 # 5. 프론트엔드 정적 서빙 라우트

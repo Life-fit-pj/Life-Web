@@ -86,6 +86,8 @@ async function runSimulation() {
 function renderResult(data) {
   if (!data) return;
 
+  window.LAST_QUERY = data.query || "";
+
   // ① 주거 만족도 점수
   const elScore = document.getElementById('resScore');
   if (elScore) {
@@ -318,6 +320,7 @@ function openReasonModal(item, weights) {
   // 막대는 이미 있는 데이터로 즉시 보여 주고,
   // 시설 정보만 나중에 채운다. 기다리는 동안에도 읽을 것이 있게 한다
   loadFacilities(item.name);
+  loadRegionExplain(item, weights);
 }
 
 /** 시설 정보를 받아 카드에 채운다 */
@@ -345,6 +348,53 @@ async function loadFacilities(fullName) {
     console.error(err);
     box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
   }
+}
+
+
+/** 동네 하나에 대한 LLM 설명을 받아 채운다 */
+async function loadRegionExplain(item, weights) {
+  const box = document.getElementById("rcLlm");
+  if (!box) return;
+
+  const parts = item.name.replace("서울특별시 ", "").split(" ");
+  const gu = parts[0];
+  const dong = parts.slice(1).join(" ");
+
+  box.innerHTML = `<div class="rc-loading">이 동네가 왜 맞는지 정리하는 중...</div>`;
+
+  try {
+    const res = await fetch("/api/region/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gu, dong,
+        query: window.LAST_QUERY || "",
+        weights: weights || null,
+        scores: item.scores || null,
+      }),
+    });
+    if (!res.ok) throw new Error("설명 요청 실패");
+
+    const data = await res.json();
+    if (!data.explanation) { box.innerHTML = ""; return; }
+
+    box.innerHTML = `
+      <div class="rc-fac-head">💬 이 동네를 고른 이유</div>
+      <div class="rc-llm-body">${escapeAndFormat(data.explanation)}</div>`;
+
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
+  }
+}
+
+/** LLM 이 만든 글을 화면에 넣기 전에 다듬는다 */
+function escapeAndFormat(text) {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")   // 태그 주입 방지
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .trim()
+    .replace(/\n/g, "<br>");
 }
 
 
@@ -422,6 +472,9 @@ function buildReasonCard(item, weights) {
       <div class="rc-facility" id="rcFacility">
         <div class="rc-loading">이 동네를 살펴보는 중...</div>
       </div>
+
+      <!-- LLM 설명이 채워지는 자리. 시설보다 오래 걸린다 -->
+      <div class="rc-llm" id="rcLlm"></div>
 
       <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
 

@@ -19,6 +19,7 @@ sys.path.insert(0, EMBED_DIR)
 
 from app.features.pipeline_api import search, recommend_by_weights
 from app.core.db import facilities, facility_counts, region_extras
+from app.features.region_explain import region_explain_cached
 
 print("✅ LLM 파이프라인 연결 성공!")
 
@@ -72,6 +73,11 @@ def get_facilities(gu, dong, limit=5):
         "items": facilities(gu, dong, limit=limit),
         "extras": region_extras(gu, dong),
     }
+
+
+def get_region_explain(gu, dong, query="", weights=None, scores=None):
+    """동네 하나에 대한 LLM 설명을 만든다. 지도 핀을 눌렀을 때 쓴다."""
+    return region_explain_cached(gu, dong, query, weights, scores)
 
 
 if __name__ == "__main__":
