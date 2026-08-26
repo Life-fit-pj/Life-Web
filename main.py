@@ -29,6 +29,10 @@ from app.features.pipeline_api import search, recommend_by_weights
 print("✅ LLM 파이프라인 연결 성공!")
 
 
+# ==========================================
+# 2. 데이터셋 로드 (data/ 폴더 내부 참조)
+# ==========================================
+
 LH_CSV_PATH = os.path.join(DATA_DIR, "0. 한국토지주택공사 주택 평면도 현황 목록 (20210915) PART-2.csv")
 try:
     df_lh = pd.read_csv(LH_CSV_PATH, encoding='cp949')
