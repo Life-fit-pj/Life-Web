@@ -17,6 +17,170 @@ Life_Fit/
 └── life-fit-web/       이 저장소 (화면, Flask 서버)
 ```
 
+다음과 같이 파일을 구성한 것은 조원들이 스스로 만든 엔진을 유용하게 탈부착 하기 위한 목적입니다.
+해당 리포지토리의 main.py에 엔진의 파이프라인이 어떤 형식으로 연결되어있는지를 확인한 후 규칙에 맞추어 각자의 엔진 파이프라인을 구성하신다면 쉽게 접목이 가능합니다. 
+
+---
+
+## 다른 엔진 붙이기
+
+이 웹은 엔진이 무엇으로 만들어졌는지 모릅니다.
+아래 **함수 두 개**만 약속대로 만들면 어떤 엔진이든 붙습니다.
+LangChain을 쓰든 OpenAI를 쓰든, 안에서 무엇을 하든 상관없습니다.
+
+### 1. 폴더를 나란히 둡니다
+
+```
+Life_Fit/
+├── life-fit-embed/     기본 엔진
+├── my-engine/          내가 만든 엔진
+└── life-fit-web/       이 저장소
+```
+
+### 2. 함수 두 개를 만듭니다
+
+엔진 폴더 안에 진입점 파일을 하나 두고, 아래 두 함수를 만듭니다.
+파일 위치와 이름은 자유입니다 (예: `my-engine/api.py`).
+
+```python
+def search(query, top_k=5):
+    """검색어 하나로 전체 추천을 만든다."""
+    ...
+
+def recommend_by_weights(weights, top_k=5):
+    """가중치만 받아 추천한다. 검색어 없이 슬라이더로 왔을 때 쓴다."""
+    ...
+```
+
+### 3. 돌려주는 모양을 맞춥니다
+
+#### `search(query)` 의 반환값
+
+```python
+{
+    "weights": {
+        "녹지": 3.2, "안전": 3.3, "교통": 2.6, "상권": 3.2,
+        "의료": 3.0, "교육": 4.6, "문화": 2.6
+    },
+    "regions": [
+        {
+            "name": "노원구 중계1동",        # "구 행정동명" — 공백 하나로 구분
+            "total": 78.7,                   # 종합 점수
+            "scores": {                      # 7개 지표 백분위 (0~100)
+                "녹지": 88, "안전": 84, "교통": 48, "상권": 68,
+                "의료": 70, "교육": 98, "문화": 25
+            }
+        },
+        # ... top_k 개
+    ],
+    "explanation": "중계1동은 교육 98점으로 ..."   # 없으면 빈 문자열
+}
+```
+
+#### `recommend_by_weights(weights)` 의 반환값
+
+`search`의 `regions` 부분과 같은 목록입니다.
+
+```python
+[
+    {"name": "노원구 중계1동", "total": 78.7, "scores": {...}},
+    # ...
+]
+```
+
+### 4. 지켜야 할 규칙
+
+| 항목 | 규칙 |
+|---|---|
+| 지표 이름 | 한국어 7개 고정 — `녹지 안전 교통 상권 의료 교육 문화` |
+| `name` | `"구 행정동명"` 형태. `서울특별시`를 붙이지 않습니다 |
+| `scores` | 0~100 숫자. 백분위가 아니어도 되지만 클수록 좋은 값이어야 합니다 |
+| `weights` | 1~5 범위 숫자. 소수점 가능 |
+| `explanation` | 없으면 빈 문자열 `""`. `None`은 안 됩니다 |
+
+**`name`의 공백이 중요합니다.** 웹이 `split(" ", 1)`로 구와 동을 나눠
+지도 좌표를 찾기 때문입니다. `"노원구 중계1동"`은 되지만
+`"노원구중계1동"`이나 `"서울특별시 노원구 중계1동"`은 좌표를 못 찾습니다.
+
+### 5. main.py 를 한 줄 고칩니다
+
+```python
+# 기본 엔진
+EMBED_DIR = os.path.join(BASE_DIR, '..', 'life-fit-embed')
+sys.path.insert(0, os.path.abspath(EMBED_DIR))
+from app.features.pipeline_api import search, recommend_by_weights
+
+# 내 엔진으로 바꾸려면
+EMBED_DIR = os.path.join(BASE_DIR, '..', 'my-engine')
+sys.path.insert(0, os.path.abspath(EMBED_DIR))
+from api import search, recommend_by_weights
+```
+
+### 6. 붙이기 전에 확인하기
+
+웹에 붙이기 전에 엔진 단독으로 돌려 보세요.
+모양이 틀리면 화면에서 원인을 찾기 어렵습니다.
+
+```python
+if __name__ == "__main__":
+    r = search("애들 학원 보내기 좋은 곳")
+
+    assert set(r["weights"]) == {"녹지","안전","교통","상권","의료","교육","문화"}
+    assert len(r["regions"]) == 5
+    assert " " in r["regions"][0]["name"]
+    assert isinstance(r["explanation"], str)
+
+    print(r["weights"])
+    for x in r["regions"]:
+        print(x["rank"] if "rank" in x else "", x["name"], x["total"])
+    print(r["explanation"])
+```
+
+전부 통과하면 웹에 붙여도 됩니다.
+
+### 7. 두 엔진을 비교하고 싶다면
+
+`main.py`에서 둘 다 불러 두고 요청마다 고를 수 있습니다.
+
+```python
+ENGINES = {}
+
+try:
+    sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '..', 'life-fit-embed')))
+    from app.features.pipeline_api import search as search_default
+    ENGINES["default"] = search_default
+except ImportError:
+    pass
+
+try:
+    sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '..', 'my-engine')))
+    from api import search as search_mine
+    ENGINES["mine"] = search_mine
+except ImportError:
+    pass
+```
+
+```python
+    # predict() 안에서
+    engine = body.get('engine') or 'default'
+    result = ENGINES[engine](query, top_k=5)
+```
+
+프론트에 선택 버튼을 하나 두면 같은 검색어로 두 엔진의 결과를
+나란히 비교할 수 있습니다.
+
+### 자주 나는 문제
+
+**지도에 마커가 안 찍힘**
+→ `name`이 `"구 행정동명"` 형태인지 확인하세요. 공백이 하나여야 합니다.
+
+**추천 사유 카드의 점이 다 비어 있음**
+→ `scores`의 키가 한국어 7개와 정확히 일치하는지 확인하세요.
+
+**슬라이더가 안 움직임**
+→ `weights`의 키가 한국어인지, 값이 숫자인지 확인하세요.
+문자열 `"4.6"`이 아니라 숫자 `4.6`이어야 합니다.
+
 ---
 
 ## 설치
