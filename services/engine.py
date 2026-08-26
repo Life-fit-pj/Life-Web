@@ -10,11 +10,11 @@ import os
 import sys
 
 # 추천 엔진은 형제 폴더에 있다.
-#   life-fit/
-#   ├── life-fit-embed/    ← 두뇌
-#   └── life-fit-web/      ← 여기
+#   Life-fit-main/
+#   ├── Life-Embed-jh/    ← 두뇌
+#   └── Life-Web/      ← 여기
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'life-fit-embed'))
+EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
 from app.features.pipeline_api import search, recommend_by_weights
