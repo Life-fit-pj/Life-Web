@@ -28,7 +28,7 @@ app = FastAPI(title="LIFE,FIT")
 # ==========================================
 
 from services.coords import lookup_coords
-from services.engine import get_regions, get_facilities, get_region_explain
+from services.engine import get_regions, get_facilities, get_region_explain, get_chat_answer
 from services.floorplan import find_floorplan
 
 
@@ -60,6 +60,17 @@ class RegionRequest(BaseModel):
     query: str | None = None
     weights: dict | None = None
     scores: dict | None = None
+
+
+class ChatRequest(BaseModel):
+    question: str
+    # 지금 화면에 떠 있는 추천 결과를 같이 받는다.
+    # 서버는 요청 사이에 아무것도 기억하지 않기 때문이다
+    regions: list | None = None
+    weights: dict | None = None
+    # 대화 기록. 지금은 안 쓰지만 자리를 열어 둔다 —
+    # 로그인·저장 기능을 붙이면 여기로 들어온다
+    history: list | None = None
 
 
 # ==========================================
@@ -135,7 +146,19 @@ def region_explain_api(body: RegionRequest):
             scores=body.scores,
         )
     }
-    
+
+
+@app.post("/api/chat")
+def chat_api(body: ChatRequest):
+    """추천 결과에 대한 후속 질문에 답한다."""
+    return {
+        "answer": get_chat_answer(
+            body.question,
+            regions=body.regions,
+            weights=body.weights,
+            history=body.history,
+        )
+    }
 
 # ==========================================
 # 5. 프론트엔드 정적 서빙 라우트

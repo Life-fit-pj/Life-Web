@@ -46,6 +46,29 @@
   <!-- 결과 화면에서 다시 검색하러 가는 버튼 -->
   <button id="reopenSearch" title="다시 검색">🔍</button>
 
+  <!-- 채팅 패널. 버튼을 누르면 오른쪽에서 열린다 -->
+  <button id="chatToggle" title="추천에 대해 물어보기">💬</button>
+
+  <div id="chatPanel">
+    <div class="chat-head">
+      <span class="chat-title">추천에 대해 물어보세요</span>
+      <button id="chatClose" aria-label="닫기">&times;</button>
+    </div>
+
+    <!-- 주고받은 말이 쌓이는 곳 -->
+    <div class="chat-body" id="chatBody">
+      <div class="chat-msg bot">
+        추천 결과에 대해 궁금한 점을 물어보세요.<br>
+        예) 중계1동에 학원이 어떤 종류가 많아요?
+      </div>
+    </div>
+
+    <div class="chat-input">
+      <input id="chatInput" type="text" placeholder="궁금한 점을 입력하세요" autocomplete="off">
+      <button id="chatSend">보내기</button>
+    </div>
+  </div>
+
   <!-- 카카오 지도 영역 -->
   <div id="map"></div>
 

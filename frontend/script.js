@@ -87,6 +87,7 @@ function renderResult(data) {
   if (!data) return;
 
   window.LAST_QUERY = data.query || "";
+  LAST_RESULT = data;          // ← 추가. 채팅이 이 결과를 근거로 답한다
 
   // ① 주거 만족도 점수
   const elScore = document.getElementById('resScore');
@@ -569,3 +570,92 @@ function buildExtraLines(e) {
 
   return lines;
 }
+
+
+// ===== 채팅 패널 =====
+
+// 서버는 요청 사이에 아무것도 기억하지 않는다.
+// 그래서 지금 화면에 떠 있는 추천 결과를 여기에 들고 있다가 질문할 때 같이 보낸다
+let LAST_RESULT = null;
+
+
+function openChat() {
+  document.getElementById("chatPanel").classList.add("open");
+  setTimeout(() => document.getElementById("chatInput").focus(), 300);
+}
+
+function closeChat() {
+  document.getElementById("chatPanel").classList.remove("open");
+}
+
+
+/** 말풍선 하나를 대화창에 붙인다 */
+function addChatMsg(text, kind) {
+  const body = document.getElementById("chatBody");
+  const div = document.createElement("div");
+  div.className = `chat-msg ${kind}`;
+  div.textContent = text;
+  body.appendChild(div);
+
+  // 새 말풍선이 보이도록 맨 아래로 내린다
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+
+/** 질문을 보내고 답을 받아 붙인다 */
+async function sendChat() {
+  const input = document.getElementById("chatInput");
+  const btn = document.getElementById("chatSend");
+
+  const question = input.value.trim();
+  if (!question) return;
+
+  addChatMsg(question, "user");
+  input.value = "";
+  btn.disabled = true;
+
+  const loading = addChatMsg("생각하는 중...", "loading");
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        regions: LAST_RESULT ? LAST_RESULT.topRegions : null,
+        weights: LAST_RESULT ? LAST_RESULT.weights : null,
+      }),
+    });
+    if (!res.ok) throw new Error("서버 응답 오류 " + res.status);
+
+    const data = await res.json();
+    loading.remove();
+    addChatMsg(data.answer || "답을 만들지 못했어요.", "bot");
+
+  } catch (err) {
+    console.error(err);
+    loading.remove();
+    addChatMsg("답변을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.", "bot");
+
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+
+/** 버튼과 키 입력을 연결한다 */
+function bindChatEvents() {
+  document.getElementById("chatToggle").addEventListener("click", openChat);
+  document.getElementById("chatClose").addEventListener("click", closeChat);
+  document.getElementById("chatSend").addEventListener("click", sendChat);
+
+  document.getElementById("chatInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendChat();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", bindChatEvents);
+
+

@@ -20,6 +20,7 @@ sys.path.insert(0, EMBED_DIR)
 from app.features.pipeline_api import search, recommend_by_weights
 from app.core.db import facilities, facility_counts, region_extras
 from app.features.region_explain import region_explain_cached
+from app.features.chat import chat as chat_engine
 
 print("✅ LLM 파이프라인 연결 성공!")
 
@@ -78,6 +79,11 @@ def get_facilities(gu, dong, limit=5):
 def get_region_explain(gu, dong, query="", weights=None, scores=None):
     """동네 하나에 대한 LLM 설명을 만든다. 지도 핀을 눌렀을 때 쓴다."""
     return region_explain_cached(gu, dong, query, weights, scores)
+
+
+def get_chat_answer(question, regions=None, weights=None, history=None):
+    """추천 결과에 대한 후속 질문에 답한다."""
+    return chat_engine(question, regions=regions, weights=weights, history=history)
 
 
 if __name__ == "__main__":
