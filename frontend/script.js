@@ -314,7 +314,39 @@ function openReasonModal(item, weights) {
   el.classList.add("is-open");
   document.body.style.overflow = "hidden";     // 뒤 화면 스크롤 잠금
   el.querySelector(".reason-close").focus();
+
+  // 막대는 이미 있는 데이터로 즉시 보여 주고,
+  // 시설 정보만 나중에 채운다. 기다리는 동안에도 읽을 것이 있게 한다
+  loadFacilities(item.name);
 }
+
+/** 시설 정보를 받아 카드에 채운다 */
+async function loadFacilities(fullName) {
+  const box = document.getElementById("rcFacility");
+  if (!box) return;
+
+  // "서울특별시 노원구 중계1동" → ["노원구", "중계1동"]
+  const parts = fullName.replace("서울특별시 ", "").split(" ");
+  const gu = parts[0];
+  const dong = parts.slice(1).join(" ");
+
+  try {
+    const res = await fetch("/api/region", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gu, dong }),
+    });
+    if (!res.ok) throw new Error("조회 실패");
+
+    const data = await res.json();
+    box.innerHTML = buildFacilityHtml(data);
+
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
+  }
+}
+
 
 function closeReasonModal() {
   if (!modalEl) return;
@@ -386,8 +418,40 @@ function buildReasonCard(item, weights) {
       </div>
       <div class="rc-rows">${rowsHtml}</div>
 
-      <!-- Phase 3 에서 시설 정보가, 그 다음에 LLM 설명이 들어올 자리 -->
+      <!-- 시설 정보가 비동기로 채워지는 자리 -->
+      <div class="rc-facility" id="rcFacility">
+        <div class="rc-loading">이 동네를 살펴보는 중...</div>
+      </div>
 
       <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
+
     </div>`;
+}
+
+
+const FACILITY_EMOJI = {
+  "문화시설": "🎨", "의료기관": "🏥", "학원": "📚",
+  "공원": "🌳", "점포": "🏪",
+};
+
+function buildFacilityHtml(data) {
+  const counts = data.counts || {};
+  const items = data.items || {};
+
+  if (!Object.keys(counts).length) return "";
+
+  // 개수 요약 — "📚 학원 261곳 · 🏥 의료기관 33곳"
+  const summary = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${FACILITY_EMOJI[k] || ""} ${k} ${n.toLocaleString()}곳`)
+    .join(" · ");
+
+  // 가장 많은 종류의 실제 이름 몇 개
+  const topKind = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  const names = (items[topKind] || []).slice(0, 4).map((i) => i.name).join(", ");
+
+  return `
+    <div class="rc-fac-head">이 동네에 있는 것</div>
+    <div class="rc-fac-summary">${summary}</div>
+    ${names ? `<div class="rc-fac-names">${topKind} · ${names} 등</div>` : ""}`;
 }

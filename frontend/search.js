@@ -121,6 +121,12 @@ function startMagnetic() {
 }
 
 function updateMagnetic(mx, my) {
+    // 검색 화면이 걷힌 뒤에는 계산할 이유가 없다.
+  // 그대로 두면 mousemove 마다 getBoundingClientRect 를 14번씩 부르느라
+  // 슬라이더 드래그 같은 다른 조작이 버벅인다
+  const screen = document.getElementById("searchScreen");
+  if (!screen || screen.classList.contains("out")) return;
+
   document.querySelectorAll(".ss-word").forEach((word) => {
     const inner = word.firstElementChild;
     const box = word.getBoundingClientRect();
@@ -145,6 +151,9 @@ function updateMagnetic(mx, my) {
 /** 몇 초마다 단어 하나를 다른 것으로 바꾼다 */
 function startRotation() {
   setInterval(() => {
+    const screen = document.getElementById("searchScreen");
+    if (screen && screen.classList.contains("out")) return;   // 안 보이면 건너뛴다
+    
     const words = document.querySelectorAll(".ss-word");
     if (!words.length) return;
 
