@@ -18,7 +18,7 @@ EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
 from app.features.pipeline_api import search, recommend_by_weights
-from app.core.db import facilities, facility_counts
+from app.core.db import facilities, facility_counts, region_extras
 
 print("✅ LLM 파이프라인 연결 성공!")
 
@@ -70,6 +70,7 @@ def get_facilities(gu, dong, limit=5):
     return {
         "counts": facility_counts(gu, dong),
         "items": facilities(gu, dong, limit=limit),
+        "extras": region_extras(gu, dong),
     }
 
 

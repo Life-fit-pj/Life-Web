@@ -437,21 +437,82 @@ const FACILITY_EMOJI = {
 function buildFacilityHtml(data) {
   const counts = data.counts || {};
   const items = data.items || {};
+  const extras = data.extras || {};
 
-  if (!Object.keys(counts).length) return "";
+  const parts = [];
 
-  // 개수 요약 — "📚 학원 261곳 · 🏥 의료기관 33곳"
-  const summary = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, n]) => `${FACILITY_EMOJI[k] || ""} ${k} ${n.toLocaleString()}곳`)
-    .join(" · ");
+  // ── 시설 개수 ──
+  if (Object.keys(counts).length) {
+    const summary = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${FACILITY_EMOJI[k] || ""} ${k} ${n.toLocaleString()}곳`)
+      .join(" · ");
 
-  // 가장 많은 종류의 실제 이름 몇 개
-  const topKind = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-  const names = (items[topKind] || []).slice(0, 4).map((i) => i.name).join(", ");
+    const topKind = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    const names = (items[topKind] || []).slice(0, 4).map((i) => i.name).join(", ");
 
-  return `
-    <div class="rc-fac-head">이 동네에 있는 것</div>
-    <div class="rc-fac-summary">${summary}</div>
-    ${names ? `<div class="rc-fac-names">${topKind} · ${names} 등</div>` : ""}`;
+    parts.push(`
+      <div class="rc-fac-head">이 동네에 있는 것</div>
+      <div class="rc-fac-summary">${summary}</div>
+      ${names ? `<div class="rc-fac-names">${topKind} · ${names} 등</div>` : ""}`);
+  }
+
+  // ── 생활 여건 (슬라이더 7개 지표 밖의 정보) ──
+  const lines = buildExtraLines(extras);
+  if (lines.length) {
+    parts.push(`
+      <div class="rc-fac-head" style="margin-top:14px;">이 동네 생활 여건</div>
+      <div class="rc-extras">${lines.join("")}</div>`);
+  }
+
+  return parts.join("");
+}
+
+
+/** 슬라이더 밖 정보를 한 줄씩 만든다 */
+function buildExtraLines(e) {
+  const lines = [];
+  const row = (label, value, note) => `
+    <div class="rc-extra-row">
+      <span class="rc-extra-label">${label}</span>
+      <span class="rc-extra-value">${value}</span>
+      ${note ? `<span class="rc-extra-note">${note}</span>` : ""}
+    </div>`;
+
+  if (e.거주안정성_점수 != null) {
+    const v = Math.round(e.거주안정성_점수);
+    const note = v >= 70 ? "주민 교체가 적은 편이에요"
+               : v >= 40 ? "평균 수준이에요"
+                         : "주민 이동이 잦은 편이에요";
+    lines.push(row("🏘️ 거주 안정성", `${v}점`, note));
+  }
+
+  if (e.평균가구원수 != null) {
+    const one = e["1인_비율"] != null ? ` · 1인 가구 ${Math.round(e["1인_비율"])}%` : "";
+    lines.push(row("👥 가구 구성", `평균 ${e.평균가구원수}명${one}`, ""));
+  }
+
+  if (e.보행편의_백분위 != null) {
+    // 쓰레기통 개수로 "깨끗하다" 를 말하면 측정하지 않은 것을 주장하게 된다.
+    // 우리가 아는 건 "버릴 곳을 찾기 쉽다" 까지다
+    lines.push(row("🚶 보행 편의",
+      `상위 ${100 - e.보행편의_백분위}%`,
+      "걷다가 쓰레기를 버릴 곳을 찾기 쉬워요"));
+  }
+
+  if (e.지하철역_수) {
+    lines.push(row("🚉 지하철역", `${e.지하철역_수}개`, ""));
+  }
+
+  // 구 단위 값은 반드시 "OO구 평균" 임을 밝힌다.
+  // 같은 구의 동네가 전부 같은 값이므로, 동네 값인 척하면 안 된다
+  if (e.소음_주간_구 != null) {
+    lines.push(row("🔊 소음", `주간 ${Math.round(e.소음_주간_구)}dB`, "자치구 평균"));
+  }
+
+  if (e.초미세먼지_구 != null) {
+    lines.push(row("🌫️ 초미세먼지", `${e.초미세먼지_구.toFixed(1)}㎍/㎥`, "자치구 평균"));
+  }
+
+  return lines;
 }
