@@ -1,17 +1,114 @@
+/* ===== 색 테마 =====
+   낮은 자연·편안함, 밤은 모던을 목표로 한다.
+   색만 바꾸는 것이 아니라 그림자·발광 같은 질감도 함께 바꾼다.
+
+   변수 이름을 색이 아니라 역할로 지었다.
+   --navy 같은 이름은 밤 모드에서 남색이 아니게 되어 거짓말이 된다 */
+
 :root {
-  --paper: #F7F5EF;
-  --card: rgba(255, 255, 255, 0.95);
-  --card-2: #F1EEE5;
-  --line: #DDD8C9;
-  --line-strong: #C9C2AC;
-  --navy: #14213D;
-  --amber: #C97A2B;
-  --amber-soft: #EFDCC4;
-  --ink: #22252B;
-  --muted: #7A7568;
-  --radius: 18px;
-  --shadow: 0 16px 34px rgba(20, 33, 61, 0.10);
+  /* ── 낮 : 자연, 편안함 ── */
+  --bg:           #F8F1D8;
+  --surface:      rgba(255, 255, 255, 0.92);
+  --surface-2:    #F1E9CE;
+  --line:         #DAD7CD;
+  --line-strong:  #BFBBA9;
+
+  --text:         #2D2A32;
+  --text-muted:   #7B7A6B;
+
+  --primary:      #344E41;   /* 깊은 숲 초록 */
+  --primary-soft: #A3B18A;   /* 이끼 초록 */
+
+  --accent:       #8A6D1F;   /* 포인트 글자. 노랑은 밝아 글자로 안 읽힌다 */
+  --accent-fill:  #FFD24A;   /* 포인트 면 */
+  --accent-soft:  #FBEFC4;
+
+  --good:         #4A9D6E;
+  --radius:       18px;
+
+  /* ── 질감 ──
+     낮은 종이 위에 놓인 카드처럼. 부드럽고 발광 없음 */
+  --shadow:       0 12px 28px rgba(52, 78, 65, 0.10);
+  --glow:         none;                    /* 발광. 낮에는 쓰지 않는다 */
+  --blur:         blur(8px);
+  --map-filter:   none;                    /* 지도는 원본 그대로 */
+
+  /* ── 옛 이름. CSS 곳곳이 아직 이 이름을 쓰고 있어 당분간 남겨 둔다 ── */
+  --paper:        var(--bg);
+  --card:         var(--surface);
+  --card-2:       var(--surface-2);
+  --navy:         var(--primary);
+  --amber:        var(--accent);
+  --amber-soft:   var(--accent-soft);
+  --ink:          var(--text);
+  --muted:        var(--text-muted);
 }
+
+/* ── 밤 : 모던 ──
+   운영체제가 어두운 모드면 자동 적용.
+   나중에 버튼을 달 때를 대비해 data-theme 도 함께 받는다 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { }
+}
+
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  /* 이 블록은 아래 @media 안에서만 값을 넣는다 (아래 참고) */
+}
+
+
+/* ── 밤 : 모던 ──
+   시스템 설정 감지는 JS 가 하고, 여기서는 data-theme 만 본다.
+   CSS 만으로 prefers-color-scheme 과 수동 선택을 함께 다루려면
+   같은 값을 두 벌 써야 해서 관리가 어렵다 */
+[data-theme="dark"] {
+  --bg:           #182A57;
+  --surface:      rgba(45, 79, 143, 0.30);
+  --surface-2:    #21376B;
+  --line:         rgba(255, 255, 255, 0.10);
+  --line-strong:  rgba(255, 255, 255, 0.18);
+
+  --text:         #F8F1D8;
+  --text-muted:   #A9B6D4;
+
+  --primary:      #2D4F8F;
+  --primary-soft: #3D63A8;
+
+  --accent:       #FFD24A;   /* 어두운 바탕에서는 노랑이 글자로도 읽힌다 */
+  --accent-fill:  #D1B15A;
+  --accent-soft:  rgba(255, 210, 74, 0.16);
+
+  --good:         #7ED6A5;
+
+  /* 질감 — 밤은 유리처럼. 발광을 쓴다 */
+  --shadow:       0 16px 40px rgba(0, 0, 0, 0.45);
+  --glow:         0 0 10px var(--accent-soft);
+  --blur:         blur(12px);
+
+  /* 카카오 기본 지도는 흰 배경이라 밤 화면에서 튄다.
+     색을 반전하고 색상환을 180도 돌려 어두운 지도로 만든다 */
+  --map-filter:   invert(95%) hue-rotate(180deg) brightness(115%) contrast(90%);
+}
+
+
+/* 버튼으로 직접 고를 때를 위한 자리 */
+:root[data-theme="dark"] {
+  --bg:           #182A57;
+  --surface:      rgba(45, 79, 143, 0.28);
+  --surface-2:    #21376B;
+  --line:         #2D4F8F;
+  --line-strong:  #3D63A8;
+  --text:         #F8F1D8;
+  --text-muted:   #A9B6D4;
+  --primary:      #2D4F8F;
+  --primary-soft: #3D63A8;
+  --accent:       #FFD24A;
+  --accent-fill:  #D1B15A;
+  --accent-soft:  rgba(255, 210, 74, 0.16);
+  --good:         #7ED6A5;
+  --shadow:       0 16px 34px rgba(0, 0, 0, 0.4);
+}
+
 
 * {
   box-sizing: border-box;
@@ -42,6 +139,10 @@ body {
   left: 0;
   right: 0;
   z-index: 0;
+  /* 낮에는 none, 밤에는 반전 필터가 들어간다.
+     카카오 기본 지도는 흰 배경이라 어두운 화면에서 혼자 튄다 */
+  filter: var(--map-filter);
+  transition: filter 0.4s ease;
 }
 
 /* ==========================================
@@ -839,4 +940,91 @@ input[type=range]::-moz-range-thumb {
 #chatSend:disabled {
   background: var(--line-strong);
   cursor: default;
+}
+
+
+/* ===== 상단 검색창 ===== */
+
+.top-search-wrap {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  /* left:50% 는 왼쪽 끝을 중앙에 두는 것이라
+     자기 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
+  transform: translateX(-50%);
+  z-index: 20;                /* 헤더(5)보다 위, 검색 화면(9000)보다 아래 */
+  width: min(520px, 42vw);
+}
+
+.top-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  pointer-events: auto; 
+}
+
+/* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
+.top-search:focus-within {
+  border-color: var(--amber);
+  box-shadow: 0 6px 24px rgba(201, 122, 43, 0.18);
+}
+
+.ts-icon {
+  font-size: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+#topSearchInput {
+  flex: 1;                    /* 남는 공간을 다 차지 */
+  min-width: 0;               /* flex 안의 input 이 넘치지 않게 */
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+#topSearchBtn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#topSearchBtn:hover { background: var(--amber); }
+
+#topSearchBtn:disabled {
+  background: var(--line-strong);
+  cursor: default;
+}
+
+.ts-status {
+  margin: 7px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  /* 문구가 없어도 자리를 지켜 화면이 흔들리지 않게 한다 */
+  min-height: 16px;
+}
+
+/* 화면이 좁으면 좌우 패널과 겹치므로 숨긴다.
+   그때는 우상단 🔍 버튼으로 검색 화면에 가면 된다 */
+@media (max-width: 1100px) {
+  .top-search-wrap { display: none; }
 }

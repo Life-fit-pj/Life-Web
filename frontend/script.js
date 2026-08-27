@@ -586,8 +586,6 @@ function initChatWithResult(data) {
   const body = document.getElementById("chatBody");
   if (!body) return;
 
-  body.innerHTML = "";     // 이전 검색의 대화를 지운다
-
   if (data.query) {
     addChatMsg(data.query, "user");
   }
