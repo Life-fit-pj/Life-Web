@@ -606,31 +606,6 @@ input[type=range]::-moz-range-thumb {
 }
 
 
-/* LLM 설명문 영역*/
-.explain-box {
-  background: #faf7f2;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin: 14px 0;
-}
-
-.explain-head {
-  font-size: 12px;
-  font-weight: 600;
-  color: #c8763a;
-  margin-bottom: 8px;
-}
-
-.explain-body {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #4a4038;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.explain-body b { color: #2b2723; }
-
 .rc-facility {
   margin-top: 16px;
   padding-top: 14px;

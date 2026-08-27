@@ -87,7 +87,8 @@ function renderResult(data) {
   if (!data) return;
 
   window.LAST_QUERY = data.query || "";
-  LAST_RESULT = data;          // ← 추가. 채팅이 이 결과를 근거로 답한다
+  LAST_RESULT = data;
+  initChatWithResult(data); // 채팅이 이 결과를 근거로 답한다
 
   // ① 주거 만족도 점수
   const elScore = document.getElementById('resScore');
@@ -104,11 +105,7 @@ function renderResult(data) {
 
   // ④ LH 평면도
   renderFloorplan(data.floorplanPath);
-
-  // ⑤ LLM 설명문
-  renderExplanation(data.explanation);
 }
-
 
 // ② 추천 TOP 5 리스트 : 우측 TOP 5 리스트 UI 갱신 함수
 function updateTopRegionsList(regions) {
@@ -200,30 +197,6 @@ function renderFloorplan(path) {
     if (txt) txt.innerText = '';
     if (ph) ph.style.display = 'block';
   }
-}
-
-
-/** ⑤ LLM 설명문 : LLM 설명문을 표시한다. 슬라이더로만 왔으면 설명이 없으므로 숨긴다 */
-function renderExplanation(text) {
-  const box = document.getElementById('explainBox');
-  const body = document.getElementById('explainBody');
-  if (!box || !body) return;
-
-  if (!text) {
-    box.style.display = 'none';
-    return;
-  }
-
-  // 서버가 **강조** 와 줄바꿈을 섞어 보낸다.
-  // innerHTML 에 그대로 넣으면 마크다운이 글자로 보이므로 변환한다
-  body.innerHTML = text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")     // 태그 주입 방지
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/^#+ .*$/gm, "")                          // '# 추천 결과 설명' 제거
-    .trim()
-    .replace(/\n/g, "<br>");
-
-  box.style.display = 'block';
 }
 
 
@@ -600,6 +573,54 @@ function addChatMsg(text, kind) {
   // 새 말풍선이 보이도록 맨 아래로 내린다
   body.scrollTop = body.scrollHeight;
   return div;
+}
+
+
+/** 검색 결과가 나오면 채팅창을 그 검색으로 시작한다.
+ *
+ * 화면이 걷히면 사용자가 무엇을 검색했는지 알 수 없게 된다.
+ * 검색어와 설명문을 첫 대화로 남겨 두면 맥락이 유지되고,
+ * 나중에 대화를 저장할 때도 시작점이 분명해진다
+ */
+function initChatWithResult(data) {
+  const body = document.getElementById("chatBody");
+  if (!body) return;
+
+  body.innerHTML = "";     // 이전 검색의 대화를 지운다
+
+  if (data.query) {
+    addChatMsg(data.query, "user");
+  }
+
+  const count = (data.topRegions || []).length;
+  const top = topWeightLabel(data.weights);
+  addChatMsg(
+    data.query
+      ? `${top}을 가장 중요하게 보고 ${count}곳을 찾았어요.`
+      : `슬라이더 설정으로 ${count}곳을 찾았어요.`,
+    "bot"
+  );
+
+  
+  /** 가장 높은 지표 이름을 돌려준다 */
+function topWeightLabel(weights) {
+  if (!weights) return "전체 조건";
+  const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+  return sorted.length ? sorted[0][0] : "전체 조건";
+}
+
+
+  // LLM 설명문은 마크다운(**강조**)이 섞여 오므로 그대로 넣으면 안 된다.
+  // textContent 를 쓰는 addChatMsg 대신 따로 처리한다
+  if (data.explanation) {
+    const div = document.createElement("div");
+    div.className = "chat-msg bot";
+    div.innerHTML = escapeAndFormat(data.explanation);
+    body.appendChild(div);
+  }
+
+  addChatMsg("궁금한 점을 물어보세요.", "bot");
+  body.scrollTop = body.scrollHeight;
 }
 
 
