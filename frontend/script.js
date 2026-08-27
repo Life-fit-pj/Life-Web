@@ -86,6 +86,9 @@ async function runSimulation() {
 function renderResult(data) {
   if (!data) return;
 
+  window.LAST_QUERY = data.query || "";
+  LAST_RESULT = data;          // ← 추가. 채팅이 이 결과를 근거로 답한다
+
   // ① 주거 만족도 점수
   const elScore = document.getElementById('resScore');
   if (elScore) {
@@ -314,7 +317,87 @@ function openReasonModal(item, weights) {
   el.classList.add("is-open");
   document.body.style.overflow = "hidden";     // 뒤 화면 스크롤 잠금
   el.querySelector(".reason-close").focus();
+
+  // 막대는 이미 있는 데이터로 즉시 보여 주고,
+  // 시설 정보만 나중에 채운다. 기다리는 동안에도 읽을 것이 있게 한다
+  loadFacilities(item.name);
+  loadRegionExplain(item, weights);
 }
+
+/** 시설 정보를 받아 카드에 채운다 */
+async function loadFacilities(fullName) {
+  const box = document.getElementById("rcFacility");
+  if (!box) return;
+
+  // "서울특별시 노원구 중계1동" → ["노원구", "중계1동"]
+  const parts = fullName.replace("서울특별시 ", "").split(" ");
+  const gu = parts[0];
+  const dong = parts.slice(1).join(" ");
+
+  try {
+    const res = await fetch("/api/region", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gu, dong }),
+    });
+    if (!res.ok) throw new Error("조회 실패");
+
+    const data = await res.json();
+    box.innerHTML = buildFacilityHtml(data);
+
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
+  }
+}
+
+
+/** 동네 하나에 대한 LLM 설명을 받아 채운다 */
+async function loadRegionExplain(item, weights) {
+  const box = document.getElementById("rcLlm");
+  if (!box) return;
+
+  const parts = item.name.replace("서울특별시 ", "").split(" ");
+  const gu = parts[0];
+  const dong = parts.slice(1).join(" ");
+
+  box.innerHTML = `<div class="rc-loading">이 동네가 왜 맞는지 정리하는 중...</div>`;
+
+  try {
+    const res = await fetch("/api/region/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gu, dong,
+        query: window.LAST_QUERY || "",
+        weights: weights || null,
+        scores: item.scores || null,
+      }),
+    });
+    if (!res.ok) throw new Error("설명 요청 실패");
+
+    const data = await res.json();
+    if (!data.explanation) { box.innerHTML = ""; return; }
+
+    box.innerHTML = `
+      <div class="rc-fac-head">💬 이 동네를 고른 이유</div>
+      <div class="rc-llm-body">${escapeAndFormat(data.explanation)}</div>`;
+
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
+  }
+}
+
+/** LLM 이 만든 글을 화면에 넣기 전에 다듬는다 */
+function escapeAndFormat(text) {
+  return text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")   // 태그 주입 방지
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .trim()
+    .replace(/\n/g, "<br>");
+}
+
 
 function closeReasonModal() {
   if (!modalEl) return;
@@ -386,8 +469,193 @@ function buildReasonCard(item, weights) {
       </div>
       <div class="rc-rows">${rowsHtml}</div>
 
-      <!-- Phase 3 에서 시설 정보가, 그 다음에 LLM 설명이 들어올 자리 -->
+      <!-- 시설 정보가 비동기로 채워지는 자리 -->
+      <div class="rc-facility" id="rcFacility">
+        <div class="rc-loading">이 동네를 살펴보는 중...</div>
+      </div>
+
+      <!-- LLM 설명이 채워지는 자리. 시설보다 오래 걸린다 -->
+      <div class="rc-llm" id="rcLlm"></div>
 
       <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
+
     </div>`;
 }
+
+
+const FACILITY_EMOJI = {
+  "문화시설": "🎨", "의료기관": "🏥", "학원": "📚",
+  "공원": "🌳", "점포": "🏪",
+};
+
+function buildFacilityHtml(data) {
+  const counts = data.counts || {};
+  const items = data.items || {};
+  const extras = data.extras || {};
+
+  const parts = [];
+
+  // ── 시설 개수 ──
+  if (Object.keys(counts).length) {
+    const summary = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${FACILITY_EMOJI[k] || ""} ${k} ${n.toLocaleString()}곳`)
+      .join(" · ");
+
+    const topKind = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    const names = (items[topKind] || []).slice(0, 4).map((i) => i.name).join(", ");
+
+    parts.push(`
+      <div class="rc-fac-head">이 동네에 있는 것</div>
+      <div class="rc-fac-summary">${summary}</div>
+      ${names ? `<div class="rc-fac-names">${topKind} · ${names} 등</div>` : ""}`);
+  }
+
+  // ── 생활 여건 (슬라이더 7개 지표 밖의 정보) ──
+  const lines = buildExtraLines(extras);
+  if (lines.length) {
+    parts.push(`
+      <div class="rc-fac-head" style="margin-top:14px;">이 동네 생활 여건</div>
+      <div class="rc-extras">${lines.join("")}</div>`);
+  }
+
+  return parts.join("");
+}
+
+
+/** 슬라이더 밖 정보를 한 줄씩 만든다 */
+function buildExtraLines(e) {
+  const lines = [];
+  const row = (label, value, note) => `
+    <div class="rc-extra-row">
+      <span class="rc-extra-label">${label}</span>
+      <span class="rc-extra-value">${value}</span>
+      ${note ? `<span class="rc-extra-note">${note}</span>` : ""}
+    </div>`;
+
+  if (e.거주안정성_점수 != null) {
+    const v = Math.round(e.거주안정성_점수);
+    const note = v >= 70 ? "주민 교체가 적은 편이에요"
+               : v >= 40 ? "평균 수준이에요"
+                         : "주민 이동이 잦은 편이에요";
+    lines.push(row("🏘️ 거주 안정성", `${v}점`, note));
+  }
+
+  if (e.평균가구원수 != null) {
+    const one = e["1인_비율"] != null ? ` · 1인 가구 ${Math.round(e["1인_비율"])}%` : "";
+    lines.push(row("👥 가구 구성", `평균 ${e.평균가구원수}명${one}`, ""));
+  }
+
+  if (e.보행편의_백분위 != null) {
+    // 쓰레기통 개수로 "깨끗하다" 를 말하면 측정하지 않은 것을 주장하게 된다.
+    // 우리가 아는 건 "버릴 곳을 찾기 쉽다" 까지다
+    lines.push(row("🚶 보행 편의",
+      `상위 ${100 - e.보행편의_백분위}%`,
+      "걷다가 쓰레기를 버릴 곳을 찾기 쉬워요"));
+  }
+
+  if (e.지하철역_수) {
+    lines.push(row("🚉 지하철역", `${e.지하철역_수}개`, ""));
+  }
+
+  // 구 단위 값은 반드시 "OO구 평균" 임을 밝힌다.
+  // 같은 구의 동네가 전부 같은 값이므로, 동네 값인 척하면 안 된다
+  if (e.소음_주간_구 != null) {
+    lines.push(row("🔊 소음", `주간 ${Math.round(e.소음_주간_구)}dB`, "자치구 평균"));
+  }
+
+  if (e.초미세먼지_구 != null) {
+    lines.push(row("🌫️ 초미세먼지", `${e.초미세먼지_구.toFixed(1)}㎍/㎥`, "자치구 평균"));
+  }
+
+  return lines;
+}
+
+
+// ===== 채팅 패널 =====
+
+// 서버는 요청 사이에 아무것도 기억하지 않는다.
+// 그래서 지금 화면에 떠 있는 추천 결과를 여기에 들고 있다가 질문할 때 같이 보낸다
+let LAST_RESULT = null;
+
+
+function openChat() {
+  document.getElementById("chatPanel").classList.add("open");
+  setTimeout(() => document.getElementById("chatInput").focus(), 300);
+}
+
+function closeChat() {
+  document.getElementById("chatPanel").classList.remove("open");
+}
+
+
+/** 말풍선 하나를 대화창에 붙인다 */
+function addChatMsg(text, kind) {
+  const body = document.getElementById("chatBody");
+  const div = document.createElement("div");
+  div.className = `chat-msg ${kind}`;
+  div.textContent = text;
+  body.appendChild(div);
+
+  // 새 말풍선이 보이도록 맨 아래로 내린다
+  body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+
+/** 질문을 보내고 답을 받아 붙인다 */
+async function sendChat() {
+  const input = document.getElementById("chatInput");
+  const btn = document.getElementById("chatSend");
+
+  const question = input.value.trim();
+  if (!question) return;
+
+  addChatMsg(question, "user");
+  input.value = "";
+  btn.disabled = true;
+
+  const loading = addChatMsg("생각하는 중...", "loading");
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        regions: LAST_RESULT ? LAST_RESULT.topRegions : null,
+        weights: LAST_RESULT ? LAST_RESULT.weights : null,
+      }),
+    });
+    if (!res.ok) throw new Error("서버 응답 오류 " + res.status);
+
+    const data = await res.json();
+    loading.remove();
+    addChatMsg(data.answer || "답을 만들지 못했어요.", "bot");
+
+  } catch (err) {
+    console.error(err);
+    loading.remove();
+    addChatMsg("답변을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.", "bot");
+
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+
+/** 버튼과 키 입력을 연결한다 */
+function bindChatEvents() {
+  document.getElementById("chatToggle").addEventListener("click", openChat);
+  document.getElementById("chatClose").addEventListener("click", closeChat);
+  document.getElementById("chatSend").addEventListener("click", sendChat);
+
+  document.getElementById("chatInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendChat();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", bindChatEvents);
+
+
