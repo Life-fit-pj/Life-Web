@@ -173,3 +173,6 @@ app.mount("/LH평면도", StaticFiles(directory=os.path.join(DATA_DIR, 'LH평면
 
 # frontend 전체를 뿌린다. 맨 마지막에 둬야 위의 경로들을 가로채지 않는다
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True))
+
+
+
