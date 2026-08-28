@@ -679,12 +679,6 @@ input[type=range]::-moz-range-thumb {
 }
 
 
-.rc-facility {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-
 .rc-loading {
   font-size: 12px;
   color: var(--muted);
@@ -746,6 +740,54 @@ input[type=range]::-moz-range-thumb {
 }
 
 .rc-llm-body b { color: var(--text); }
+
+
+/* ### 탭 (5점 점수표 / 생활 여건 / 주변 시세 / 로드뷰) ### */
+
+.rc-tabs {
+  margin-top: 16px;
+}
+
+.rc-tab-heads {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rc-tab-head {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rc-tab-head.is-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.rc-tab-panel { display: none; padding-top: 14px; }
+.rc-tab-panel.is-active { display: block; }
+
+.rc-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.rc-roadview {
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
 
 
 /* ===== 채팅 패널 ===== */
@@ -1009,4 +1051,9 @@ input[type=range]::-moz-range-thumb {
 #searchInput::placeholder {
   color: var(--text-muted);
   opacity: 1;
+}
+
+.rc-chart {
+  height: 240px;
+  margin: 4px 0 14px;
 }

@@ -88,6 +88,10 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
   `POST /api/chat`(결과 화면에서의 추가 질문)도 호출하지만, **`main.py`에 이 두 라우트는 아직
   없습니다.** 요청은 404로 실패하고 프론트엔드가 이를 조용히 삼켜 해당 UI 영역만 비워 두므로,
   화면이 깨지진 않지만 기능은 동작하지 않습니다. 이 두 엔드포인트를 구현하는 것이 남은 작업입니다.
+  > **[2026-08-29 정정]** `main.py`를 다시 확인해 보니 위 두 라우트(`/api/region/explain`,
+  > `/api/chat`)가 이미 구현되어 있습니다(123~151번째 줄 부근). 이 문단은 그 사이에 작업이
+  > 진행되면서 사실과 달라진 오래된 메모이니, 두 엔드포인트가 "없다"는 앞 문장은 더 이상
+  > 유효하지 않습니다.
 
 ### 교체 가능한 엔진 계약
 
@@ -116,245 +120,421 @@ API 키, 토큰, 기타 비밀 정보는 반드시 `.env`(gitignore 처리됨)�
 
 ## 메인 화면 검색창 버그 진단 (2026-08-27)
 
-메인 화면 좌측 상단에 검색창(`topSearchInput`)을 새로 추가하면서 생긴 문제 3개를 코드만
-읽어서 진단한 결과입니다. 아래 수정은 아직 파일에 적용하지 않았습니다 — 직접 적용해보고
-결과를 확인해 주세요.
 
-### 콘솔에는 에러가 안 뜨는 게 함정
+## 핀 클릭 상세 정보 모달 — 오류 진단 + 구조 개선 설계 (2026-08-29)
 
-이번 문제는 `Uncaught SyntaxError` 같은 게 콘솔에 안 뜹니다. HTML은 닫는 태그
-(`</div>`)가 하나 빠져도 브라우저가 에러를 내지 않고, 그냥 그 아래 있는 태그들을 전부
-안 닫힌 태그 속으로 밀어 넣어 버리기 때문입니다. 그래서 겉보기엔 멀쩡해 보이는데 안쪽
-구조가 완전히 달라져 있는 상태입니다.
+> **[2026-08-29 적용 완료]** 아래 진단·설계 내용은 실제로 `frontend/script.js`,
+> `frontend/style.css`에 적용했습니다(버그 A/B 수정, LLM 이유 박스 이동, 탭 4개 추가,
+> 로드뷰 지연 초기화 뼈대까지 전부 반영). 로드뷰는 카카오 API 연동 자체는 코드로
+> 넣어뒀지만 실제 파노라마가 뜨는지는 브라우저에서 직접 확인이 필요합니다(자동화 도구
+> 없이는 핀 클릭→탭 클릭까지 실제 클릭 시나리오를 검증하지 못했습니다). 아래 설명은
+> "왜 이렇게 고쳤는지"를 이해하기 위한 기록으로 남겨둡니다.
 
-확인하는 법: 브라우저에서 F12 → Elements(요소) 탭 → `<div class="header">`를 펼쳐보면,
-원래는 그 옆에 나란히(형제로) 있어야 할 `<div class="panel ctrl-panel">`
-(왼쪽 슬라이더 패널)과 `<div class="panel rank-panel">`(오른쪽 결과 패널)이 전부
-`header` **안에** 들어가 있는 걸 볼 수 있습니다.
+아래 내용은 애초에 진단·설계 문서로 작성됐습니다. 지금 막 코딩을 배우기 시작한
+단계라고 하셔서, 각 함수가 왜 이렇게 짜여 있는지부터 풀어서 설명합니다.
 
-### 원인
+### 0. 먼저 알아야 할 것 — 이 모달은 어떻게 화면에 뜨는가
 
-`frontend/index.html` 76번째 줄에서 `<div class="header">`를 여는데, 87번째 줄
-(`<p id="topSearchStatus">`) 다음에 이걸 닫는 `</div>`가 없습니다. 검색창(`top-search`)을
-header 안에 추가하는 작업을 하다가, 원래 header를 닫던 `</div>` 한 줄이 같이 지워진
-것으로 보입니다.
+지도 위 핀(마커)을 클릭했을 때 뜨는 그 창의 코드 이름은 `reason-modal`("추천 사유
+모달")입니다. 흐름은 이렇습니다.
 
-```html
-    <p id="topSearchStatus" class="ts-status"></p>
+1. `addMarkerAndOverlay(item, latLng, bounds, weights)` ([script.js:204](frontend/script.js#L204)) —
+   지도에 핀을 하나 찍고, 그 핀에 클릭 이벤트를 건다. `item`은 그 동네 하나의 정보
+   (이름, 순위, 점수, 좌표, 지표별 점수 등을 담은 객체)이고, `weights`는 사용자가
+   슬라이더로 설정한(또는 자연어 검색이 변환한) 7개 지표의 중요도다.
+   ```js
+   kakao.maps.event.addListener(marker, "click", () => {
+     openReasonModal(item, weights);
+   });
+   ```
+   즉 "이 핀을 누르면 `openReasonModal`을 부른다"는 예약만 미리 걸어두는 코드다.
 
-  <!-- 좌측 조건 설정 패널 -->
-  <div class="panel ctrl-panel">
-```
+2. `ensureModal()` ([script.js:262](frontend/script.js#L262)) — 모달 껍데기(배경 어둡게
+   깔리는 부분 + 흰 카드 + 닫기 버튼)를 **딱 한 번만** 만들어서 `modalEl` 이라는 전역
+   변수에 저장해 두고, 이후에는 그걸 재사용한다. 핀을 클릭할 때마다 매번 새로
+   `document.createElement`로 만들면 이전에 걸어둔 "배경 클릭하면 닫기", "Esc 누르면
+   닫기" 같은 이벤트 리스너가 핀 클릭 횟수만큼 계속 쌓이는 문제가 생기기 때문에,
+   "이미 있으면 그걸 그대로 돌려주고, 없을 때만 만든다"는 패턴(흔히 **싱글턴**이라고
+   부른다)을 쓴 것이다.
 
-이 상태로는 `header`가 끝까지(파일 맨 아래 `</body>` 직전까지) 안 닫혀서, 그 뒤에 나오는
-좌측 패널·우측 패널이 전부 `header`의 자식이 되어버립니다.
+3. `openReasonModal(item, weights)` ([script.js:287](frontend/script.js#L287)) — 실제로
+   모달을 채우고 여는 함수. 이 함수 안에서 하는 일은 크게 두 갈래로 나뉜다.
+   - **동기(즉시) 처리**: `buildReasonCard(item, weights)`로 카드 HTML을 만들어 넣고,
+     `drawRadar(...)`로 레이더 차트(스파이더 웹)를 그린다. 둘 다 서버에 물어볼 필요
+     없이 이미 갖고 있는 `item`/`weights` 값만으로 계산할 수 있어서 기다림 없이
+     바로 화면에 나온다.
+   - **비동기(나중에 채워짐) 처리**: `loadFacilities(item.name)`와
+     `loadRegionExplain(item, weights)`는 각각 `/api/region`, `/api/region/explain`에
+     `fetch`로 물어봐야 답이 오는 함수라서, 답이 올 때까지는 "~ 살펴보는 중..." 같은
+     로딩 문구만 보이다가 응답이 도착하면 그 안의 `innerHTML`을 채워 넣는다.
 
-이게 왜 문제냐면, `frontend/style.css` 50~59번째 줄에 이런 규칙이 있습니다.
+4. `buildReasonCard(item, weights)` ([script.js:412](frontend/script.js#L412)) — 모달
+   안에 들어갈 HTML을 문자열로 조립하는 함수. 여기서 중요한 건, 시설 정보나 LLM
+   설명처럼 "나중에 채워질 자리"를 `<div id="rcFacility">...</div>`,
+   `<div id="rcLlm"></div>`처럼 **빈 상자로 미리 만들어 둔다**는 점이다. 3번의
+   `loadFacilities`/`loadRegionExplain`은 이 id를
+   `document.getElementById("rcFacility")`로 찾아서 그 안의 `innerHTML`만 나중에
+   바꿔치기한다. 그래서 이 빈 상자 `<div>`가 카드 템플릿의 어느 줄에 있는지가 곧
+   "화면에서 그 내용이 어디에 나오는지"를 그대로 결정한다 — 2번 항목에서 위치를
+   옮기는 작업이 왜 "그냥 템플릿 문자열 안에서 순서만 바꾸면 되는" 작업인지의 근거다.
 
-```css
-.header {
-  ...
-  pointer-events: none;
+### 1. 모달에서 발견한 오류 2가지
+
+#### 버그 A — 핀 하나 클릭할 때마다 서버에 같은 요청을 2번씩 보낸다
+
+위치: [script.js:287-304](frontend/script.js#L287-L304) `openReasonModal` 함수
+
+```js
+function openReasonModal(item, weights) {
+  const el = ensureModal();
+  el.querySelector(".reason-body").innerHTML = buildReasonCard(item, weights);
+  el.classList.add("is-open");
+  document.body.style.overflow = "hidden";     // 뒤 화면 스크롤 잠금
+  el.querySelector(".reason-close").focus();
+
+  // 카드가 화면에 붙은 뒤에 그려야 canvas 크기가 잡힌다
+  drawRadar(buildRows(item, weights));
+
+  loadFacilities(item.name);
+  loadRegionExplain(item, weights);
+
+  // 막대는 이미 있는 데이터로 즉시 보여 주고,
+  // 시설 정보만 나중에 채운다. 기다리는 동안에도 읽을 것이 있게 한다
+  loadFacilities(item.name);
+  loadRegionExplain(item, weights);
 }
 ```
 
-`pointer-events: none`은 "이 요소는 마우스 클릭을 받지 않고, 클릭을 그대로 아래(지도)로
-흘려보낸다"는 뜻입니다. header가 화면 위쪽 전체를 덮는 반투명 배경이라서, 빈 공간을
-눌렀을 때 지도가 반응하도록 일부러 넣은 설정입니다. 문제는 **이 성질이 자식 요소에도
-그대로 상속된다**는 점입니다. 그래서 `.disclaimer`처럼 진짜로 클릭이 되어야 하는 요소는
-따로 `pointer-events: auto;`를 다시 걸어서 되살려 놨는데, 새로 추가한 `.top-search`에는
-이 처리가 빠져 있습니다. 게다가 위에서 발견한 "닫는 div 누락" 때문에 원래는 header 밖에
-있어야 할 `ctrl-panel`/`rank-panel`(슬라이더, AI 분석 버튼, TOP5 리스트)까지도 지금은
-header 밑에 깔려서 똑같이 클릭이 통과해 버립니다.
+`loadFacilities(item.name)`와 `loadRegionExplain(item, weights)`가 각각 **두 번씩**
+호출되고 있다. 주석("막대는 이미 있는 데이터로 즉시 보여 주고...")을 보면 원래는 설명을
+적어두려던 자리였는데, 그 아래에 실제 호출 코드까지 실수로 한 번 더 복사돼서 남은
+것으로 보인다.
 
-**문제점 2, 3은 사실 같은 원인의 두 증상입니다:**
-- "지도 조종층이 검색창보다 위에 있다" → 실제로는 지도가 위로 올라온 게 아니라, 검색창이
-  클릭을 못 받는 상태라서 클릭이 그 밑의 지도로 그냥 전달되는 것입니다. 눈으로는 검색창이
-  멀쩡히 보이니 "외관상 문제없음"으로 느껴진 것도 이 때문입니다.
-- "재검색이 안 된다" → 같은 이유로 `topSearchInput`에 글자를 입력하거나
-  `topSearchBtn`을 누르는 동작 자체가 클릭으로 인식되지 않기 때문입니다.
+이게 왜 문제가 되냐면:
+- 핀 하나를 클릭할 때마다 `/api/region`과 `/api/region/explain`에 요청이 각각 2번씩,
+  총 4번의 네트워크 요청이 나간다. 특히 `/api/region/explain`은 안에서 LLM(Anthropic
+  API)을 호출하는 엔드포인트라서([main.py:133](main.py#L133) 부근), 요청이 2배가 되면
+  응답 속도도 느려지고 API 호출 비용도 2배로 나간다.
+- 두 응답이 정확히 같은 순서로 돌아온다는 보장이 없다(네트워크 타이밍은 매번 달라질
+  수 있다). 운이 나쁘면 나중에 도착한 두 번째 응답이 먼저 도착한 첫 번째 응답의
+  내용을 덮어써서 화면이 잠깐 깜빡이거나, 두 응답 내용이 미묘하게 다를 경우(예: LLM
+  이 매번 살짝 다른 문장을 만드는 경우) 사용자가 알아채지 못하는 사이에 결과가 한 번
+  더 바뀌는 상태가 된다.
 
-**문제점 1(검색한 문구가 안 보인다)**도 여기서 이어질 가능성이 큽니다. `search.js`의
-`fillTopSearch()` 함수 코드 자체는 검색어를 `topSearchInput.value`에 정확히 넣도록 짜여
-있어서(직접 코드를 따라가며 확인함) 로직상 문제는 없어 보입니다. 다만 그 입력창을 클릭해도
-반응이 없으니, 실제로는 값이 들어가 있어도 사용자가 클릭해서 커서를 확인하거나 글자를
-선택해볼 방법이 없어 "안 보인다"고 느껴졌을 가능성이 높습니다. 아래 수정을 적용한 뒤
-다시 검색해서 이 부분도 같이 해결되는지 확인해 주세요. 그래도 안 보이면 알려주시면
-`search.js` 쪽을 더 들여다보겠습니다.
+**고치는 방향**: 아래쪽에 중복된 두 줄(과 그 위의 주석)을 지우고, 호출을 한 번씩만
+남긴다.
 
-### 고치기
+```js
+function openReasonModal(item, weights) {
+  const el = ensureModal();
+  el.querySelector(".reason-body").innerHTML = buildReasonCard(item, weights);
+  el.classList.add("is-open");
+  document.body.style.overflow = "hidden";     // 뒤 화면 스크롤 잠금
+  el.querySelector(".reason-close").focus();
 
-**1) `frontend/index.html` — header 닫는 태그 추가**
+  // 카드가 화면에 붙은 뒤에 그려야 canvas 크기가 잡힌다
+  drawRadar(buildRows(item, weights));
 
-87번째 줄(`<p id="topSearchStatus" ...>`) 바로 다음에 `</div>` 한 줄을 추가해서 header를
-닫아주세요.
-
-지금:
-```html
-    <p id="topSearchStatus" class="ts-status"></p>
-
-  <!-- 좌측 조건 설정 패널 -->
-  <div class="panel ctrl-panel">
+  // 막대는 이미 있는 데이터로 즉시 보여 주고,
+  // 시설 정보/LLM 설명은 서버 응답이 오는 대로 나중에 채운다
+  loadFacilities(item.name);
+  loadRegionExplain(item, weights);
+}
 ```
 
-이렇게 바꾸세요:
-```html
-    <p id="topSearchStatus" class="ts-status"></p>
-  </div>
+#### 버그 B — 지표 5점 점수줄(rc-rows)이 카드 안에서 통째로 두 번 찍힌다
 
-  <!-- 좌측 조건 설정 패널 -->
-  <div class="panel ctrl-panel">
+위치: [script.js:449-451](frontend/script.js#L449-L451) `buildReasonCard` 함수 안
+
+```js
+      <div class="rc-chart"><canvas id="rcRadar"></canvas></div>
+      <div class="rc-rows">${rowsHtml}</div>
+      <div class="rc-rows">${rowsHtml}</div>
 ```
 
-**2) `frontend/style.css` — 검색창 클릭 되살리기**
+`rowsHtml`은 `rows.map(...).join("")`로 **녹지·안전·교통·상권·의료·교육·문화 7개
+지표의 점(●●●○○) 줄**을 만든 결과인데, 그 결과를 담는 `<div class="rc-rows">`가
+줄만 바뀌어 그대로 두 번 나온다. `style.css`를 확인해 보면 `.rc-rows`(복수형, 감싸는
+상자)에는 애초에 스타일 규칙 자체가 없고, 실제 grid 배치는 그 안의 각 줄인
+`.rc-row`(단수형)에 걸려 있다([style.css:631](frontend/style.css#L631)) — 그래서 이
+중복은 CSS로 가려지지 않고 그대로 "7개 지표 줄이 위아래로 두 벌, 총 14줄" 나오는
+형태로 화면에 보인다.
 
-`===== 상단 검색창 =====` 아래에 있는 `.top-search` 규칙에 `pointer-events: auto;`
-한 줄을 추가하세요. `.disclaimer`에 이미 같은 이유로 붙어있는 처리와 동일합니다.
+사용자가 겪고 계신 "핀 클릭 모달 오류"의 눈에 보이는 정체가 바로 이것일 가능성이
+높습니다 — 같은 지표 목록이 카드 안에서 두 번 반복되는 것이 이상하게 느껴졌을
+것입니다. 그리고 이 중복은 3번 항목("정보 과다로 인한 피로감")의 원인 중 하나이기도
+합니다 — 정리하는 김에 여기서 같이 없애는 게 자연스럽습니다.
+
+**고치는 방향**: 아래 두 줄 중 하나를 지운다.
+
+```js
+      <div class="rc-chart"><canvas id="rcRadar"></canvas></div>
+      <div class="rc-rows">${rowsHtml}</div>
+```
+
+> 다만 3번 항목에서 이 `rc-rows` 자체를 탭 안으로 옮기는 리팩터를 같이 하게 되므로,
+> 실제로는 이 줄을 지우는 작업과 3번의 탭 구조 변경을 한 번에 처리하는 편이 두 번
+> 손대는 것보다 편할 수 있습니다.
+
+### 2. "이 동네를 고른 이유"(LLM 응답) 박스를 스파이더 웹 아래로 이동
+
+지금 `buildReasonCard`가 만드는 카드 내부 순서는 위에서 아래로 이렇다
+([script.js:437-463](frontend/script.js#L437-L463)):
+
+1. `rc-eyebrow` — "N순위 추천 지역" 작은 글씨
+2. `rc-head` — 동네 이름 + MATCH 점수
+3. `rc-reason` — 한 줄 요약 문장(헤드라인 + 보조 설명)
+4. `rc-chart` — **스파이더 웹(레이더 차트)**
+5. `rc-rows` × 2 (버그 B) — 지표 5점 점수줄
+6. `rc-facility` (`id="rcFacility"`, 비동기) — "이 동네에 있는 것" / "생활 여건"
+7. `rc-llm` (`id="rcLlm"`, 비동기) — **"💬 이 동네를 고른 이유"** ← 지금 여기, 맨 아래 근처
+8. `rc-source` — 출처 문구
+
+즉 지금은 LLM 응답 박스가 시설 정보(6번)보다도 아래, 카드에서 거의 마지막에
+나옵니다. 요청하신 대로 하려면 7번을 4번 바로 다음으로 옮기면 됩니다.
+
+**바뀔 순서**: `rc-chart`(스파이더 웹) → `rc-llm`(이 동네를 고른 이유) → (3번에서
+만들 탭 영역) → `rc-source`
+
+이동 자체는 위험한 작업이 아닙니다. `loadRegionExplain` 함수는 위치와 상관없이
+`document.getElementById("rcLlm")`으로 그 상자를 **찾아서** 내용을 채워 넣는 방식이라,
+그 상자가 템플릿 문자열의 몇 번째 줄에 있는지는 함수 동작에 전혀 영향을 주지 않습니다.
+즉 `buildReasonCard`의 return 문 안에서 `<div class="rc-llm" id="rcLlm"></div>` 한
+덩어리를 오려서 `rc-chart` 바로 다음 줄에 붙여넣기만 하면 됩니다. 다른 함수는 손댈
+필요가 없습니다.
 
 지금:
+```js
+      <div class="rc-chart"><canvas id="rcRadar"></canvas></div>
+      <div class="rc-rows">${rowsHtml}</div>
+
+      <!-- 시설 정보가 비동기로 채워지는 자리 -->
+      <div class="rc-facility" id="rcFacility">
+        <div class="rc-loading">이 동네를 살펴보는 중...</div>
+      </div>
+
+      <!-- LLM 설명이 채워지는 자리. 시설보다 오래 걸린다 -->
+      <div class="rc-llm" id="rcLlm"></div>
+
+      <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
+```
+
+이렇게 바꾸세요 (3번의 탭 영역까지 함께 넣은 최종 형태입니다):
+```js
+      <div class="rc-chart"><canvas id="rcRadar"></canvas></div>
+
+      <!-- LLM 설명이 채워지는 자리. 스파이더 웹 바로 아래로 이동 -->
+      <div class="rc-llm" id="rcLlm"></div>
+
+      <!-- 3번 항목: 탭 UI. rc-rows / rc-facility 는 각 탭 패널 안으로 이동 -->
+      <div class="rc-tabs">
+        ...(아래 3번 항목 참고)...
+      </div>
+
+      <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
+```
+
+`rc-llm:empty { border-top: none; margin: 0; padding: 0; }` 규칙이
+[style.css:736](frontend/style.css#L736)에 이미 있어서, LLM 설명이 아직 안 왔거나
+실패해서 빈 상태일 때는 위쪽 구분선(border-top)이 저절로 사라지도록 짜여 있습니다.
+위치를 옮겨도 이 동작은 그대로 유지되니 별도로 손볼 필요는 없습니다.
+
+### 3. LLM 응답 박스 아래에 탭 추가 (정보 과다 완화)
+
+**탭 UI란**: 여러 묶음의 정보를 한 화면에 전부 펼쳐 놓는 대신, 위쪽에 버튼(탭 머리글)을
+몇 개 두고 그중 하나를 눌렀을 때 그 버튼에 해당하는 내용만 보여주고 나머지는 숨겨두는
+방식입니다. 별도 라이브러리 없이 HTML/CSS/JS만으로 만들 수 있는 가장 단순한 형태는:
+- 모든 탭의 내용(panel)을 HTML에는 전부 넣어 두되, CSS로 `display: none`(안 보이는
+  탭)과 `display: block`(보이는 탭)만 클래스로 토글한다.
+- 탭 버튼을 클릭하면 JS가 "지금 선택된 버튼"과 "지금 보여줄 패널"에만
+  `is-active` 클래스를 붙이고, 나머지에서는 뗀다.
+
+요청하신 4개 탭과 기존 코드의 대응 관계:
+
+| 탭 | 내용 | 기존 코드에서 가져올 것 |
+|---|---|---|
+| 인디케이터 5점 점수표 | 지표 7개 × 5점 dot | `rc-rows` (`buildRows`가 만든 `rowsHtml`) — 버그 B에서 지운 나머지 한 벌 |
+| 이 동네에 있는 것 / 생활 여건 | 시설 개수·이름, 거주안정성 등 | `rc-facility`(`id="rcFacility"`) — `loadFacilities`가 채워주는 그대로 |
+| 주변 시세 | (추가 예정) | 아직 데이터 소스가 없음 — 우선 "준비 중" 안내만 |
+| 로드뷰 | (구현 예정) | 새로 작성 필요 — 아래에 설계안 |
+
+#### 3-1. HTML — `buildReasonCard`의 return 템플릿에 추가할 부분
+
+```js
+      <div class="rc-tabs">
+        <div class="rc-tab-heads">
+          <button class="rc-tab-head is-active" data-tab="score">5점 점수표</button>
+          <button class="rc-tab-head" data-tab="living">생활 여건</button>
+          <button class="rc-tab-head" data-tab="price">주변 시세</button>
+          <button class="rc-tab-head" data-tab="roadview">로드뷰</button>
+        </div>
+
+        <div class="rc-tab-panel is-active" data-tab-panel="score">
+          <div class="rc-rows">${rowsHtml}</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="living" id="rcFacility">
+          <div class="rc-loading">이 동네를 살펴보는 중...</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="price">
+          <div class="rc-empty">준비 중입니다.</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="roadview">
+          <div id="rcRoadview" class="rc-roadview"></div>
+        </div>
+      </div>
+```
+
+주의할 점 하나 — `id="rcFacility"`는 그대로 유지해야 합니다. `loadFacilities` 함수가
+여전히 `document.getElementById("rcFacility")`로 이 상자를 찾아서 채우기 때문에,
+클래스를 `rc-facility`에서 `rc-tab-panel`로 바꾸더라도 `id`만은 그대로 둬야 기존
+비동기 채우기 로직을 건드리지 않아도 됩니다.
+
+#### 3-2. CSS — `style.css`에 새로 추가할 규칙
+
 ```css
-.top-search {
+.rc-tab-heads {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px 7px 16px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  gap: 4px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rc-tab-head {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rc-tab-head.is-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.rc-tab-panel { display: none; padding-top: 14px; }
+.rc-tab-panel.is-active { display: block; }
+
+.rc-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 20px 0; }
+
+.rc-roadview {
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
 }
 ```
 
-이렇게 바꾸세요:
-```css
-.top-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px 7px 16px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  pointer-events: auto;      /* header가 클릭을 막아버려서, 검색창만 다시 클릭되게 되살림 */
+기존 `.rc-facility`, `.rc-loading`, `.rc-fac-head` 등의 스타일은 그대로 둬도 됩니다 —
+`rc-facility` 클래스 자체를 지우지 않고 `rc-tab-panel`을 추가로 덧붙이는 방식이면 두
+스타일이 함께 적용되어 지금과 같은 여백/글자 크기가 유지됩니다.
+
+#### 3-3. JS — 탭 전환 로직 + 로드뷰(구현 예정)
+
+탭 버튼 클릭에 반응하는 함수를 하나 추가하고, `openReasonModal` 끝에서 호출합니다.
+
+```js
+/** 탭 버튼 클릭에 맞춰 패널을 바꿔 보여준다 */
+function bindReasonTabs(el, item) {
+  el.querySelectorAll(".rc-tab-head").forEach((head) => {
+    head.addEventListener("click", () => {
+      const name = head.dataset.tab;
+
+      el.querySelectorAll(".rc-tab-head")
+        .forEach((h) => h.classList.toggle("is-active", h === head));
+      el.querySelectorAll(".rc-tab-panel")
+        .forEach((p) => p.classList.toggle("is-active", p.dataset.tabPanel === name));
+
+      if (name === "roadview") initRoadview(item);
+    });
+  });
 }
 ```
 
-두 가지를 다 적용하면: (a) 좌우 패널이 다시 header 밖으로 나와 원래대로 자유롭게
-클릭되고, (b) 검색창 자체도 클릭·입력이 가능해집니다. 이 상태로 첫 화면에서 검색 →
-메인 화면 전환 → 상단 검색창에 문구 표시 → 그 검색창에서 재검색까지 순서대로 다시
-테스트해 보세요.
-
-### 참고: 급하진 않지만 남겨진 것
-
-`style.css`에 `.top-search-wrap`이라는 규칙(화면 중앙에 알약 모양으로 고정시키려던 것으로
-보임, `position: fixed; left: 50%; ...`)이 있는데, `index.html`에는 이 클래스를 쓰는
-요소가 없습니다. 그래서 이 스타일은 지금 아무 데도 적용되지 않는 죽은 CSS이고, 검색창은
-그냥 header 안 문단처럼 자연스럽게 흘러가는 위치에 놓여 있습니다. 위 두 가지를 고친
-뒤에도 위치가 마음에 안 들면(화면 중앙 위쪽에 알약 모양으로 떠 있게 하고 싶다면),
-`<div class="top-search">`를 `<div class="top-search-wrap"><div class="top-search">...</div></div>`
-처럼 한 겹 더 감싸면 원래 의도한 모양이 나올 것으로 보입니다. 다만 이건 미관 문제라
-당장 급한 건 아닙니다.
-
-## 후속 확인: 위 두 수정을 적용한 뒤 (2026-08-27)
-
-위 두 가지(`</div>` 추가, `pointer-events: auto` 추가)를 실제로 파일에 적용하신 걸
-`git diff`로 확인했습니다. 그런데 그 이후에 "엔터로 검색 안 됨 / 클릭해도 안 됨 /
-검색어가 검색창에 안 보임 / 채팅창 확인 불가"가 다시 보고되어서, 이번엔 코드만 읽지
-않고 **실제로 브라우저를 띄워서** 재현을 시도해봤습니다 (Chrome을 headless 모드로 실행해서
-`searchInput`에 문구를 입력 → 클릭/엔터 → 결과 확인, 이 과정을 그대로 자동화했습니다).
-
-결과: 지금 저장된 코드로는 아래 4가지가 **전부 정상 동작**하는 것을 확인했습니다.
-
-- 첫 화면 검색창에서 클릭으로 검색 → 정상 (결과 문구 "OO · OO 조건으로 찾았어요" 출력됨)
-- 첫 화면 검색창에서 Enter로 검색 → 정상
-- 메인 화면 상단 검색창에서 클릭/Enter로 재검색 → 둘 다 정상
-- 검색 후 메인 화면 상단 검색창에 검색어가 정확히 채워짐
-- 검색 후 채팅창에 내가 검색한 문구 + AI의 요약 답변이 자동으로 추가됨
-
-즉 **지금 파일 안의 코드 자체에는 이 4가지를 막는 버그가 없습니다.** 그런데도 화면에서
-안 되는 것처럼 보인다면, 가장 유력한 원인은 코드 문제가 아니라 **브라우저가 예전 화면을
-그대로 붙들고 있는 것(캐시)**입니다. 특히 이렇게 재현되기 쉽습니다:
-
-- 코드를 고치기 전부터 브라우저 탭을 계속 켜놓고 테스트했다 → 그 탭은 새로고침을 하기
-  전까지 예전 `search.js`/`style.css`를 메모리에 그대로 들고 있습니다. 파일을 고쳐도
-  서버는 다시 켤 필요가 없지만(정적 파일은 요청마다 디스크에서 새로 읽으므로), **브라우저
-  탭은 직접 새로고침을 해줘야** 새 파일을 받아옵니다.
-
-### 확인해 주세요
-
-1. 지금 테스트 중인 브라우저 탭에서 **Ctrl+Shift+R** (또는 Ctrl+F5)로 강력 새로고침을
-   한 번 해보세요. 일반 새로고침(F5)보다 캐시를 더 확실히 무시합니다.
-2. 그래도 안 되면, 아예 새 시크릿 창(Ctrl+Shift+N)에서 `http://127.0.0.1:5000`을 열어
-   캐시가 전혀 없는 상태로 다시 테스트해 주세요.
-3. 그래도 같은 증상이 재현되면, F12 → Console 탭을 연 채로 검색을 시도해서 빨간 글씨로
-   뜨는 에러 메시지를 그대로 알려주세요. 지금까지는 코드 읽기 + 자동화 테스트로는 에러가
-   전혀 재현되지 않아서, 실제 에러 메시지가 있어야 다음 진단이 가능합니다.
-
-## 채팅 기록이 검색할 때마다 사라지는 문제 (2026-08-27)
-
-### 증상
-
-검색(첫 화면 검색 또는 상단 재검색)을 하거나, 슬라이더를 조절하고 "AI 분석 실행"을
-누를 때마다 채팅창의 대화 내용이 이전 것은 지워지고 새 내용으로 교체됩니다. 원하는
-동작은 이전 대화 아래에 새 대화가 이어서 쌓이는(누적되는) 것입니다.
-
-### 원인
-
-`frontend/script.js`의 `initChatWithResult(data)` 함수(585번째 줄 부근)를 보면,
-검색 결과가 나올 때마다 채팅창 내용을 지우는 코드가 있습니다.
+`openReasonModal` 안에서는 `buildReasonCard`로 채운 직후에 한 번 불러주면 됩니다.
 
 ```js
-function initChatWithResult(data) {
-  const body = document.getElementById("chatBody");
-  if (!body) return;
+function openReasonModal(item, weights) {
+  const el = ensureModal();
+  el.querySelector(".reason-body").innerHTML = buildReasonCard(item, weights);
+  el.classList.add("is-open");
+  document.body.style.overflow = "hidden";
+  el.querySelector(".reason-close").focus();
 
-  body.innerHTML = "";     // 이전 검색의 대화를 지운다
-  ...
+  bindReasonTabs(el, item);     // 추가: 탭 클릭 이벤트 연결
+
+  drawRadar(buildRows(item, weights));
+  loadFacilities(item.name);
+  loadRegionExplain(item, weights);
+}
 ```
 
-`body.innerHTML = "";`가 바로 그 줄입니다. 이 함수는 `renderResult(data)` 안에서
-호출되는데, `renderResult`는 검색으로 얻은 결과든 슬라이더로 얻은 결과든 **모든 새
-결과가 나올 때마다** 똑같이 호출됩니다(86번째 줄 `renderResult` 함수 참고: "검색과
-슬라이더 둘 다 이 함수만 부른다"). 그래서 결과가 나올 때마다 채팅창이 통째로
-비워지고 새로 채워지는 것입니다. 주석에 적힌 "이전 검색의 대화를 지운다"는 문구를
-보면, 이건 버그가 아니라 처음엔 의도한 동작이었던 것으로 보입니다 — 다만 지금은
-그 동작을 원치 않는 상황입니다.
+**로드뷰(카카오 API)는 아직 구현되어 있지 않으므로, 아래는 코드가 아니라 설계
+스케치입니다.** `frontend/index.html:14`에서 이미 `libraries=services`를 붙여
+카카오 지도 SDK를 불러오고 있는데, 로드뷰 자체는 이 `services` 라이브러리에 포함돼
+있어서 **스크립트 태그를 더 추가할 필요는 없습니다.** 필요한 건 좌표로 가장 가까운
+파노라마 사진을 찾아주는 `kakao.maps.RoadviewClient`와, 그걸 그려줄
+`kakao.maps.Roadview` 두 가지입니다. `item.lat`/`item.lng`는
+[script.js:161-162](frontend/script.js#L161-L162)에서 보듯 이미 마커를 찍을 때 쓰는
+값이라 그대로 재사용할 수 있습니다.
 
-### 고치기
-
-`frontend/script.js` — `body.innerHTML = "";` 한 줄만 지우면 됩니다. 나머지 코드는
-`appendChild`/`addChatMsg`로 이미 "맨 아래에 덧붙이는" 방식으로 짜여 있어서, 지우는
-줄만 없애면 자동으로 누적됩니다.
-
-지금:
 ```js
-function initChatWithResult(data) {
-  const body = document.getElementById("chatBody");
-  if (!body) return;
+// 모달을 새로 열 때마다 buildReasonCard()가 #rcRoadview 를 완전히 새로 만들기 때문에,
+// 이전 모달에서 만든 Roadview 인스턴스는 더 이상 쓸 수 있는 DOM에 붙어있지 않다.
+// radarChart 를 매번 destroy() 하고 새로 만드는 것과 같은 이유로,
+// 여기서도 모달을 닫을 때 인스턴스를 반드시 null 로 되돌려야 한다.
+let roadviewInstance = null;
 
-  body.innerHTML = "";     // 이전 검색의 대화를 지운다
+function initRoadview(item) {
+  if (roadviewInstance) return;      // 이미 이번 모달에서 초기화했다면 다시 안 함
 
-  if (data.query) {
+  const container = document.getElementById("rcRoadview");
+  if (!container || typeof kakao === "undefined") return;
+
+  const position = new kakao.maps.LatLng(item.lat, item.lng);
+  const client = new kakao.maps.RoadviewClient();
+
+  // 반경 50m 안에서 가장 가까운 로드뷰 파노라마를 찾는다
+  client.getNearestPanoId(position, 50, (panoId) => {
+    if (!panoId) {
+      container.innerHTML = "<div class='rc-empty'>이 위치는 로드뷰를 지원하지 않아요.</div>";
+      return;
+    }
+    roadviewInstance = new kakao.maps.Roadview(container);
+    roadviewInstance.setPanoId(panoId, position);
+  });
+}
 ```
 
-이렇게 바꾸세요:
+그리고 `closeReasonModal`에 한 줄을 더해서, 모달을 닫을 때 `roadviewInstance`를
+비워야 합니다 — 그래야 **다른 동네** 핀을 클릭해서 모달을 다시 열었을 때
+`initRoadview`가 "이미 초기화했다"고 착각해서 아무 것도 안 하는 상태를 막을 수
+있습니다.
+
 ```js
-function initChatWithResult(data) {
-  const body = document.getElementById("chatBody");
-  if (!body) return;
-
-  if (data.query) {
+function closeReasonModal() {
+  if (!modalEl) return;
+  modalEl.classList.remove("is-open");
+  document.body.style.overflow = "";
+  roadviewInstance = null;      // 추가: 다음 모달에서 다시 초기화되도록
+}
 ```
 
-이렇게 바꾸면: 검색할 때마다 대화창 맨 아래에 "이번에 검색한 문구 → AI 요약 →
-궁금한 점을 물어보세요" 순서로 계속 이어 붙습니다. 다만 그렇게 되면 어디서부터
-새 검색인지 구분이 잘 안 될 수 있는데, 원하시면 새 검색이 시작될 때마다 구분선(예:
-"───── 새 검색 ─────" 같은 짧은 문구)을 하나 추가로 넣는 방법도 있습니다 — 필요하면
-말씀해 주세요, 그 부분도 정리해서 적어드리겠습니다.
+로드뷰를 탭을 누르기 전(즉 화면에 아직 안 보이는 `display: none` 상태)에 미리
+만들려고 하면 컨테이너 크기가 0이라서 지도가 깨진 채로 초기화되는 문제가 흔히
+생깁니다. 그래서 `initRoadview`를 모달이 열릴 때 바로 부르지 않고, **로드뷰 탭을
+실제로 클릭한 시점**(`bindReasonTabs` 안의 `if (name === "roadview")`)에만 부르도록
+설계했습니다 — 이런 걸 "지연 초기화(lazy initialization)"라고 부릅니다.
+
+주변 시세 탭은 아직 데이터를 어디서 가져올지 정해지지 않았으므로, 우선 "준비
+중입니다" 문구만 두고 데이터 소스가 정해지면 `loadFacilities`와 비슷한 형태의 비동기
+함수(`loadNearbyPrice(item)` 같은)를 추가해서 `data-tab-panel="price"` 안을 채우면
+됩니다.

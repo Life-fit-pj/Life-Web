@@ -291,8 +291,13 @@ function openReasonModal(item, weights) {
   document.body.style.overflow = "hidden";     // 뒤 화면 스크롤 잠금
   el.querySelector(".reason-close").focus();
 
+  bindReasonTabs(el, item);
+
+  // 카드가 화면에 붙은 뒤에 그려야 canvas 크기가 잡힌다
+  drawRadar(buildRows(item, weights));
+
   // 막대는 이미 있는 데이터로 즉시 보여 주고,
-  // 시설 정보만 나중에 채운다. 기다리는 동안에도 읽을 것이 있게 한다
+  // 시설 정보/LLM 설명은 서버 응답이 오는 대로 나중에 채운다
   loadFacilities(item.name);
   loadRegionExplain(item, weights);
 }
@@ -376,17 +381,57 @@ function closeReasonModal() {
   if (!modalEl) return;
   modalEl.classList.remove("is-open");
   document.body.style.overflow = "";
+  roadviewInstance = null;     // 다음에 열릴 모달에서 로드뷰가 다시 초기화되도록
+}
+
+/** 탭 버튼 클릭에 맞춰 패널을 바꿔 보여준다 */
+function bindReasonTabs(el, item) {
+  el.querySelectorAll(".rc-tab-head").forEach((head) => {
+    head.addEventListener("click", () => {
+      const name = head.dataset.tab;
+
+      el.querySelectorAll(".rc-tab-head")
+        .forEach((h) => h.classList.toggle("is-active", h === head));
+      el.querySelectorAll(".rc-tab-panel")
+        .forEach((p) => p.classList.toggle("is-active", p.dataset.tabPanel === name));
+
+      if (name === "roadview") initRoadview(item);
+    });
+  });
+}
+
+// 모달을 새로 열 때마다 buildReasonCard()가 #rcRoadview 를 완전히 새로 만들기 때문에,
+// 이전 모달에서 만든 Roadview 인스턴스는 더 이상 쓸 수 있는 DOM에 붙어있지 않다.
+// closeReasonModal()에서 null 로 되돌려야 다음 모달에서 다시 초기화된다
+let roadviewInstance = null;
+
+/** 로드뷰 탭을 처음 열 때만 실행된다(지연 초기화) — 숨겨진 상태에서 만들면 지도가 깨진다 */
+function initRoadview(item) {
+  if (roadviewInstance) return;
+
+  const container = document.getElementById("rcRoadview");
+  if (!container || typeof kakao === "undefined") return;
+
+  const position = new kakao.maps.LatLng(item.lat, item.lng);
+  const client = new kakao.maps.RoadviewClient();
+
+  // 반경 50m 안에서 가장 가까운 로드뷰 파노라마를 찾는다
+  client.getNearestPanoId(position, 50, (panoId) => {
+    if (!panoId) {
+      container.innerHTML = "<div class='rc-empty'>이 위치는 로드뷰를 지원하지 않아요.</div>";
+      return;
+    }
+    roadviewInstance = new kakao.maps.Roadview(container);
+    roadviewInstance.setPanoId(panoId, position);
+  });
 }
 
 // 카드내용
 
-function buildReasonCard(item, weights) {
-  const rows = CRITERIA.map((key) => {
-    // 사용자가 원한 수준 (1~5)
+/** 지표별 판단을 계산한다. 카드와 레이더 차트가 같은 값을 쓴다 */
+function buildRows(item, weights) {
+  return CRITERIA.map((key) => {
     const want = Math.round(weights?.[key] ?? 3);
-
-    // 동네의 실제 수준. 서버는 백분위(0~100)를 주므로 5단계로 바꾼다.
-    //   0~20 → 1점, 81~100 → 5점
     const pct = item.scores?.[key] ?? 50;
     const got = Math.max(1, Math.min(5, Math.ceil(pct / 20)));
 
@@ -400,13 +445,15 @@ function buildReasonCard(item, weights) {
       .map((n) => `<i class="${n <= got ? "on" : ""}"></i>`)
       .join("");
 
-    // 상위 30% 안에 들 때만 표시한다.
-    // 58점을 "상위 42%" 라고 하면 실제보다 좋아 보인다
     const pctText = pct >= 70 ? `상위 ${100 - Math.round(pct)}%` : "";
 
     return { key, want, got, pct, gap, state, word, dots, pctText };
   });
+}
 
+function buildReasonCard(item, weights) {
+  const rows = buildRows(item, weights);
+  
   const short = rows.filter((r) => r.gap < 0);
   // 기대보다 얼마나 넉넉한지를 먼저 보고, 같으면 중요하게 본 순
   const strong = rows
@@ -440,21 +487,123 @@ function buildReasonCard(item, weights) {
         <div class="rc-headline">${headline}</div>
         ${sub ? `<div class="rc-sub">${sub}</div>` : ""}
       </div>
-      <div class="rc-rows">${rowsHtml}</div>
 
-      <!-- 시설 정보가 비동기로 채워지는 자리 -->
-      <div class="rc-facility" id="rcFacility">
-        <div class="rc-loading">이 동네를 살펴보는 중...</div>
-      </div>
+      <div class="rc-chart"><canvas id="rcRadar"></canvas></div>
 
       <!-- LLM 설명이 채워지는 자리. 시설보다 오래 걸린다 -->
       <div class="rc-llm" id="rcLlm"></div>
+
+      <div class="rc-tabs">
+        <div class="rc-tab-heads">
+          <button class="rc-tab-head is-active" data-tab="score">5점 점수표</button>
+          <button class="rc-tab-head" data-tab="living">생활 여건</button>
+          <button class="rc-tab-head" data-tab="price">주변 시세</button>
+          <button class="rc-tab-head" data-tab="roadview">로드뷰</button>
+        </div>
+
+        <div class="rc-tab-panel is-active" data-tab-panel="score">
+          <div class="rc-rows">${rowsHtml}</div>
+        </div>
+
+        <!-- 시설 정보가 비동기로 채워지는 자리. id 는 loadFacilities()가 그대로 찾아 쓴다 -->
+        <div class="rc-tab-panel" data-tab-panel="living" id="rcFacility">
+          <div class="rc-loading">이 동네를 살펴보는 중...</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="price">
+          <div class="rc-empty">준비 중입니다.</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="roadview">
+          <div id="rcRoadview" class="rc-roadview"></div>
+        </div>
+      </div>
 
       <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
 
     </div>`;
 }
 
+// Chart.js 는 같은 canvas 에 두 번 그리면 겹친다.
+// 이전 차트를 부수고 새로 그리려고 인스턴스를 들고 있는다
+let radarChart = null;
+
+/** 추천 사유 카드에 레이더 차트를 그린다.
+ *
+ * 두 겹으로 겹쳐 그린다 —
+ * 안쪽은 사용자가 원한 수준, 바깥은 이 동네의 실제 수준.
+ * 바깥이 안쪽을 감싸면 조건을 충족한 것이 한눈에 보인다
+ */
+function drawRadar(rows) {
+  const canvas = document.getElementById("rcRadar");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  if (radarChart) radarChart.destroy();
+
+  // CSS 변수를 읽어 온다. 테마가 바뀌어도 차트 색이 따라간다
+  const css = getComputedStyle(document.documentElement);
+  const v = (name) => css.getPropertyValue(name).trim();
+
+  const accent = v("--accent");
+  const text = v("--text");
+  const muted = v("--text-muted");
+  const line = v("--line-strong");
+
+  radarChart = new Chart(canvas.getContext("2d"), {
+    type: "radar",
+    data: {
+      labels: rows.map((r) => r.key),
+      datasets: [
+        {
+          label: "이 동네",
+          data: rows.map((r) => r.got),
+          borderColor: accent,
+          backgroundColor: hexToRgba(accent, 0.18),
+          pointBackgroundColor: accent,
+          pointRadius: 3,
+          borderWidth: 2,
+        },
+        {
+          label: "원하신 수준",
+          data: rows.map((r) => r.want),
+          borderColor: muted,
+          backgroundColor: "transparent",
+          borderDash: [4, 4],       // 점선. 기준선이라는 느낌을 준다
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          min: 0,
+          max: 5,
+          angleLines: { color: line },
+          grid: { color: line },
+          pointLabels: { color: text, font: { size: 11.5, weight: "600" } },
+          ticks: { display: false, stepSize: 1 },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: { color: muted, boxWidth: 12, font: { size: 11 } },
+        },
+      },
+    },
+  });
+}
+
+
+/** #RRGGBB 를 rgba() 로 바꾼다. Chart.js 는 반투명 배경을 이 형태로 받는다 */
+function hexToRgba(hex, alpha) {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return hex;      // rgba() 등 다른 형식이면 그대로
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 const FACILITY_EMOJI = {
   "문화시설": "🎨", "의료기관": "🏥", "학원": "📚",
