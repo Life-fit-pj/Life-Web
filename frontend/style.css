@@ -281,7 +281,6 @@ input[type=range]::-webkit-slider-thumb {
   cursor: pointer;
   border: 2px solid #ffffff;
   box-shadow: 0 0 0 1px var(--line-strong);
-  box-shadow: var(--glow);
   transition: transform 0.1s ease;
 }
 
@@ -294,7 +293,7 @@ input[type=range]::-moz-range-thumb {
   height: 12px;
   border-radius: 50%;
   background: var(--navy);
-  border: 2px solid #ffffff;
+  border: 2px solid var(--bg);
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
 }
@@ -311,7 +310,7 @@ input[type=range]::-moz-range-thumb {
   width: 100%;
   padding: 11px;
   background: var(--navy);
-  color: #ffffff;
+  color: var(--bg);;
   border: none;
   border-radius: 10px;
   font-size: 13px;
@@ -764,7 +763,7 @@ input[type=range]::-moz-range-thumb {
   border: 1px solid var(--line);
   border-radius: 50%;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
   font-size: 20px;
   cursor: pointer;
   box-shadow: var(--shadow);
@@ -863,7 +862,7 @@ input[type=range]::-moz-range-thumb {
 .chat-msg.user {
   align-self: flex-end;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
 }
 
 /* 답을 기다리는 중 */
@@ -903,7 +902,7 @@ input[type=range]::-moz-range-thumb {
   border: none;
   border-radius: 8px;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -939,7 +938,7 @@ input[type=range]::-moz-range-thumb {
   border: 1px solid var(--line);
   border-radius: 999px;
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: var(--blur);
   backdrop-filter: blur(8px);
   transition: border-color 0.2s, box-shadow 0.2s;
   pointer-events: auto; 
@@ -947,7 +946,7 @@ input[type=range]::-moz-range-thumb {
 
 /* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
 .top-search:focus-within {
-  border-color: var(--amber);
+  border-color: var(--shadow), var(--glow);
   box-shadow: 0 6px 24px rgba(201, 122, 43, 0.18);
 }
 
@@ -974,7 +973,7 @@ input[type=range]::-moz-range-thumb {
   border: none;
   border-radius: 999px;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
