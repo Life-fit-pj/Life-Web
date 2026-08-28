@@ -44,18 +44,6 @@
   --muted:        var(--text-muted);
 }
 
-/* ── 밤 : 모던 ──
-   운영체제가 어두운 모드면 자동 적용.
-   나중에 버튼을 달 때를 대비해 data-theme 도 함께 받는다 */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { }
-}
-
-:root[data-theme="dark"],
-:root:not([data-theme="light"]) {
-  /* 이 블록은 아래 @media 안에서만 값을 넣는다 (아래 참고) */
-}
-
 
 /* ── 밤 : 모던 ──
    시스템 설정 감지는 JS 가 하고, 여기서는 data-theme 만 본다.
@@ -88,25 +76,6 @@
   /* 카카오 기본 지도는 흰 배경이라 밤 화면에서 튄다.
      색을 반전하고 색상환을 180도 돌려 어두운 지도로 만든다 */
   --map-filter:   invert(95%) hue-rotate(180deg) brightness(115%) contrast(90%);
-}
-
-
-/* 버튼으로 직접 고를 때를 위한 자리 */
-:root[data-theme="dark"] {
-  --bg:           #182A57;
-  --surface:      rgba(45, 79, 143, 0.28);
-  --surface-2:    #21376B;
-  --line:         #2D4F8F;
-  --line-strong:  #3D63A8;
-  --text:         #F8F1D8;
-  --text-muted:   #A9B6D4;
-  --primary:      #2D4F8F;
-  --primary-soft: #3D63A8;
-  --accent:       #FFD24A;
-  --accent-fill:  #D1B15A;
-  --accent-soft:  rgba(255, 210, 74, 0.16);
-  --good:         #7ED6A5;
-  --shadow:       0 16px 34px rgba(0, 0, 0, 0.4);
 }
 
 
@@ -155,7 +124,7 @@ body {
   right: 0;
   z-index: 5;
   padding: 20px 26px 56px;
-  background: linear-gradient(180deg, rgba(247, 245, 239, 0.97) 0%, rgba(247, 245, 239, 0) 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
   pointer-events: none;
 }
 
@@ -191,7 +160,7 @@ h1 em {
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.93);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 12px;
@@ -283,8 +252,8 @@ select#bldgType {
   font-weight: 500;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
-  background: #ffffff;
-  color: var(--ink);
+  background: var(--surface-2);
+  color: var(--text);
   outline: none;
   cursor: pointer;
 }
@@ -435,7 +404,7 @@ input[type=range]::-moz-range-thumb {
 
 .list-item {
   padding: 12px 14px;
-  background: #ffffff;
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
@@ -495,7 +464,7 @@ input[type=range]::-moz-range-thumb {
   height: auto;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--surface-2);
 }
 
 .filename-text {
@@ -565,7 +534,8 @@ input[type=range]::-moz-range-thumb {
   width: min(460px, 92vw);
   max-height: 86vh;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface-2);
+  color: var(--text);
   border-radius: 18px;
   padding: 28px 26px 22px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
@@ -586,11 +556,11 @@ input[type=range]::-moz-range-thumb {
   background: none;
   font-size: 26px;
   line-height: 1;
-  color: #b0a496;
+  color: var(--muted);
   cursor: pointer;
 }
 
-.reason-close:hover { color: #6b5f52; }
+.reason-close:hover { color: var(--text); }
 
 
 /* ### 카드 머리 ### */
@@ -598,7 +568,7 @@ input[type=range]::-moz-range-thumb {
 .rc-eyebrow {
   font-size: 12px;
   letter-spacing: 0.08em;
-  color: #c8763a;
+  color: var(--amber);
   margin-bottom: 6px;
 }
 
@@ -619,14 +589,14 @@ input[type=range]::-moz-range-thumb {
 .rc-score {
   font-size: 26px;
   font-weight: 700;
-  color: #c8763a;
+  color: var(--amber);
 }
 
 .rc-score span {
   display: block;
   font-size: 10px;
   letter-spacing: 0.1em;
-  color: #b0a496;
+  color: var(--muted);
   text-align: right;
 }
 
@@ -634,7 +604,7 @@ input[type=range]::-moz-range-thumb {
 /* ### 사유 문장 ### */
 
 .rc-reason {
-  background: #faf7f2;
+  background: var(--card);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 18px;
@@ -643,18 +613,18 @@ input[type=range]::-moz-range-thumb {
 .rc-headline {
   font-size: 15px;
   font-weight: 600;
-  color: #2b2723;
+  color: var(--text);
   line-height: 1.5;
 }
 
 .rc-sub {
   margin-top: 6px;
   font-size: 13px;
-  color: #6b5f52;
+  color: var(--muted);
   line-height: 1.5;
 }
 
-.rc-sub b { color: #c8763a; }
+.rc-sub b { color: var(--amber); }
 
 
 /* ### 지표줄 ###*/
@@ -667,14 +637,14 @@ input[type=range]::-moz-range-thumb {
   align-items: center;
   gap: 10px;
   padding: 7px 0;
-  border-bottom: 1px solid #f0ebe4;
+  border-bottom: 1px solid var(--line);
 }
 
 .rc-row:last-child { border-bottom: none; }
 
 .rc-row-name {
   font-size: 13px;
-  color: #4a4038;
+  color: var(--text);
 }
 
 /* 점 5개 */
@@ -684,28 +654,28 @@ input[type=range]::-moz-range-thumb {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #e3dbd0;          /* 꺼진 점 */
+  background: var(--line);          /* 꺼진 점 */
 }
 
-.rc-dots.over  i.on { background: #4a9d6e; }
-.rc-dots.match i.on { background: #c8763a; }
-.rc-dots.under i.on { background: #b0a496; }
+.rc-dots.over  i.on { background: var(--good); }
+.rc-dots.match i.on { background: var(--amber); }
+.rc-dots.under i.on { background: var(--muted); }
 
 .rc-word { font-size: 12px; }
-.rc-word.over  { color: #4a9d6e; }
-.rc-word.match { color: #c8763a; }
-.rc-word.under { color: #a89b8c; }
+.rc-word.over  { color: var(--good); }
+.rc-word.match { color: var(--amber); }
+.rc-word.under { color: var(--muted); }
 
 .rc-pct {
   font-size: 11px;
-  color: #b0a496;
+  color: var(--muted);
   text-align: right;
 }
 
 .rc-source {
   margin-top: 16px;
   font-size: 11px;
-  color: #b0a496;
+  color: var(--muted);
   text-align: center;
 }
 
@@ -713,31 +683,31 @@ input[type=range]::-moz-range-thumb {
 .rc-facility {
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid #f0ebe4;
+  border-top: 1px solid var(--line);
 }
 
 .rc-loading {
   font-size: 12px;
-  color: #b0a496;
+  color: var(--muted);
 }
 
 .rc-fac-head {
   font-size: 12px;
   font-weight: 600;
-  color: #c8763a;
+  color: var(--amber);
   margin-bottom: 8px;
 }
 
 .rc-fac-summary {
   font-size: 13px;
-  color: #4a4038;
+  color: var(--text);
   line-height: 1.6;
 }
 
 .rc-fac-names {
   margin-top: 6px;
   font-size: 11.5px;
-  color: #8b7f72;
+  color: var(--muted);
   line-height: 1.5;
 }
 
@@ -754,14 +724,14 @@ input[type=range]::-moz-range-thumb {
   font-size: 12.5px;
 }
 
-.rc-extra-label { color: #4a4038; }
-.rc-extra-value { color: #2b2723; font-weight: 600; }
-.rc-extra-note  { color: #a89b8c; font-size: 11.5px; }
+.rc-extra-label { color: var(--text); }
+.rc-extra-value { color: var(--text); font-weight: 600; }
+.rc-extra-note  { color: var(--muted); font-size: 11.5px; }
 
 .rc-llm {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid #f0ebe4;
+  border-top: 1px solid var(--line);
 }
 
 .rc-llm:empty {
@@ -773,10 +743,10 @@ input[type=range]::-moz-range-thumb {
 .rc-llm-body {
   font-size: 13px;
   line-height: 1.65;
-  color: #4a4038;
+  color: var(--text);
 }
 
-.rc-llm-body b { color: #2b2723; }
+.rc-llm-body b { color: var(--text); }
 
 
 /* ===== 채팅 패널 ===== */
@@ -842,7 +812,7 @@ input[type=range]::-moz-range-thumb {
   justify-content: space-between;
   padding: 16px 18px;
   border-bottom: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-2);
 }
 
 .chat-title {
@@ -884,9 +854,9 @@ input[type=range]::-moz-range-thumb {
 /* 답변은 왼쪽 */
 .chat-msg.bot {
   align-self: flex-start;
-  background: #fff;
+  background: var(--surface-2);     /* #fff → */
   border: 1px solid var(--line);
-  color: var(--ink);
+  color: var(--text);
 }
 
 /* 내 질문은 오른쪽 */
@@ -911,7 +881,7 @@ input[type=range]::-moz-range-thumb {
   gap: 8px;
   padding: 12px 14px;
   border-top: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-2);
 }
 
 #chatInput {
@@ -922,7 +892,8 @@ input[type=range]::-moz-range-thumb {
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  color: var(--ink);
+  background: var(--bg);            /* ← 추가 */
+  color: var(--text);
 }
 
 #chatInput:focus { border-color: var(--amber); }
@@ -964,7 +935,7 @@ input[type=range]::-moz-range-thumb {
   align-items: center;
   gap: 8px;
   padding: 7px 8px 7px 16px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 999px;
   box-shadow: var(--shadow);
@@ -994,7 +965,7 @@ input[type=range]::-moz-range-thumb {
   background: transparent;
   font-family: inherit;
   font-size: 13.5px;
-  color: var(--ink);
+  color: var(--text);
 }
 
 #topSearchBtn {
@@ -1030,4 +1001,13 @@ input[type=range]::-moz-range-thumb {
    그때는 우상단 🔍 버튼으로 검색 화면에 가면 된다 */
 @media (max-width: 1100px) {
   .top-search-wrap { display: none; }
+}
+
+/* 입력칸 안내 문구.
+   opacity 를 1 로 두는 이유 — 파이어폭스가 기본으로 흐리게 만든다 */
+#chatInput::placeholder,
+#topSearchInput::placeholder,
+#searchInput::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
 }
