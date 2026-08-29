@@ -22,6 +22,8 @@ from app.core.db import facilities, facility_counts, region_extras
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
 
+from .price import apply_budget
+
 print("✅ LLM 파이프라인 연결 성공!")
 
 
@@ -49,22 +51,26 @@ def to_korean_weights(user_prefs):
     return weights
 
 
-def get_regions(user_prefs):
-    """요청 하나로 (가중치, 추천 목록, 설명문) 을 만든다.
+# 예산 감점 뒤에도 5개를 채우려면 후보가 넉넉해야 한다.
+# 5개만 받아 오면 그 5개 안에서 순서만 바뀐다
+CANDIDATE_K = 25
 
-    두 입력을 모두 받는다.
-      · query 가 있으면  → LLM 이 검색어를 가중치로 바꾼다
-      · 없으면           → 슬라이더 값을 그대로 쓴다
-    어느 쪽이든 뒤 처리는 같으므로 분기를 여기서 끝낸다
-    """
+
+def get_regions(user_prefs):
     query = (user_prefs.get('query') or '').strip()
 
     if query:
-        result = search(query, top_k=5)
-        return result["weights"], result["regions"], result["explanation"]
+        result = search(query, top_k=CANDIDATE_K)
+        weights = result["weights"]
+        regions = result["regions"]
+        explanation = result["explanation"]
+    else:
+        weights = to_korean_weights(user_prefs)
+        regions = recommend_by_weights(weights, top_k=CANDIDATE_K)
+        explanation = ""
 
-    weights = to_korean_weights(user_prefs)
-    return weights, recommend_by_weights(weights, top_k=5), ""
+    regions = apply_budget(regions, user_prefs, top_k=5)
+    return weights, regions, explanation
 
 
 def get_facilities(gu, dong, limit=5):
