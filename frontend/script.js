@@ -57,7 +57,7 @@ async function runSimulation() {
 
   const seq = nextSeq();
   const payload = {
-    bldgType: document.getElementById('bldgType')?.value || "1",
+    bldgType: document.getElementById('bldgType')?.value || "아파트",
     area: document.getElementById('area')?.value || 59,
     builtYear: document.getElementById('builtYear')?.value || 2015,
     greenery: document.getElementById('greenery')?.value || 3,

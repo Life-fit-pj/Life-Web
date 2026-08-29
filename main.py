@@ -50,7 +50,7 @@ class PredictRequest(BaseModel):
 
     area: int = 59
     builtYear: int = 2015
-    bldgType: str = "1"
+    bldgType: str = "아파트"
 
 
 class RegionRequest(BaseModel):
