@@ -342,3 +342,46 @@ function ensureMenu() {
 `false`가 된 상태로 로그인 전 목록(회원가입/로그인)을 다시 그리고,
 `menuLogout.hidden = true`도 같이 실행되어 로그아웃 링크 자체도 사라집니다
 — 이게 "로그아웃 누르면 로그인/회원가입 화면으로 돌아간다"는 동작입니다.
+
+## 3. 메뉴 열릴 때 배경이 어두워지는 효과 없애기
+
+메뉴를 열면 화면 전체가 살짝 어두워지는 건 `.menu-backdrop`의 `background`
+값 때문입니다. `.menu-backdrop`은 메뉴 패널 뒤에서 화면 전체를 덮고 있는
+투명한 판인데(패널 바깥 아무 데나 클릭하면 닫히는 것도 이 판이 클릭을
+받아주기 때문입니다 — `ensureMenu()`의 `menuModalEl.addEventListener("click", ...)`
+부분), 그 판에 반투명 검정색(`rgba(0, 0, 0, 0.4)`)을 깔아 둔 게 어두워지는
+정체입니다. 이 값을 지우거나 완전히 투명하게 바꾸면, "바깥 클릭하면 닫힌다"는
+기능은 그대로 유지하면서 어두워지는 효과만 없앨 수 있습니다.
+
+`frontend/style.css`의 `.menu-backdrop`(원본):
+```css
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 9000;
+  display: none;
+}
+.menu-backdrop.is-open { display: block; }
+```
+
+수정:
+```css
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 9000;
+  display: none;
+}
+.menu-backdrop.is-open { display: block; }
+```
+
+`background: transparent;`로 바꾸는 이유: 아예 그 줄을 지워버려도 결과는
+똑같이 안 보이지만(원래 배경이 없는 것과 같음), `transparent`라고 명시해
+두면 나중에 이 코드를 다시 보는 사람(자기 자신 포함)이 "배경을 깜빡
+빠뜨린 게 아니라 일부러 안 깔았다"는 걸 바로 알 수 있습니다.
+
+이렇게 바꾸면 메뉴가 열려도 화면이 어두워지지 않고, 지도·결과 화면이
+패널 뒤로 그대로 다 보이는 상태에서 메뉴 패널(`.menu-panel`)만 오른쪽에
+뜨게 됩니다.
