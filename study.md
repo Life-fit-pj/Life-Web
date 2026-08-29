@@ -61,8 +61,7 @@
 
 그래서 이 작업은 **프론트 전용으로 바로 가능한 부분**과 **백엔드·DB가 먼저
 필요한 부분**으로 나눠서 정리해 둡니다. 백엔드가 없어도 화면 흐름은 미리
-만들어서 눈으로 확인해 볼 수 있으니, 아래 "앞으로 할 일" 절에서 그 방법을
-정리합니다.
+만들어서 눈으로 확인해 볼 수 있으니, 아래 절에서 그 방법을 정리합니다.
 
 ## 2. 메뉴 항목별로 실제 필요한 백엔드 작업
 
@@ -105,35 +104,44 @@
 
 ---
 
-# 앞으로 할 일 — 로그인 메뉴 흐름 마무리 (2026-08-29)
+# 메뉴 항목을 <a>로 되돌리기 + 로그아웃 추가 (2026-08-29)
 
-메뉴 버튼(☰)과 메뉴 패널 자체는 이미 동작합니다(`frontend/menu.js`,
-`index.html`, `style.css`). 지금 메뉴 안의 "회원가입"/"로그인"과, 로그인 후
-목록의 다섯 항목은 전부 존재하지 않는 페이지(`signup.html`, `login.html`,
-`mypage.html` 등)를 가리키고 있어서 누르면 404가 납니다. 아래 세 가지를
-순서대로 고치면 됩니다. **아직 코드에는 적용하지 않았고, 이 study.md에만
-정리해 둔 계획입니다.**
+## 0. 지금까지 상황 정리
 
-## 1. "로그인" 버튼을 누르면 메뉴 목록이 그 자리에서 "로그인 후" 목록으로 바뀌게 하기
+- `comingSoonEl` 선언 누락 버그는 이미 고쳐졌습니다(`menu.js` 맨 위에
+  `let comingSoonEl = null;`이 들어가 있는 걸 확인했습니다) — 더 손댈 것 없음.
+- 반면 로그인 후 목록 4개 항목과 "로그인" 항목을 `<button>`으로 만들고
+  CSS로 버튼 기본 스타일을 지우는 방식은 **취소**합니다. `<a>`를 쓰면서
+  `e.preventDefault()`로 이동만 막으면 애초에 상자 스타일 문제 자체가 안
+  생기기 때문입니다. 아래 1번에서 다시 `<a>`로 되돌리는 방법을 정리합니다.
+- 여기에 더해, 로그인 후 메뉴에서 다시 로그인 전 상태로 돌아갈 수 있는
+  "로그아웃"을 관리자 링크 바로 위에 추가합니다(2번).
 
-실제 로그인 서버가 없으니, 지금은 "진짜 로그인"을 만들 수 없습니다. 대신
-개발 중에 로그인 후 화면이 잘 만들어졌는지 눈으로 확인할 수 있도록, 로그인
-버튼을 누르면 **로그인한 척**(가짜 토큰을 잠깐 저장)하고 메뉴 목록만 즉시
-바꿔서 보여주는 방법을 씁니다.
+## 1. `<button>` 대신 `<a href="#">` + `e.preventDefault()`
 
-이게 가능한 이유: `frontend/menu.js`의 `isLoggedIn()`은 서버에 물어보지
-않고, 그냥 브라우저에 `localStorage.getItem("lifefit-token")` 값이 있는지만
-봅니다(진짜 로그인 기능이 생기기 전까지 쓰기로 한 임시 버전이었죠). 그러니
-이 값을 아무 문자열로나 채워 넣기만 해도 `isLoggedIn()`은 "로그인
-했다"고 착각합니다.
+**왜 `<a>`로 되돌리는 게 더 간단한가**: `<button>`은 "페이지 이동이 없는
+동작"이라는 의미에 더 정확히 맞는 태그이지만, 그 대가로 브라우저가 자동으로
+입혀주는 회색 상자 스타일을 CSS로 일일이 지워야 합니다. `<a>`는 원래
+페이지 이동 태그이지만, 클릭 이벤트 핸들러 안에서 `e.preventDefault()`를
+불러주면 그 이동 동작만 막을 수 있습니다 — 즉 `<a>`를 쓰면서도 실제로는
+아무 데도 이동하지 않고 원하는 JS 함수만 실행되게 만들 수 있고, 브라우저가
+`<a>`에는 애초에 상자 모양 기본 스타일을 입히지 않으므로 CSS를 따로 지울
+필요도 없습니다. (스크린리더 같은 접근성 도구는 `<a>`와 `<button>`을 다르게
+안내하긴 하지만, 지금 단계에서는 화면을 빨리 확인하는 게 더 급하니 나중에
+실제 로그인 기능을 붙일 때 다시 검토해도 됩니다.)
 
 `frontend/menu.js`의 `renderMenuItems()` 안, 로그인 전 분기(원본):
 ```js
     if (!isLoggedIn()) {
         box.innerHTML = `
             <a class="menu-item" href="signup.html">회원가입</a>
-            <a class="menu-item" href="login.html">로그인</a>
+            <button class="menu-item" type="button" id="menuLogin">로그인</button>
         `;
+
+        document.getElementById("menuLogin").addEventListener("click", () => {
+            localStorage.setItem("lifefit-token", "dev-fake-token");
+            renderMenuItems();
+        });
         return;
     }
 ```
@@ -143,61 +151,23 @@
     if (!isLoggedIn()) {
         box.innerHTML = `
             <a class="menu-item" href="signup.html">회원가입</a>
-            <button class="menu-item" type="button" id="menuLogin">로그인</button>
+            <a class="menu-item" href="#" id="menuLogin">로그인</a>
         `;
 
-        document.getElementById("menuLogin").addEventListener("click", () => {
+        document.getElementById("menuLogin").addEventListener("click", (e) => {
+            // href="#" 때문에 브라우저가 페이지 맨 위로 이동하려는 걸 막는다
+            e.preventDefault();
             // TODO: 실제 로그인 API가 생기면 이 두 줄을 서버 호출로 바꾼다.
             // 지금은 로그인 후 화면을 미리 확인해 보기 위한 개발용 임시 로그인이다.
             localStorage.setItem("lifefit-token", "dev-fake-token");
             renderMenuItems();   // 패널을 닫지 않고 목록만 다시 그린다
         });
+        document.getElementById("menuLogout").hidden = true;   // 2번에서 추가
         return;
     }
 ```
 
-왜 `<a href="login.html">`이 아니라 `<button>`으로 바꾸는지: `<a href>`는
-클릭하면 그 주소로 페이지 이동을 "시도"하는 태그라서, 페이지가 없으면
-404가 뜹니다. 지금은 어디로도 이동하지 않고 "메뉴 목록만 바꿔치기"하면
-되므로, 페이지 이동이 없는 `<button>`이 맞습니다.
-
-왜 `renderMenuItems()`를 다시 부르기만 하면 되는지: 이 함수는 매번
-`document.getElementById("menuItems")`로 같은 상자를 찾아서 그 안의
-`innerHTML`을 새로 채웁니다. 메뉴 패널(`.menu-backdrop`) 자체를 닫았다 여는
-게 아니라, 그 안의 목록 부분만 다시 그리는 것이므로 사용자 눈에는 "같은
-패널 안에서 목록만 바뀌는" 것처럼 보입니다 — 이게 요청하신 "로그인 클릭 시
-메뉴창 리스트가 로그인 이후 메뉴창으로 전환"되는 동작입니다.
-
-> **참고 (선택 사항)**: 로그인 후 화면을 여러 번 반복해서 확인하려면
-> 다시 로그아웃 상태로 되돌릴 방법도 있으면 편합니다. 브라우저 개발자
-> 도구 콘솔에 `localStorage.removeItem("lifefit-token")`을 직접 쳐서
-> 초기화할 수도 있고, 원하시면 로그인 후 목록 맨 아래에 작은 "로그아웃
-> (테스트용)" 버튼을 하나 추가해서 `localStorage.removeItem(...)` 후
-> `renderMenuItems()`를 다시 부르게 만들 수도 있습니다. 이 부분은
-> 요청하신 4가지 항목에는 없어서 지금 코드로 적어두지 않았고, 필요하시면
-> 말씀해 주세요.
-
-## 2. 로그인 후 메뉴의 각 항목 — 클릭하면 "준비 중" 안내창이 뜨게 하기
-
-로그인 후 목록의 네 항목(마이페이지, 기록 저장소, 좋아요, 데이터 출처)은
-전부 `mypage.html`처럼 아직 만들지 않은 페이지를 가리키고 있어서 지금
-클릭하면 404가 뜹니다(관리자 페이지는 3번에서 따로 다룹니다). 아직 그
-페이지들을 만들 단계는 아니니, 당장은 클릭했을 때 "아직 준비 중이에요"
-라고 알려주는 공용 안내창 하나만 만들어 두고, 각 페이지가 실제로
-완성되는 대로 그 항목만 원래 `<a href="...">` 형태로 되돌리면 됩니다.
-
-`frontend/menu.js`의 `renderMenuItems()` 안, 로그인 후 분기(원본):
-```js
-    box.innerHTML = `
-        <a class="menu-item" href="mypage.html">마이페이지</a>
-        <a class="menu-item" href="history.html">검색 및 대화 기록 저장소</a>
-        <a class="menu-item" href="likes.html">좋아요 한 거주지</a>
-        <a class="menu-item" href="admin.html">관리자 페이지</a>
-        <a class="menu-item" href="about-data.html">원본 데이터 및 출처 안내</a>
-    `;
-```
-
-수정 (관리자 페이지 항목은 3번에서 패널 하단으로 옮기므로 여기서는 뺍니다):
+로그인 후 분기(원본):
 ```js
     box.innerHTML = `
         <button class="menu-item" type="button" data-feature="마이페이지">마이페이지</button>
@@ -210,113 +180,79 @@
     });
 ```
 
-`data-feature` 속성에 눈여겨볼 점: 버튼마다 이름이 다른데 클릭했을 때 뜨는
-안내 문구도 각각 달라야 하니, "이 버튼이 어떤 기능인지"를 `data-feature`라는
-HTML 속성에 적어두고, 클릭 이벤트 안에서 `btn.dataset.feature`로 그 값을
-다시 읽어와 안내창에 넘겨줍니다. 함수 하나(`openComingSoon`)를 항목 4개가
-공유해서 쓸 수 있는 이유가 이것입니다.
-
-`menu.js` 맨 아래에 새로 추가할 공용 안내창(이미 있는 `ensureMenu()`와 같은
-"한 번만 만들고 재사용하는" 패턴입니다):
+수정:
 ```js
-let comingSoonEl = null;
-
-// 아직 안 만든 화면으로 이동하려 할 때 보여주는 공용 안내창.
-// 페이지가 완성되면 그 항목의 버튼을 <a href="...html"> 로 되돌리고
-// 이 함수 호출은 지우면 된다
-function ensureComingSoon() {
-    if (comingSoonEl) return comingSoonEl;
-
-    comingSoonEl = document.createElement("div");
-    comingSoonEl.className = "coming-soon-backdrop";
-    comingSoonEl.innerHTML = `
-        <div class="coming-soon-panel">
-            <button class="coming-soon-close" aria-label="닫기">&times;</button>
-            <p id="comingSoonText"></p>
-        </div>
+    box.innerHTML = `
+        <a class="menu-item" href="#" data-feature="마이페이지">마이페이지</a>
+        <a class="menu-item" href="#" data-feature="검색 및 대화 기록 저장소">검색 및 대화 기록 저장소</a>
+        <a class="menu-item" href="#" data-feature="좋아요 한 거주지">좋아요 한 거주지</a>
+        <a class="menu-item" href="#" data-feature="원본 데이터 및 출처 안내">원본 데이터 및 출처 안내</a>
     `;
-    document.body.appendChild(comingSoonEl);
-
-    comingSoonEl.addEventListener("click", (e) => {
-        if (e.target === comingSoonEl) closeComingSoon();
+    box.querySelectorAll("a[data-feature]").forEach((link) => {
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            openComingSoon(link.dataset.feature);
+        });
     });
-    comingSoonEl.querySelector(".coming-soon-close").addEventListener("click", closeComingSoon);
-
-    return comingSoonEl;
-}
-
-function openComingSoon(featureName) {
-    const el = ensureComingSoon();
-    el.querySelector("#comingSoonText").textContent = `"${featureName}" 기능은 아직 준비 중이에요.`;
-    el.classList.add("is-open");
-}
-
-function closeComingSoon() {
-    if (!comingSoonEl) return;
-    comingSoonEl.classList.remove("is-open");
-}
+    document.getElementById("menuLogout").hidden = false;   // 2번에서 추가
 ```
 
-`style.css`에 추가할 스타일(`.menu-backdrop` 근처에 두면 메뉴 관련 스타일이
-한자리에 모입니다):
+`style.css`의 `.menu-item` 규칙은 이제 버튼 기본 스타일을 지울 필요가 없어져서
+원래 형태로 되돌려도 됩니다(지금 들어가 있는 `border: none`, `background: none`,
+`font: inherit` 같은 속성들은 `<a>`에는 원래 해당 사항이 없는 값이라 남겨둬도
+동작에 지장은 없지만, 정리하는 김에 단순하게 되돌립니다).
+
+원본(현재 style.css):
 ```css
-.coming-soon-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 9500;               /* 메뉴(.menu-backdrop, 9000)보다 위에 뜨도록 */
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-.coming-soon-backdrop.is-open { display: flex; }
-
-.coming-soon-panel {
-  position: relative;
-  width: min(320px, 90vw);
-  background: var(--surface-2);
-  border-radius: 16px;
-  padding: 28px 24px;
-  box-shadow: var(--shadow);
-  text-align: center;
-  font-size: 14px;
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 8px;
   color: var(--text);
-}
-
-.coming-soon-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
+  text-decoration: none;
   border: none;
-  font-size: 20px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 ```
 
-## 3. 관리자 페이지 전용 통로를 메뉴 패널 맨 아래에 작게 만들기
-
-관리자 페이지는 원래 "로그인만으로는 부족하고, 이 사람이 관리자인지까지
-확인해야 하는" 항목이라 일반 사용자 메뉴 목록에 나란히 두는 게 맞지
-않습니다(위 "2. 메뉴 항목별로 실제 필요한 백엔드 작업" 참고). 그런데 지금은
-`admin.html` 자체를 아직 만들지 않았고, 앞으로 그 화면을 만들면서 계속
-들어가 볼 통로가 필요합니다. 그래서 눈에 잘 띄는 목록 안이 아니라, 메뉴
-패널 맨 아래에 작은 글씨 링크 하나로 따로 둡니다 — "이건 일반 사용자용
-메뉴가 아니라 개발 중인 화면으로 가는 지름길"이라는 걸 크기로도 구분해
-두는 것입니다.
-
-`frontend/menu.js`의 `ensureMenu()` 안(원본):
-```js
-    menuModalEl.innerHTML = `
-        <nav class="menu-panel">
-            <button class="menu-close" aria-label="닫기">&times;</button>
-            <div class="menu-items" id="menuItems"></div>
-        </nav>
-    `;
+수정:
+```css
+.menu-item {
+  display: block;
+  padding: 12px 8px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
 ```
 
-수정:
+## 2. 로그아웃 — 관리자 링크 바로 위에 작게 추가
+
+로그인 상태를 벗어날 방법이 지금은 브라우저 개발자 도구를 여는 것뿐이라,
+누르면 로그인 전 화면(회원가입/로그인 목록)으로 바로 돌아가는 "로그아웃"
+링크를 만듭니다. 관리자 링크(`.menu-admin-link`)처럼 항상 패널에 존재하되,
+로그인 상태일 때만 보이게 합니다.
+
+**왜 로그인 전용 요소를 매번 새로 만들지 않고 "숨기기/보이기"로 처리하는가**:
+`menu-admin-link`처럼 `ensureMenu()`가 패널을 한 번 만들 때 로그아웃 링크도
+같이 만들어 두고, `renderMenuItems()`가 불릴 때마다 로그인 여부에 따라
+보였다 숨었다만 하면 됩니다. 이렇게 하면 클릭 이벤트도 `ensureMenu()`에서
+딱 한 번만 연결해 두면 되고(패널 자체가 싱글턴이니까), `renderMenuItems()`가
+매번 `innerHTML`을 새로 쓸 때 이벤트가 같이 사라지는 문제(1번 항목의 메뉴
+목록들이 왜 매번 이벤트를 다시 걸어야 했는지와 같은 이유)를 신경 쓰지
+않아도 됩니다.
+
+`frontend/menu.js`의 `ensureMenu()`(원본):
 ```js
+function ensureMenu() {
+    if (menuModalEl) return menuModalEl;
+    menuModalEl = document.createElement("div");
+    menuModalEl.className = "menu-backdrop";
     menuModalEl.innerHTML = `
         <nav class="menu-panel">
             <button class="menu-close" aria-label="닫기">&times;</button>
@@ -324,27 +260,85 @@ function closeComingSoon() {
             <a class="menu-admin-link" href="admin.html">관리자 페이지 (개발용)</a>
         </nav>
     `;
+    document.body.appendChild(menuModalEl);
+
+    // 배경 클릭하면 닫기
+    menuModalEl.addEventListener("click", (e) => {
+        if (e.target === menuModalEl) closeMenu();
+    });
+    menuModalEl.querySelector(".menu-close").addEventListener("click", closeMenu);
+
+    return menuModalEl;
+}
 ```
 
-`style.css`에 추가할 스타일:
+수정:
+```js
+function ensureMenu() {
+    if (menuModalEl) return menuModalEl;
+    menuModalEl = document.createElement("div");
+    menuModalEl.className = "menu-backdrop";
+    menuModalEl.innerHTML = `
+        <nav class="menu-panel">
+            <button class="menu-close" aria-label="닫기">&times;</button>
+            <div class="menu-items" id="menuItems"></div>
+            <a class="menu-logout-link" href="#" id="menuLogout" hidden>로그아웃</a>
+            <a class="menu-admin-link" href="admin.html">관리자 페이지 (개발용)</a>
+        </nav>
+    `;
+    document.body.appendChild(menuModalEl);
+
+    // 배경 클릭하면 닫기
+    menuModalEl.addEventListener("click", (e) => {
+        if (e.target === menuModalEl) closeMenu();
+    });
+    menuModalEl.querySelector(".menu-close").addEventListener("click", closeMenu);
+
+    // 로그아웃: 토큰을 지우고 목록을 다시 그린다 (로그인 전 화면으로 전환)
+    menuModalEl.querySelector("#menuLogout").addEventListener("click", (e) => {
+        e.preventDefault();
+        localStorage.removeItem("lifefit-token");
+        renderMenuItems();
+    });
+
+    return menuModalEl;
+}
+```
+
+`hidden`이라는 속성 설명: HTML 표준 속성으로, 붙어 있으면 브라우저가 그
+엘리먼트를 화면에서 안 보이게 처리합니다(`style="display:none"`과 거의
+같은 효과). JS에서는 `엘리먼트.hidden = true`나 `= false`로 간단히 켜고 끌
+수 있어서, 위 1번 코드에서 로그인 전 분기 끝에는
+`document.getElementById("menuLogout").hidden = true;`, 로그인 후 분기 끝에는
+`document.getElementById("menuLogout").hidden = false;`를 넣어 로그인
+상태가 바뀔 때마다 로그아웃 링크가 자동으로 나타나거나 사라지게 됩니다.
+
+`style.css`에 `.menu-admin-link` 규칙 바로 위(또는 아래)에 추가:
 ```css
-.menu-admin-link {
+.menu-logout-link {
   display: block;
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   text-align: center;
   text-decoration: none;
 }
-.menu-admin-link:hover { color: var(--text); }
+.menu-logout-link:hover { color: var(--text); }
+.menu-logout-link[hidden] { display: none; }
 ```
 
-`admin.html` 파일 자체는 아직 없으니 지금 눌러보면 404가 뜹니다 — 이건
-당연한 상태이고, 앞으로 그 파일을 만들면서 이 링크로 계속 들어가 확인하면
-됩니다. 로그인 여부와 상관없이 항상 이 링크가 보이는 이유도 같습니다:
-지금은 "일반 사용자에게 보여줄지 말지"를 정할 단계가 아니라 "화면을 만드는
-동안 개발자가 쉽게 들어갈 수 있어야 하는" 단계이기 때문입니다. 나중에
-실제로 로그인·관리자 권한 시스템이 생기면, 이 링크를 `isAdmin()` 체크로
-감싸서 관리자가 아니면 아예 안 보이게 바꾸면 됩니다.
+**`[hidden] { display: none; }` 줄이 왜 필요한가**: 브라우저는 원래
+`hidden` 속성이 붙은 엘리먼트를 자동으로 안 보이게 하지만, 그건 브라우저가
+기본으로 깔아 두는 아주 약한 우선순위의 스타일입니다. 우리가 만든
+`.menu-logout-link { display: block; }` 같은 스타일은 그보다 우선순위가
+높아서, `hidden` 속성만 믿고 있으면 오히려 `display: block`이 이겨서 숨겨야
+할 때도 계속 보이는 문제가 생길 수 있습니다. 그래서 `.menu-logout-link[hidden]`
+처럼 우리 클래스 이름에 `hidden`까지 같이 걸어서, 확실하게 `display: none`이
+이기도록 명시해 둡니다.
+
+로그아웃을 누르면 `renderMenuItems()`가 다시 불려서 `isLoggedIn()`이
+`false`가 된 상태로 로그인 전 목록(회원가입/로그인)을 다시 그리고,
+`menuLogout.hidden = true`도 같이 실행되어 로그아웃 링크 자체도 사라집니다
+— 이게 "로그아웃 누르면 로그인/회원가입 화면으로 돌아간다"는 동작입니다.
