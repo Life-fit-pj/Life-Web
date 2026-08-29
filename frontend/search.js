@@ -194,10 +194,12 @@ function startRotation() {
  * 그동안 아무 반응이 없으면 고장난 줄 알기 때문에
  * 진행 문구를 단계별로 바꿔 준다
  */
-async function runSearch(query) {
-  const btn = document.getElementById("searchBtn");
-  const status = document.getElementById("searchStatus");
+async function runSearch(query, from = "screen") {
+  const isTop = from === "top";
+  const btn = document.getElementById(isTop ? "topSearchBtn" : "searchBtn");
+  const status = document.getElementById(isTop ? "topSearchStatus" : "searchStatus");
 
+  const seq = nextSeq();
   btn.disabled = true;                    // 중복 클릭 방지
   const stopSteps = showSteps(status);    // 진행 문구 시작
 
@@ -209,12 +211,14 @@ async function runSearch(query) {
     });
 
     if (!res.ok) throw new Error("서버 응답 오류 " + res.status);
-
+    
     const data = await res.json();
+    if (!isLatest(seq)) return;     // 오래된 응답은 버린다
 
     stopSteps();
     applyWeights(data.weights);            // 슬라이더에 반영
     renderResult(data);                    // 같은 응답으로 결과 화면 채우기
+    fillTopSearch(query);
 
     // 무엇을 읽었는지 알려 준다
     status.textContent = topLabel(data.weights) + " 조건으로 찾았어요";
@@ -222,6 +226,7 @@ async function runSearch(query) {
     setTimeout(closeSearch, 800);
 
   } catch (err) {
+    if (!isLatest(seq)) return;
     // LLM 이 실패해도 슬라이더 화면으로는 보내 준다.
     // 검색 화면에 갇히는 것보다 낫다
     console.error(err);
@@ -285,14 +290,6 @@ function closeSearch() {
   document.getElementById("searchScreen").classList.add("out");
 }
 
-function reopenSearch() {
-  const el = document.getElementById("searchScreen");
-  el.classList.remove("out");
-  const input = document.getElementById("searchInput");
-  input.value = "";
-  document.getElementById("searchStatus").textContent = "";
-  setTimeout(() => input.focus(), 400);
-}
 
 /** 버튼과 키 입력을 연결한다 */
 function bindEvents() {
@@ -309,7 +306,7 @@ function bindEvents() {
   });
 
   document.getElementById("skipSearch").addEventListener("click", closeSearch);
-  document.getElementById("reopenSearch").addEventListener("click", reopenSearch);
+  document.getElementById("menuToggle").addEventListener("click", openMenu);
 }
 
 // 페이지가 다 읽히면 시작한다
@@ -320,3 +317,34 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   setTimeout(() => document.getElementById("searchInput").focus(), 400);
 });
+
+
+// ===== 상단 검색창 =====
+// 결과 화면에서도 검색어를 보고 다시 검색할 수 있게 한다.
+// 검색 로직은 runSearch 가 이미 갖고 있으므로 여기서는 부르기만 한다
+
+/** 검색이 끝나면 상단 검색창에 그 검색어를 채운다 */
+function fillTopSearch(query) {
+  const input = document.getElementById("topSearchInput");
+  if (input) input.value = query || "";
+}
+
+
+function bindTopSearch() {
+  const input = document.getElementById("topSearchInput");
+  const btn = document.getElementById("topSearchBtn");
+  if (!input || !btn) return;
+
+  const submit = () => {
+    const q = input.value.trim();
+    if (!q) { input.focus(); return; }
+    runSearch(q, "top");        // "top" 은 어느 창에서 왔는지 알리는 표시
+  };
+
+  btn.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submit();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", bindTopSearch);

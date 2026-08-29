@@ -1,3 +1,16 @@
+// 요청마다 번호를 붙인다.
+// 검색을 연달아 하면 응답이 보낸 순서대로 오지 않는다.
+// 번호가 최신이 아니면 그 응답은 버려서 과거 결과가 화면에 남는 것을 막는다
+let requestSeq = 0;
+
+function nextSeq() {
+  return ++requestSeq;
+}
+
+function isLatest(seq) {
+  return seq === requestSeq;
+}
+
 let map = null;
 let currentMarkers = []; // 지도 위의 마커 및 뱃지를 관리하는 배열
 let geocoder = null;    // 카카오 주소-좌표 변환 객체
@@ -42,7 +55,7 @@ async function runSimulation() {
   const loadingEl = document.getElementById('loading');
   if (loadingEl) loadingEl.style.display = 'block';
 
-  // index.html의 입력값들을 수집
+  const seq = nextSeq();
   const payload = {
     bldgType: document.getElementById('bldgType')?.value || "1",
     area: document.getElementById('area')?.value || 59,
@@ -66,9 +79,13 @@ async function runSimulation() {
 
     if (!response.ok) throw new Error("서버 응답 에러");
 
-    renderResult(await response.json());
+    const data = await response.json();
+    if (!isLatest(seq)) return;     // 그 사이 새 요청이 있었으면 버린다
+
+    renderResult(data);
 
   } catch (error) {
+    if (!isLatest(seq)) return;
     console.error("❌ 분석 중 오류 발생:", error);
     alert("AI 분석 실행 중 오류가 발생했습니다. 백엔드 서버 상태를 확인해 주세요.");
   } finally {
@@ -87,7 +104,8 @@ function renderResult(data) {
   if (!data) return;
 
   window.LAST_QUERY = data.query || "";
-  LAST_RESULT = data;          // ← 추가. 채팅이 이 결과를 근거로 답한다
+  LAST_RESULT = data;
+  initChatWithResult(data); // 채팅이 이 결과를 근거로 답한다
 
   // ① 주거 만족도 점수
   const elScore = document.getElementById('resScore');
@@ -104,11 +122,7 @@ function renderResult(data) {
 
   // ④ LH 평면도
   renderFloorplan(data.floorplanPath);
-
-  // ⑤ LLM 설명문
-  renderExplanation(data.explanation);
 }
-
 
 // ② 추천 TOP 5 리스트 : 우측 TOP 5 리스트 UI 갱신 함수
 function updateTopRegionsList(regions) {
@@ -203,30 +217,6 @@ function renderFloorplan(path) {
 }
 
 
-/** ⑤ LLM 설명문 : LLM 설명문을 표시한다. 슬라이더로만 왔으면 설명이 없으므로 숨긴다 */
-function renderExplanation(text) {
-  const box = document.getElementById('explainBox');
-  const body = document.getElementById('explainBody');
-  if (!box || !body) return;
-
-  if (!text) {
-    box.style.display = 'none';
-    return;
-  }
-
-  // 서버가 **강조** 와 줄바꿈을 섞어 보낸다.
-  // innerHTML 에 그대로 넣으면 마크다운이 글자로 보이므로 변환한다
-  body.innerHTML = text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")     // 태그 주입 방지
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/^#+ .*$/gm, "")                          // '# 추천 결과 설명' 제거
-    .trim()
-    .replace(/\n/g, "<br>");
-
-  box.style.display = 'block';
-}
-
-
 // 마커 및 오버레이 뱃지 추가 헬퍼 함수
 function addMarkerAndOverlay(item, latLng, bounds, weights) {
   const marker = new kakao.maps.Marker({
@@ -318,8 +308,13 @@ function openReasonModal(item, weights) {
   document.body.style.overflow = "hidden";     // 뒤 화면 스크롤 잠금
   el.querySelector(".reason-close").focus();
 
+  bindReasonTabs(el, item);
+
+  // 카드가 화면에 붙은 뒤에 그려야 canvas 크기가 잡힌다
+  drawRadar(buildRows(item, weights));
+
   // 막대는 이미 있는 데이터로 즉시 보여 주고,
-  // 시설 정보만 나중에 채운다. 기다리는 동안에도 읽을 것이 있게 한다
+  // 시설 정보/LLM 설명은 서버 응답이 오는 대로 나중에 채운다
   loadFacilities(item.name);
   loadRegionExplain(item, weights);
 }
@@ -403,17 +398,57 @@ function closeReasonModal() {
   if (!modalEl) return;
   modalEl.classList.remove("is-open");
   document.body.style.overflow = "";
+  roadviewInstance = null;     // 다음에 열릴 모달에서 로드뷰가 다시 초기화되도록
+}
+
+/** 탭 버튼 클릭에 맞춰 패널을 바꿔 보여준다 */
+function bindReasonTabs(el, item) {
+  el.querySelectorAll(".rc-tab-head").forEach((head) => {
+    head.addEventListener("click", () => {
+      const name = head.dataset.tab;
+
+      el.querySelectorAll(".rc-tab-head")
+        .forEach((h) => h.classList.toggle("is-active", h === head));
+      el.querySelectorAll(".rc-tab-panel")
+        .forEach((p) => p.classList.toggle("is-active", p.dataset.tabPanel === name));
+
+      if (name === "roadview") initRoadview(item);
+    });
+  });
+}
+
+// 모달을 새로 열 때마다 buildReasonCard()가 #rcRoadview 를 완전히 새로 만들기 때문에,
+// 이전 모달에서 만든 Roadview 인스턴스는 더 이상 쓸 수 있는 DOM에 붙어있지 않다.
+// closeReasonModal()에서 null 로 되돌려야 다음 모달에서 다시 초기화된다
+let roadviewInstance = null;
+
+/** 로드뷰 탭을 처음 열 때만 실행된다(지연 초기화) — 숨겨진 상태에서 만들면 지도가 깨진다 */
+function initRoadview(item) {
+  if (roadviewInstance) return;
+
+  const container = document.getElementById("rcRoadview");
+  if (!container || typeof kakao === "undefined") return;
+
+  const position = new kakao.maps.LatLng(item.lat, item.lng);
+  const client = new kakao.maps.RoadviewClient();
+
+  // 반경 50m 안에서 가장 가까운 로드뷰 파노라마를 찾는다
+  client.getNearestPanoId(position, 50, (panoId) => {
+    if (!panoId) {
+      container.innerHTML = "<div class='rc-empty'>이 위치는 로드뷰를 지원하지 않아요.</div>";
+      return;
+    }
+    roadviewInstance = new kakao.maps.Roadview(container);
+    roadviewInstance.setPanoId(panoId, position);
+  });
 }
 
 // 카드내용
 
-function buildReasonCard(item, weights) {
-  const rows = CRITERIA.map((key) => {
-    // 사용자가 원한 수준 (1~5)
+/** 지표별 판단을 계산한다. 카드와 레이더 차트가 같은 값을 쓴다 */
+function buildRows(item, weights) {
+  return CRITERIA.map((key) => {
     const want = Math.round(weights?.[key] ?? 3);
-
-    // 동네의 실제 수준. 서버는 백분위(0~100)를 주므로 5단계로 바꾼다.
-    //   0~20 → 1점, 81~100 → 5점
     const pct = item.scores?.[key] ?? 50;
     const got = Math.max(1, Math.min(5, Math.ceil(pct / 20)));
 
@@ -427,13 +462,15 @@ function buildReasonCard(item, weights) {
       .map((n) => `<i class="${n <= got ? "on" : ""}"></i>`)
       .join("");
 
-    // 상위 30% 안에 들 때만 표시한다.
-    // 58점을 "상위 42%" 라고 하면 실제보다 좋아 보인다
     const pctText = pct >= 70 ? `상위 ${100 - Math.round(pct)}%` : "";
 
     return { key, want, got, pct, gap, state, word, dots, pctText };
   });
+}
 
+function buildReasonCard(item, weights) {
+  const rows = buildRows(item, weights);
+  
   const short = rows.filter((r) => r.gap < 0);
   // 기대보다 얼마나 넉넉한지를 먼저 보고, 같으면 중요하게 본 순
   const strong = rows
@@ -467,21 +504,123 @@ function buildReasonCard(item, weights) {
         <div class="rc-headline">${headline}</div>
         ${sub ? `<div class="rc-sub">${sub}</div>` : ""}
       </div>
-      <div class="rc-rows">${rowsHtml}</div>
 
-      <!-- 시설 정보가 비동기로 채워지는 자리 -->
-      <div class="rc-facility" id="rcFacility">
-        <div class="rc-loading">이 동네를 살펴보는 중...</div>
-      </div>
+      <div class="rc-chart"><canvas id="rcRadar"></canvas></div>
 
       <!-- LLM 설명이 채워지는 자리. 시설보다 오래 걸린다 -->
       <div class="rc-llm" id="rcLlm"></div>
+
+      <div class="rc-tabs">
+        <div class="rc-tab-heads">
+          <button class="rc-tab-head is-active" data-tab="score">5점 점수표</button>
+          <button class="rc-tab-head" data-tab="living">생활 여건</button>
+          <button class="rc-tab-head" data-tab="price">주변 시세</button>
+          <button class="rc-tab-head" data-tab="roadview">로드뷰</button>
+        </div>
+
+        <div class="rc-tab-panel is-active" data-tab-panel="score">
+          <div class="rc-rows">${rowsHtml}</div>
+        </div>
+
+        <!-- 시설 정보가 비동기로 채워지는 자리. id 는 loadFacilities()가 그대로 찾아 쓴다 -->
+        <div class="rc-tab-panel" data-tab-panel="living" id="rcFacility">
+          <div class="rc-loading">이 동네를 살펴보는 중...</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="price">
+          <div class="rc-empty">준비 중입니다.</div>
+        </div>
+
+        <div class="rc-tab-panel" data-tab-panel="roadview">
+          <div id="rcRoadview" class="rc-roadview"></div>
+        </div>
+      </div>
 
       <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
 
     </div>`;
 }
 
+// Chart.js 는 같은 canvas 에 두 번 그리면 겹친다.
+// 이전 차트를 부수고 새로 그리려고 인스턴스를 들고 있는다
+let radarChart = null;
+
+/** 추천 사유 카드에 레이더 차트를 그린다.
+ *
+ * 두 겹으로 겹쳐 그린다 —
+ * 안쪽은 사용자가 원한 수준, 바깥은 이 동네의 실제 수준.
+ * 바깥이 안쪽을 감싸면 조건을 충족한 것이 한눈에 보인다
+ */
+function drawRadar(rows) {
+  const canvas = document.getElementById("rcRadar");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  if (radarChart) radarChart.destroy();
+
+  // CSS 변수를 읽어 온다. 테마가 바뀌어도 차트 색이 따라간다
+  const css = getComputedStyle(document.documentElement);
+  const v = (name) => css.getPropertyValue(name).trim();
+
+  const accent = v("--accent");
+  const text = v("--text");
+  const muted = v("--text-muted");
+  const line = v("--line-strong");
+
+  radarChart = new Chart(canvas.getContext("2d"), {
+    type: "radar",
+    data: {
+      labels: rows.map((r) => r.key),
+      datasets: [
+        {
+          label: "이 동네",
+          data: rows.map((r) => r.got),
+          borderColor: accent,
+          backgroundColor: hexToRgba(accent, 0.18),
+          pointBackgroundColor: accent,
+          pointRadius: 3,
+          borderWidth: 2,
+        },
+        {
+          label: "원하신 수준",
+          data: rows.map((r) => r.want),
+          borderColor: muted,
+          backgroundColor: "transparent",
+          borderDash: [4, 4],       // 점선. 기준선이라는 느낌을 준다
+          pointRadius: 0,
+          borderWidth: 1.5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          min: 0,
+          max: 5,
+          angleLines: { color: line },
+          grid: { color: line },
+          pointLabels: { color: text, font: { size: 11.5, weight: "600" } },
+          ticks: { display: false, stepSize: 1 },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: { color: muted, boxWidth: 12, font: { size: 11 } },
+        },
+      },
+    },
+  });
+}
+
+
+/** #RRGGBB 를 rgba() 로 바꾼다. Chart.js 는 반투명 배경을 이 형태로 받는다 */
+function hexToRgba(hex, alpha) {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return hex;      // rgba() 등 다른 형식이면 그대로
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 const FACILITY_EMOJI = {
   "문화시설": "🎨", "의료기관": "🏥", "학원": "📚",
@@ -600,6 +739,52 @@ function addChatMsg(text, kind) {
   // 새 말풍선이 보이도록 맨 아래로 내린다
   body.scrollTop = body.scrollHeight;
   return div;
+}
+
+
+/** 검색 결과가 나오면 채팅창을 그 검색으로 시작한다.
+ *
+ * 화면이 걷히면 사용자가 무엇을 검색했는지 알 수 없게 된다.
+ * 검색어와 설명문을 첫 대화로 남겨 두면 맥락이 유지되고,
+ * 나중에 대화를 저장할 때도 시작점이 분명해진다
+ */
+function initChatWithResult(data) {
+  const body = document.getElementById("chatBody");
+  if (!body) return;
+
+  if (data.query) {
+    addChatMsg(data.query, "user");
+  }
+
+  const count = (data.topRegions || []).length;
+  const top = topWeightLabel(data.weights);
+  addChatMsg(
+    data.query
+      ? `${top}을 가장 중요하게 보고 ${count}곳을 찾았어요.`
+      : `슬라이더 설정으로 ${count}곳을 찾았어요.`,
+    "bot"
+  );
+
+  
+  /** 가장 높은 지표 이름을 돌려준다 */
+function topWeightLabel(weights) {
+  if (!weights) return "전체 조건";
+  const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+  return sorted.length ? sorted[0][0] : "전체 조건";
+}
+
+
+  // LLM 설명문은 마크다운(**강조**)이 섞여 오므로 그대로 넣으면 안 된다.
+  // textContent 를 쓰는 addChatMsg 대신 따로 처리한다
+  if (data.explanation) {
+    const div = document.createElement("div");
+    div.className = "chat-msg bot";
+    div.innerHTML = escapeAndFormat(data.explanation);
+    body.appendChild(div);
+  }
+
+  addChatMsg("궁금한 점을 물어보세요.", "bot");
+  body.scrollTop = body.scrollHeight;
 }
 
 

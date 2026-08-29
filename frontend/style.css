@@ -1,17 +1,83 @@
+/* ===== 색 테마 =====
+   낮은 자연·편안함, 밤은 모던을 목표로 한다.
+   색만 바꾸는 것이 아니라 그림자·발광 같은 질감도 함께 바꾼다.
+
+   변수 이름을 색이 아니라 역할로 지었다.
+   --navy 같은 이름은 밤 모드에서 남색이 아니게 되어 거짓말이 된다 */
+
 :root {
-  --paper: #F7F5EF;
-  --card: rgba(255, 255, 255, 0.95);
-  --card-2: #F1EEE5;
-  --line: #DDD8C9;
-  --line-strong: #C9C2AC;
-  --navy: #14213D;
-  --amber: #C97A2B;
-  --amber-soft: #EFDCC4;
-  --ink: #22252B;
-  --muted: #7A7568;
-  --radius: 18px;
-  --shadow: 0 16px 34px rgba(20, 33, 61, 0.10);
+  /* ── 낮 : 자연, 편안함 ── */
+  --bg:           #F8F1D8;
+  --surface:      rgba(255, 255, 255, 0.92);
+  --surface-2:    #F1E9CE;
+  --line:         #DAD7CD;
+  --line-strong:  #BFBBA9;
+
+  --text:         #2D2A32;
+  --text-muted:   #7B7A6B;
+
+  --primary:      #344E41;   /* 깊은 숲 초록 */
+  --primary-soft: #A3B18A;   /* 이끼 초록 */
+
+  --accent:       #8A6D1F;   /* 포인트 글자. 노랑은 밝아 글자로 안 읽힌다 */
+  --accent-fill:  #FFD24A;   /* 포인트 면 */
+  --accent-soft:  #FBEFC4;
+
+  --good:         #4A9D6E;
+  --radius:       18px;
+
+  /* ── 질감 ──
+     낮은 종이 위에 놓인 카드처럼. 부드럽고 발광 없음 */
+  --shadow:       0 12px 28px rgba(52, 78, 65, 0.10);
+  --glow:         none;                    /* 발광. 낮에는 쓰지 않는다 */
+  --blur:         blur(8px);
+  --map-filter:   none;                    /* 지도는 원본 그대로 */
+
+  /* ── 옛 이름. CSS 곳곳이 아직 이 이름을 쓰고 있어 당분간 남겨 둔다 ── */
+  --paper:        var(--bg);
+  --card:         var(--surface);
+  --card-2:       var(--surface-2);
+  --navy:         var(--primary);
+  --amber:        var(--accent);
+  --amber-soft:   var(--accent-soft);
+  --ink:          var(--text);
+  --muted:        var(--text-muted);
 }
+
+
+/* ── 밤 : 모던 ──
+   시스템 설정 감지는 JS 가 하고, 여기서는 data-theme 만 본다.
+   CSS 만으로 prefers-color-scheme 과 수동 선택을 함께 다루려면
+   같은 값을 두 벌 써야 해서 관리가 어렵다 */
+[data-theme="dark"] {
+  --bg:           #182A57;
+  --surface:      rgba(45, 79, 143, 0.30);
+  --surface-2:    #21376B;
+  --line:         rgba(255, 255, 255, 0.10);
+  --line-strong:  rgba(255, 255, 255, 0.18);
+
+  --text:         #F8F1D8;
+  --text-muted:   #A9B6D4;
+
+  --primary:      #2D4F8F;
+  --primary-soft: #3D63A8;
+
+  --accent:       #FFD24A;   /* 어두운 바탕에서는 노랑이 글자로도 읽힌다 */
+  --accent-fill:  #D1B15A;
+  --accent-soft:  rgba(255, 210, 74, 0.16);
+
+  --good:         #7ED6A5;
+
+  /* 질감 — 밤은 유리처럼. 발광을 쓴다 */
+  --shadow:       0 16px 40px rgba(0, 0, 0, 0.45);
+  --glow:         0 0 10px var(--accent-soft);
+  --blur:         blur(12px);
+
+  /* 카카오 기본 지도는 흰 배경이라 밤 화면에서 튄다.
+     색을 반전하고 색상환을 180도 돌려 어두운 지도로 만든다 */
+  --map-filter:   invert(95%) hue-rotate(180deg) brightness(115%) contrast(90%);
+}
+
 
 * {
   box-sizing: border-box;
@@ -42,6 +108,10 @@ body {
   left: 0;
   right: 0;
   z-index: 0;
+  /* 낮에는 none, 밤에는 반전 필터가 들어간다.
+     카카오 기본 지도는 흰 배경이라 어두운 화면에서 혼자 튄다 */
+  filter: var(--map-filter);
+  transition: filter 0.4s ease;
 }
 
 /* ==========================================
@@ -54,7 +124,7 @@ body {
   right: 0;
   z-index: 5;
   padding: 20px 26px 56px;
-  background: linear-gradient(180deg, rgba(247, 245, 239, 0.97) 0%, rgba(247, 245, 239, 0) 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
   pointer-events: none;
 }
 
@@ -69,17 +139,18 @@ body {
 }
 
 h1 {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: clamp(19px, 2.8vw, 26px);
-  line-height: 1.25;
+  font-family: 'Cafe24Ssurround', 'Inter', sans-serif;
+  font-weight: normal;        /* 이 폰트는 굵기가 하나뿐이다 */
+  font-size: clamp(20px, 2.9vw, 27px);
+  line-height: 1.3;
   margin: 0;
-  color: var(--navy);
+  color: var(--text);
+  letter-spacing: -0.5px;
 }
 
 h1 em {
-  font-style: italic;
-  color: var(--amber);
+  font-style: normal;         /* 기울임이 없어 어색해진다 */
+  color: var(--accent);
 }
 
 .disclaimer {
@@ -89,7 +160,7 @@ h1 em {
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.93);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 12px;
@@ -108,7 +179,7 @@ h1 em {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  -webkit-backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: var(--blur);
   backdrop-filter: blur(8px);
   box-shadow: var(--shadow);
 }
@@ -120,7 +191,7 @@ h1 em {
   top: 150px;
   left: 24px;
   width: 310px;
-  padding: 20px;
+  padding: 24px;
   max-height: calc(100vh - 182px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -131,7 +202,7 @@ h1 em {
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
-  margin: 0 0 11px;
+  margin: 0 0 14px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -146,18 +217,19 @@ h1 em {
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+  box-shadow: var(--glow);
 }
 
 /* 입력 컨트롤 스타일 */
 .weight-row {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .weight-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 .wlabel {
@@ -180,8 +252,8 @@ select#bldgType {
   font-weight: 500;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
-  background: #ffffff;
-  color: var(--ink);
+  background: var(--surface-2);
+  color: var(--text);
   outline: none;
   cursor: pointer;
 }
@@ -221,7 +293,7 @@ input[type=range]::-moz-range-thumb {
   height: 12px;
   border-radius: 50%;
   background: var(--navy);
-  border: 2px solid #ffffff;
+  border: 2px solid var(--bg);
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
 }
@@ -229,7 +301,7 @@ input[type=range]::-moz-range-thumb {
 .divider {
   height: 1px;
   background: var(--line);
-  margin: 16px 0;
+  margin: 20px 0;
 }
 
 /* AI 분석 버튼 */
@@ -238,7 +310,7 @@ input[type=range]::-moz-range-thumb {
   width: 100%;
   padding: 11px;
   background: var(--navy);
-  color: #ffffff;
+  color: var(--bg);;
   border: none;
   border-radius: 10px;
   font-size: 13px;
@@ -278,7 +350,7 @@ input[type=range]::-moz-range-thumb {
   max-height: calc(100vh - 182px);
   display: flex;
   flex-direction: column;
-  padding: 18px;
+  padding: 24px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -288,9 +360,9 @@ input[type=range]::-moz-range-thumb {
   background: var(--card-2);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 18px;
   text-align: center;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 
 .main-score-box p {
@@ -307,6 +379,7 @@ input[type=range]::-moz-range-thumb {
   font-size: 28px;
   color: var(--amber);
   font-weight: 700;
+  text-shadow: var(--glow);
 }
 
 .rank-head {
@@ -321,16 +394,16 @@ input[type=range]::-moz-range-thumb {
 .rank-scroll {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   max-height: 220px; /* 5개 항목이 잘 보이도록 스크롤 영역 확보 */
   overflow-y: auto;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   padding-right: 4px;
 }
 
 .list-item {
-  padding: 10px 12px;
-  background: #ffffff;
+  padding: 12px 14px;
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
@@ -365,7 +438,7 @@ input[type=range]::-moz-range-thumb {
 /* 평면도 영역 */
 .floorplan-area {
   border-top: 1px solid var(--line);
-  padding-top: 14px;
+  padding-top: 20px;
 }
 
 .floorplan-area h4 {
@@ -390,7 +463,7 @@ input[type=range]::-moz-range-thumb {
   height: auto;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--surface-2);
 }
 
 .filename-text {
@@ -460,7 +533,8 @@ input[type=range]::-moz-range-thumb {
   width: min(460px, 92vw);
   max-height: 86vh;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface-2);
+  color: var(--text);
   border-radius: 18px;
   padding: 28px 26px 22px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
@@ -481,11 +555,11 @@ input[type=range]::-moz-range-thumb {
   background: none;
   font-size: 26px;
   line-height: 1;
-  color: #b0a496;
+  color: var(--muted);
   cursor: pointer;
 }
 
-.reason-close:hover { color: #6b5f52; }
+.reason-close:hover { color: var(--text); }
 
 
 /* ### 카드 머리 ### */
@@ -493,7 +567,7 @@ input[type=range]::-moz-range-thumb {
 .rc-eyebrow {
   font-size: 12px;
   letter-spacing: 0.08em;
-  color: #c8763a;
+  color: var(--amber);
   margin-bottom: 6px;
 }
 
@@ -506,23 +580,22 @@ input[type=range]::-moz-range-thumb {
 }
 
 .rc-name {
-  font-family: "Fraunces", serif;
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
   font-size: 24px;
-  font-weight: 600;
-  color: #2b2723;
+  color: var(--text);
 }
 
 .rc-score {
   font-size: 26px;
   font-weight: 700;
-  color: #c8763a;
+  color: var(--amber);
 }
 
 .rc-score span {
   display: block;
   font-size: 10px;
   letter-spacing: 0.1em;
-  color: #b0a496;
+  color: var(--muted);
   text-align: right;
 }
 
@@ -530,7 +603,7 @@ input[type=range]::-moz-range-thumb {
 /* ### 사유 문장 ### */
 
 .rc-reason {
-  background: #faf7f2;
+  background: var(--card);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 18px;
@@ -539,18 +612,18 @@ input[type=range]::-moz-range-thumb {
 .rc-headline {
   font-size: 15px;
   font-weight: 600;
-  color: #2b2723;
+  color: var(--text);
   line-height: 1.5;
 }
 
 .rc-sub {
   margin-top: 6px;
   font-size: 13px;
-  color: #6b5f52;
+  color: var(--muted);
   line-height: 1.5;
 }
 
-.rc-sub b { color: #c8763a; }
+.rc-sub b { color: var(--amber); }
 
 
 /* ### 지표줄 ###*/
@@ -563,14 +636,14 @@ input[type=range]::-moz-range-thumb {
   align-items: center;
   gap: 10px;
   padding: 7px 0;
-  border-bottom: 1px solid #f0ebe4;
+  border-bottom: 1px solid var(--line);
 }
 
 .rc-row:last-child { border-bottom: none; }
 
 .rc-row-name {
   font-size: 13px;
-  color: #4a4038;
+  color: var(--text);
 }
 
 /* 점 5개 */
@@ -580,85 +653,54 @@ input[type=range]::-moz-range-thumb {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #e3dbd0;          /* 꺼진 점 */
+  background: var(--line);          /* 꺼진 점 */
 }
 
-.rc-dots.over  i.on { background: #4a9d6e; }
-.rc-dots.match i.on { background: #c8763a; }
-.rc-dots.under i.on { background: #b0a496; }
+.rc-dots.over  i.on { background: var(--good); }
+.rc-dots.match i.on { background: var(--amber); }
+.rc-dots.under i.on { background: var(--muted); }
 
 .rc-word { font-size: 12px; }
-.rc-word.over  { color: #4a9d6e; }
-.rc-word.match { color: #c8763a; }
-.rc-word.under { color: #a89b8c; }
+.rc-word.over  { color: var(--good); }
+.rc-word.match { color: var(--amber); }
+.rc-word.under { color: var(--muted); }
 
 .rc-pct {
   font-size: 11px;
-  color: #b0a496;
+  color: var(--muted);
   text-align: right;
 }
 
 .rc-source {
   margin-top: 16px;
   font-size: 11px;
-  color: #b0a496;
+  color: var(--muted);
   text-align: center;
 }
 
 
-/* LLM 설명문 영역*/
-.explain-box {
-  background: #faf7f2;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin: 14px 0;
-}
-
-.explain-head {
-  font-size: 12px;
-  font-weight: 600;
-  color: #c8763a;
-  margin-bottom: 8px;
-}
-
-.explain-body {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #4a4038;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.explain-body b { color: #2b2723; }
-
-.rc-facility {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid #f0ebe4;
-}
-
 .rc-loading {
   font-size: 12px;
-  color: #b0a496;
+  color: var(--muted);
 }
 
 .rc-fac-head {
   font-size: 12px;
   font-weight: 600;
-  color: #c8763a;
+  color: var(--amber);
   margin-bottom: 8px;
 }
 
 .rc-fac-summary {
   font-size: 13px;
-  color: #4a4038;
+  color: var(--text);
   line-height: 1.6;
 }
 
 .rc-fac-names {
   margin-top: 6px;
   font-size: 11.5px;
-  color: #8b7f72;
+  color: var(--muted);
   line-height: 1.5;
 }
 
@@ -675,14 +717,14 @@ input[type=range]::-moz-range-thumb {
   font-size: 12.5px;
 }
 
-.rc-extra-label { color: #4a4038; }
-.rc-extra-value { color: #2b2723; font-weight: 600; }
-.rc-extra-note  { color: #a89b8c; font-size: 11.5px; }
+.rc-extra-label { color: var(--text); }
+.rc-extra-value { color: var(--text); font-weight: 600; }
+.rc-extra-note  { color: var(--muted); font-size: 11.5px; }
 
 .rc-llm {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid #f0ebe4;
+  border-top: 1px solid var(--line);
 }
 
 .rc-llm:empty {
@@ -694,10 +736,58 @@ input[type=range]::-moz-range-thumb {
 .rc-llm-body {
   font-size: 13px;
   line-height: 1.65;
-  color: #4a4038;
+  color: var(--text);
 }
 
-.rc-llm-body b { color: #2b2723; }
+.rc-llm-body b { color: var(--text); }
+
+
+/* ### 탭 (5점 점수표 / 생활 여건 / 주변 시세 / 로드뷰) ### */
+
+.rc-tabs {
+  margin-top: 16px;
+}
+
+.rc-tab-heads {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rc-tab-head {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rc-tab-head.is-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.rc-tab-panel { display: none; padding-top: 14px; }
+.rc-tab-panel.is-active { display: block; }
+
+.rc-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.rc-roadview {
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
 
 
 /* ===== 채팅 패널 ===== */
@@ -715,7 +805,7 @@ input[type=range]::-moz-range-thumb {
   border: 1px solid var(--line);
   border-radius: 50%;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
   font-size: 20px;
   cursor: pointer;
   box-shadow: var(--shadow);
@@ -723,10 +813,10 @@ input[type=range]::-moz-range-thumb {
 }
 
 #chatToggle:hover {
-  background: var(--amber);
-  /* hover 에서도 translateX(-50%) 를 다시 써야 한다.
-     transform 은 덮어쓰기라, 빠뜨리면 버튼이 오른쪽으로 튄다 */
+  background: var(--accent);
+  color: var(--bg);
   transform: translateX(-50%) translateY(-2px);
+  box-shadow: var(--shadow), var(--glow);   /* ← 추가 */
 }
 
 
@@ -763,7 +853,7 @@ input[type=range]::-moz-range-thumb {
   justify-content: space-between;
   padding: 16px 18px;
   border-bottom: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-2);
 }
 
 .chat-title {
@@ -805,16 +895,16 @@ input[type=range]::-moz-range-thumb {
 /* 답변은 왼쪽 */
 .chat-msg.bot {
   align-self: flex-start;
-  background: #fff;
+  background: var(--surface-2);     /* #fff → */
   border: 1px solid var(--line);
-  color: var(--ink);
+  color: var(--text);
 }
 
 /* 내 질문은 오른쪽 */
 .chat-msg.user {
   align-self: flex-end;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
 }
 
 /* 답을 기다리는 중 */
@@ -832,7 +922,7 @@ input[type=range]::-moz-range-thumb {
   gap: 8px;
   padding: 12px 14px;
   border-top: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-2);
 }
 
 #chatInput {
@@ -843,7 +933,8 @@ input[type=range]::-moz-range-thumb {
   font-size: 13px;
   font-family: inherit;
   outline: none;
-  color: var(--ink);
+  background: var(--bg);            /* ← 추가 */
+  color: var(--text);
 }
 
 #chatInput:focus { border-color: var(--amber); }
@@ -853,7 +944,7 @@ input[type=range]::-moz-range-thumb {
   border: none;
   border-radius: 8px;
   background: var(--navy);
-  color: #fff;
+  color: var(--bg);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -864,4 +955,162 @@ input[type=range]::-moz-range-thumb {
 #chatSend:disabled {
   background: var(--line-strong);
   cursor: default;
+}
+
+
+/* ===== 상단 검색창 ===== */
+
+.top-search-wrap {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  /* left:50% 는 왼쪽 끝을 중앙에 두는 것이라
+     자기 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
+  transform: translateX(-50%);
+  z-index: 20;                /* 헤더(5)보다 위, 검색 화면(9000)보다 아래 */
+  width: min(520px, 42vw);
+}
+
+.top-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  pointer-events: auto; 
+}
+
+/* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
+.top-search:focus-within {
+  border-color: var(--shadow), var(--glow);
+  box-shadow: 0 6px 24px rgba(201, 122, 43, 0.18);
+}
+
+.ts-icon {
+  font-size: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+#topSearchInput {
+  flex: 1;                    /* 남는 공간을 다 차지 */
+  min-width: 0;               /* flex 안의 input 이 넘치지 않게 */
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+#topSearchBtn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--bg);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#topSearchBtn:hover { background: var(--amber); }
+
+#topSearchBtn:disabled {
+  background: var(--line-strong);
+  cursor: default;
+}
+
+.ts-status {
+  margin: 7px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  /* 문구가 없어도 자리를 지켜 화면이 흔들리지 않게 한다 */
+  min-height: 16px;
+}
+
+/* 화면이 좁으면 좌우 패널과 겹치므로 숨긴다.
+   그때는 우상단 🔍 버튼으로 검색 화면에 가면 된다 */
+@media (max-width: 1100px) {
+  .top-search-wrap { display: none; }
+}
+
+/* 입력칸 안내 문구.
+   opacity 를 1 로 두는 이유 — 파이어폭스가 기본으로 흐리게 만든다 */
+#chatInput::placeholder,
+#topSearchInput::placeholder,
+#searchInput::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.rc-chart {
+  height: 240px;
+  margin: 4px 0 14px;
+}
+
+/* 메뉴창 */
+#menuToggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 8000;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+#menuToggle:hover { background: var(--accent-soft); }
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 9000;
+  display: none;
+}
+.menu-backdrop.is-open { display: block; }
+
+.menu-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 260px;
+  background: var(--surface-2);
+  padding: 24px 16px;
+  box-shadow: var(--shadow);
+}
+
+.menu-item {
+  display: block;
+  padding: 12px 8px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.menu-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
 }

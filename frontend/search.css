@@ -10,7 +10,7 @@
   inset: 0;                     /* top/right/bottom/left 를 전부 0 으로 */
   z-index: 9000;                /* 지도·패널보다 위에 오게 한다 */
 
-  background: #faf7f2;
+  background: var(--bg);
   display: flex;                /* 안의 내용을 가운데 정렬하기 위한 설정 */
   align-items: center;          /* 세로 가운데 */
   justify-content: center;      /* 가로 가운데 */
@@ -36,16 +36,16 @@
 }
 
 .ss-logo {
-  font-family: "Fraunces", serif;
+  font-family: 'Cafe24Ssurround', 'Inter', sans-serif;
   font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #2b2723;
+  color: var(--text);
 }
 
 .ss-logo i {                    /* LIFE 와 FIT 사이의 쉼표만 색을 다르게 */
   font-style: normal;
-  color: #c8763a;
+  color: var(--accent);
 }
 
 
@@ -75,7 +75,7 @@
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
-  color: #6b5f52;
+  color: var(--text-muted);
   transition: transform 0.25s ease-out, color 0.2s,
               border-color 0.2s, background 0.2s;
 }
@@ -92,14 +92,14 @@
 
 /* 마우스가 가까워지면 "누를 수 있다"는 신호 */
 .ss-word.near .ss-word-in {
-  border-color: rgba(200, 118, 58, 0.45);
-  color: #c8763a;
+  border-color: var(--accent);        /* rgba(200,118,58,0.45) → */
+  color: var(--accent);
 }
 
 .ss-word:hover .ss-word-in {
-  border-color: #c8763a;
-  background: rgba(200, 118, 58, 0.1);
-  color: #a85c26;
+  border-color: var(--accent);
+  background: var(--accent-soft);     /* rgba(200,118,58,0.1) → */
+  color: var(--accent);
 }
 
 
@@ -113,21 +113,21 @@
 }
 
 .search-title {
-  font-family: "Fraunces", serif;
+  font-family: 'Cafe24Ssurround', 'Inter', sans-serif;
   font-size: 34px;
   font-weight: 600;
-  color: #2b2723;
+  color: var(--text);
   margin: 0 0 10px;
 }
 
 .search-title em {
   font-style: normal;
-  color: #c8763a;
+  color: var(--accent);
 }
 
 .search-sub {
   font-size: 15px;
-  color: #8b7f72;
+  color: var(--text-muted);
   margin: 0 0 28px;
 }
 
@@ -137,18 +137,18 @@
 .search-box {
   display: flex;
   gap: 8px;
-  background: #fff;
-  border: 1px solid #e3dbd0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 6px 6px 6px 22px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 /* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
 .search-box:focus-within {
-  border-color: #c8763a;
-  box-shadow: 0 4px 24px rgba(200, 118, 58, 0.15);
+  border-color: var(--accent);
+  box-shadow: var(--shadow), var(--glow);
 }
 
 #searchInput {
@@ -158,25 +158,28 @@
   background: transparent;
   font-size: 16px;
   font-family: inherit;
-  color: #2b2723;
+  color: var(--text);
 }
 
 #searchBtn {
   border: none;
   border-radius: 999px;
   padding: 12px 26px;
-  background: #2b2723;
-  color: #fff;
+  background: var(--primary);
+  color: var(--bg);
   font-size: 15px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
-#searchBtn:hover { background: #c8763a; }
+#searchBtn:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
 
 /* 검색 중에는 눌리지 않게 */
 #searchBtn:disabled {
-  background: #b8ada0;
+  background: var(--line-strong);
   cursor: default;
 }
 
@@ -187,37 +190,18 @@
   min-height: 20px;             /* 문구가 없어도 자리를 지켜 화면이 안 흔들리게 */
   margin: 18px 0 0;
   font-size: 14px;
-  color: #8b7f72;
+  color: var(--text-muted);
 }
 
 .search-skip {
   margin-top: 22px;
   border: none;
   background: none;
-  color: #a89b8c;
+  color: var(--text-muted);
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
 }
 
-.search-skip:hover { color: #6b5f52; }
+.search-skip:hover { color: var(--text); }
 
-
-/* ### 다시 검색 버튼 ###*/
-
-#reopenSearch {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 8000;                /* 검색 화면(9000)보다는 아래 */
-  width: 44px;
-  height: 44px;
-  border: 1px solid #e3dbd0;
-  border-radius: 50%;
-  background: #fff;
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-}
-
-#reopenSearch:hover { background: #faf7f2; }

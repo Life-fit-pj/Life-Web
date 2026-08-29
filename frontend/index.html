@@ -9,12 +9,37 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <!-- 카카오 지도 SDK (https 및 autoload=false 적용) -->
   <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=766835f4db7d7fb274504adc9e8d9f5e&libraries=services"></script>
+  
+    <!-- 테마를 CSS 보다 먼저 정한다.
+       나중에 정하면 낮 색이 잠깐 보였다가 밤 색으로 바뀌어 화면이 번쩍인다 -->
+  <script>
+    (function () {
+      const saved = localStorage.getItem("lifefit-theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme =
+        saved || (prefersDark ? "dark" : "light");
+    })();
+  </script>
+  
+   <!-- 레이더 차트용 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- 스타일시트 -->
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="search.css">
+
+    <!-- 제목용 폰트. 둥글고 친근해 "집" 이라는 주제와 맞는다 -->
+  <style>
+    @font-face {
+      font-family: 'Cafe24Ssurround';
+      src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }
+  </style>
+  
 </head>
 <body>
 
@@ -43,8 +68,8 @@
     </div>
   </div>
 
-  <!-- 결과 화면에서 다시 검색하러 가는 버튼 -->
-  <button id="reopenSearch" title="다시 검색">🔍</button>
+  <!-- 결과 화면 우측 상단 메뉴 버튼 -->
+  <button id="menuToggle" title="메뉴">☰</button>
 
   <!-- 채팅 패널. 버튼을 누르면 오른쪽에서 열린다 -->
   <button id="chatToggle" title="추천에 대해 물어보기">💬</button>
@@ -76,11 +101,17 @@
   <div class="header">
     <p class="eyebrow">AI Housing Recommendation</p>
     <h1>당신에게 딱 맞는 <em>집</em>과 <em>공간</em></h1>
-    <div class="disclaimer">
-      <b>AI 주거 만족도 분석</b> — 선택하신 라이프스타일 지표를 기반으로 예상 만족도(100점 만점)와 최적의 지역, 맞춤형 LH 평면도를 매칭합니다.
+    <!-- 결과 화면에서도 검색어를 보고 다시 검색할 수 있게 한다.
+         첫 화면으로 돌아갈 이유를 없애는 것이 목적이다 -->
+    <div class="top-search">
+      <span class="ts-icon">🔍</span>
+      <input id="topSearchInput" type="text"
+             placeholder="어떤 동네를 찾으세요?" autocomplete="off">
+      <button id="topSearchBtn">검색</button>
     </div>
+    <p id="topSearchStatus" class="ts-status"></p>
   </div>
-
+  
   <!-- 좌측 조건 설정 패널 -->
   <div class="panel ctrl-panel">
 
@@ -191,12 +222,6 @@
       <h3 id="resScore">77.3 <span style="font-size:16px; color:var(--muted);">/ 100</span></h3>
     </div>
 
-    <!-- LLM 설명문. 검색어로 왔을 때만 채워진다 -->
-    <div class="explain-box" id="explainBox" style="display:none;">
-      <div class="explain-head">💬 이렇게 골랐어요</div>
-      <div class="explain-body" id="explainBody"></div>
-    </div>
-
     <!-- 추천 지역 TOP 5 -->
     <div class="rank-head">
       <span>👑 추천 지역 TOP 5</span>
@@ -223,6 +248,7 @@
 
   <!-- 자바스크립트 -->
   <script src="script.js" defer></script>
+  <script src="menu.js" defer></script>
   <script src="search.js"></script>
 
 </body>
