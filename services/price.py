@@ -7,6 +7,7 @@
 
 import csv
 import os
+import re
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(BASE_DIR, "data", "시세_지역별.csv")
@@ -16,6 +17,9 @@ CSV_PATH = os.path.join(BASE_DIR, "data", "시세_지역별.csv")
 # 엔진이 점수 체계를 바꿔도 이 값은 그대로 쓸 수 있다
 MAX_PENALTY = 0.25    # 아무리 비싸도 25% 까지만
 SLOPE = 0.5           # 예산 대비 50% 초과 → 25% 감점
+
+# MAX_PENALTY = 0.30   # 상한을 조금 올리고
+# SLOPE = 0.25         # 기울기는 완만하게
 
 _TABLE = None
 
@@ -45,10 +49,23 @@ def _num(v):
         return None
 
 
+def _norm(dong):
+    """엔진의 '신당제5동' 을 CSV 의 '신당5동' 에 맞춘다.
+
+    CSV 는 숫자가 붙는 동을 전부 '제' 없이 적는다.
+    '제기동', '홍제1동' 의 '제' 는 지명 일부라 건드리면 안 되므로
+    "숫자 앞의 제" 만 지운다
+    """
+    return re.sub(r"제(\d+동)$", r"\1", dong)
+
+
 def lookup(gu, dong, bldg, deal):
     """동네 하나의 시세를 돌려준다. 없으면 None."""
-    row = _load().get((gu, dong, bldg, deal))
+    table = _load()
+    row = table.get((gu, dong, bldg, deal)) or \
+          table.get((gu, _norm(dong), bldg, deal))
     if not row:
+        print(f"[시세없음] {gu} {dong} {bldg} {deal}")
         return None
 
     info = {
@@ -118,6 +135,14 @@ def apply_budget(regions, prefs, top_k=5):
 
         if gap > 0:
             r["total"] = round(r["total"] * (1 - min(MAX_PENALTY, gap * SLOPE)), 2)
-
+            
     regions.sort(key=lambda r: r["total"], reverse=True)
-    return regions[:top_k]
+
+    print(f"\n[예산검토] {deal} {bldg}")
+    for r in regions[:top_k]:
+        p = r.get("price")
+        시세 = (p or {}).get("금액") or (p or {}).get("보증금") or "없음"
+        print(f"  {r['name']:14} 원점수 {r['totalRaw']:6.1f} → {r['total']:6.1f}"
+              f"  초과 {r['priceGap']*100:5.1f}%  시세 {시세}")
+
+    return regions[:top_k]            
