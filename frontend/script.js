@@ -1,3 +1,16 @@
+// 요청마다 번호를 붙인다.
+// 검색을 연달아 하면 응답이 보낸 순서대로 오지 않는다.
+// 번호가 최신이 아니면 그 응답은 버려서 과거 결과가 화면에 남는 것을 막는다
+let requestSeq = 0;
+
+function nextSeq() {
+  return ++requestSeq;
+}
+
+function isLatest(seq) {
+  return seq === requestSeq;
+}
+
 let map = null;
 let currentMarkers = []; // 지도 위의 마커 및 뱃지를 관리하는 배열
 let geocoder = null;    // 카카오 주소-좌표 변환 객체
@@ -42,7 +55,7 @@ async function runSimulation() {
   const loadingEl = document.getElementById('loading');
   if (loadingEl) loadingEl.style.display = 'block';
 
-  // index.html의 입력값들을 수집
+  const seq = nextSeq();
   const payload = {
     bldgType: document.getElementById('bldgType')?.value || "1",
     area: document.getElementById('area')?.value || 59,
@@ -66,9 +79,13 @@ async function runSimulation() {
 
     if (!response.ok) throw new Error("서버 응답 에러");
 
-    renderResult(await response.json());
+    const data = await response.json();
+    if (!isLatest(seq)) return;     // 그 사이 새 요청이 있었으면 버린다
+
+    renderResult(data);
 
   } catch (error) {
+    if (!isLatest(seq)) return;
     console.error("❌ 분석 중 오류 발생:", error);
     alert("AI 분석 실행 중 오류가 발생했습니다. 백엔드 서버 상태를 확인해 주세요.");
   } finally {

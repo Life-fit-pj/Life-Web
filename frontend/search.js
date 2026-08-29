@@ -195,15 +195,13 @@ function startRotation() {
  * 진행 문구를 단계별로 바꿔 준다
  */
 async function runSearch(query, from = "screen") {
-  // from 이 "top" 이면 결과 화면의 상단 검색창에서 온 것이다.
-  // 그때는 첫 화면을 걷을 필요가 없고, 진행 문구도 상단에 띄워야 한다
   const isTop = from === "top";
-
   const btn = document.getElementById(isTop ? "topSearchBtn" : "searchBtn");
   const status = document.getElementById(isTop ? "topSearchStatus" : "searchStatus");
 
-  btn.disabled = true;
-  const stopSteps = showSteps(status);
+  const seq = nextSeq();
+  btn.disabled = true;                    // 중복 클릭 방지
+  const stopSteps = showSteps(status);    // 진행 문구 시작
 
   try {
     const res = await fetch("/api/predict", {
@@ -213,23 +211,28 @@ async function runSearch(query, from = "screen") {
     });
 
     if (!res.ok) throw new Error("서버 응답 오류 " + res.status);
-
+    
     const data = await res.json();
+    if (!isLatest(seq)) return;     // 오래된 응답은 버린다
 
     stopSteps();
-    applyWeights(data.weights);
-    renderResult(data);
-    fillTopSearch(query);           // 상단 검색창에 검색어를 남긴다
+    applyWeights(data.weights);            // 슬라이더에 반영
+    renderResult(data);                    // 같은 응답으로 결과 화면 채우기
+    fillTopSearch(query);
 
+    // 무엇을 읽었는지 알려 준다
     status.textContent = topLabel(data.weights) + " 조건으로 찾았어요";
-    if (!isTop) setTimeout(closeSearch, 800);
-    else setTimeout(() => { status.textContent = ""; }, 2500);
+
+    setTimeout(closeSearch, 800);
 
   } catch (err) {
+    if (!isLatest(seq)) return;
+    // LLM 이 실패해도 슬라이더 화면으로는 보내 준다.
+    // 검색 화면에 갇히는 것보다 낫다
     console.error(err);
     stopSteps();
     status.textContent = "검색어 분석에 실패했어요. 슬라이더로 조절해 주세요.";
-    if (!isTop) setTimeout(closeSearch, 1600);
+    setTimeout(closeSearch, 1600);
 
   } finally {
     btn.disabled = false;
@@ -287,14 +290,6 @@ function closeSearch() {
   document.getElementById("searchScreen").classList.add("out");
 }
 
-function reopenSearch() {
-  const el = document.getElementById("searchScreen");
-  el.classList.remove("out");
-  const input = document.getElementById("searchInput");
-  input.value = "";
-  document.getElementById("searchStatus").textContent = "";
-  setTimeout(() => input.focus(), 400);
-}
 
 /** 버튼과 키 입력을 연결한다 */
 function bindEvents() {
@@ -311,7 +306,7 @@ function bindEvents() {
   });
 
   document.getElementById("skipSearch").addEventListener("click", closeSearch);
-  document.getElementById("reopenSearch").addEventListener("click", reopenSearch);
+  document.getElementById("menuToggle").addEventListener("click", openMenu);
 }
 
 // 페이지가 다 읽히면 시작한다
