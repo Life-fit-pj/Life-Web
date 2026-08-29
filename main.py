@@ -52,6 +52,12 @@ class PredictRequest(BaseModel):
     builtYear: int = 2015
     bldgType: str = "아파트"
 
+    dealType: str = "전세"
+    salePrice: int = 58000       # 매매가
+    jeonseDeposit: int = 23000   # 전세 보증금
+    wolseDeposit: int = 3000     # 월세 보증금
+    wolseRent: int = 60          # 월 임대료
+
 
 class RegionRequest(BaseModel):
     gu: str

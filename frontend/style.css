@@ -258,6 +258,37 @@ select#bldgType {
   cursor: pointer;
 }
 
+/* 거래 유형 선택. 셋 중 하나라 select 보다 버튼이 빠르다 */
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+}
+
+.seg-btn {
+  flex: 1;
+  padding: 7px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg-btn:hover { color: var(--text); }
+
+.seg-btn.is-on {
+  background: var(--primary);
+  color: var(--bg);
+}
+
 /* Range Input Cross-Browser Customization */
 input[type=range] {
   -webkit-appearance: none;

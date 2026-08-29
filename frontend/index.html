@@ -129,6 +129,52 @@
       </select>
     </div>
 
+      <div class="weight-row">
+      <div class="weight-top">
+        <span class="wlabel">거래 유형</span>
+      </div>
+      <div class="seg" id="dealSeg">
+        <button type="button" class="seg-btn" data-deal="매매">매매</button>
+        <button type="button" class="seg-btn is-on" data-deal="전세">전세</button>
+        <button type="button" class="seg-btn" data-deal="월세">월세</button>
+      </div>
+    </div>
+
+    <!-- 매매 -->
+    <div class="weight-row" data-deal-group="매매">
+      <div class="weight-top">
+        <span class="wlabel">매매가</span>
+        <span class="wval" id="salePriceVal"></span>
+      </div>
+      <input type="range" id="salePrice" min="10000" max="300000" step="1000" value="58000">
+    </div>
+
+    <!-- 전세 -->
+    <div class="weight-row" data-deal-group="전세">
+      <div class="weight-top">
+        <span class="wlabel">전세 보증금</span>
+        <span class="wval" id="jeonseDepositVal"></span>
+      </div>
+      <input type="range" id="jeonseDeposit" min="5000" max="150000" step="1000" value="23000">
+    </div>
+
+    <!-- 월세 -->
+    <div class="weight-row" data-deal-group="월세">
+      <div class="weight-top">
+        <span class="wlabel">보증금</span>
+        <span class="wval" id="wolseDepositVal"></span>
+      </div>
+      <input type="range" id="wolseDeposit" min="0" max="100000" step="500" value="3000">
+    </div>
+
+    <div class="weight-row" data-deal-group="월세">
+      <div class="weight-top">
+        <span class="wlabel">월 임대료</span>
+        <span class="wval" id="wolseRentVal"></span>
+      </div>
+      <input type="range" id="wolseRent" min="10" max="300" step="5" value="60">
+    </div>  
+
     <div class="weight-row">
       <div class="weight-top">
         <span class="wlabel">건축 면적 (㎡)</span>
@@ -136,16 +182,6 @@
       </div>
       <input type="range" id="area" min="10" max="150" value="59" oninput="document.getElementById('areaVal').innerText = this.value + ' ㎡'">
     </div>
-
-    <div class="weight-row">
-      <div class="weight-top">
-        <span class="wlabel">건축 연도 (노후도)</span>
-        <span class="wval" id="yearVal">2015 년</span>
-      </div>
-      <input type="range" id="builtYear" min="1990" max="2024" value="2015" oninput="document.getElementById('yearVal').innerText = this.value + ' 년'">
-    </div>
-
-    <div class="divider"></div>
 
     <!-- 2. 환경 정보 -->
     <h2>🌳 환경 (Environment)</h2>
