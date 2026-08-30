@@ -7,6 +7,18 @@ LIFE,FIT 웹 서버 (FastAPI)
 실행:  uvicorn main:app --reload --port 5000
 """
 
+import sys
+# Windows 콘솔의 기본 코드페이지(cp949)는 이모지를 못 담는다.
+# services/*.py 가 로드 시점에 찍는 ✅/❌ print 가 그대로 두면 UnicodeEncodeError 로
+# 서버 임포트 자체를 죽인다 — 여기서 먼저 UTF-8 로 바꿔 둔다
+if sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
+import mimetypes
+mimetypes.add_type("text/javascript", ".js")
+mimetypes.add_type("text/css", ".css")
+
 import os
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -50,13 +62,13 @@ class PredictRequest(BaseModel):
 
     area: int = 59
     builtYear: int = 2015
-    bldgType: str = "아파트"
+    bldgType: str | None = None
 
-    dealType: str = "전세"
-    salePrice: int = 58000       # 매매가
-    jeonseDeposit: int = 23000   # 전세 보증금
-    wolseDeposit: int = 3000     # 월세 보증금
-    wolseRent: int = 60          # 월 임대료
+    dealType: str | None = None
+    salePrice: int | None = None
+    jeonseDeposit: int | None = None
+    wolseDeposit: int | None = None
+    wolseRent: int | None = None
 
 
 class RegionRequest(BaseModel):
@@ -106,6 +118,7 @@ def predict(body: PredictRequest):
             "lng": lng,
             "score": r["total"],
             "scores": r["scores"],
+            "price": r.get("price"),   # housing 조건이 없었으면 None
         })
 
     # 가중치 합이 클수록 높은 점수

@@ -1,6 +1,6 @@
 import { postPredict } from "../lib/api.js";
 import { state, nextSeq, isLatest } from "../lib/state.js";
-import { currentDeal } from "./deal.js";
+import { currentDeal, isPriceAny } from "./deal.js";
 import { renderKakaoMapMarkers, panToRegion } from "./map.js";
 import { initChatWithResult } from "./chat.js";
 
@@ -11,13 +11,16 @@ export async function runSimulation() {
   if (loadingEl) loadingEl.style.display = 'block';
 
   const seq = nextSeq();
+  const priceAny = isPriceAny();
   const payload = {
-    bldgType: document.getElementById('bldgType')?.value || "아파트",
-    dealType: currentDeal(),
-    salePrice: Number(document.getElementById('salePrice')?.value || 58000),
-    jeonseDeposit: Number(document.getElementById('jeonseDeposit')?.value || 23000),
-    wolseDeposit: Number(document.getElementById('wolseDeposit')?.value || 3000),
-    wolseRent: Number(document.getElementById('wolseRent')?.value || 60),
+    // "가격 상관없음"이 켜지면 null 로 보낸다.
+    // 슬라이더 값을 그대로 보내면 서버가 "이 가격을 원한다" 로 알아듣기 때문이다
+    bldgType: priceAny ? null : (document.getElementById('bldgType')?.value || "아파트"),
+    dealType: priceAny ? null : currentDeal(),
+    salePrice: priceAny ? null : Number(document.getElementById('salePrice')?.value || 58000),
+    jeonseDeposit: priceAny ? null : Number(document.getElementById('jeonseDeposit')?.value || 23000),
+    wolseDeposit: priceAny ? null : Number(document.getElementById('wolseDeposit')?.value || 3000),
+    wolseRent: priceAny ? null : Number(document.getElementById('wolseRent')?.value || 60),
     area: document.getElementById('area')?.value || 59,
     builtYear: document.getElementById('builtYear')?.value || 2015,
     greenery: document.getElementById('greenery')?.value || 3,

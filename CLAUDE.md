@@ -38,9 +38,22 @@ py -m uvicorn main:app --reload --port 5000
 해당 모듈을 단독으로 점검하려면 직접 실행하면 됩니다(예: `py services/coords.py`,
 `py services/engine.py`, `py services/floorplan.py`).
 
-`main.py` 맨 아래의 `if __name__ == '__main__': app.run(...)` 블록은 Flask 시절 코드가 그대로
-남은 죽은 코드입니다 — `FastAPI` 인스턴스에는 `.run()`이 없어서 `py main.py`로 직접 실행하면
-`AttributeError`가 납니다. 반드시 위의 `uvicorn` 명령으로 실행하세요.
+`services/coords.py`, `services/engine.py`, `services/floorplan.py`는 임포트 시점에 `✅`/`❌`
+이모지를 `print()`합니다. 한국어 Windows 콘솔의 기본 코드페이지(cp949)는 이 문자들을 못
+담아 `UnicodeEncodeError`가 나고, 그 에러를 처리하는 `except` 블록의 `print`도 같은 이유로
+또 실패해 서버가 임포트 단계에서 죽습니다 — `main.py`가 다른 임포트보다 먼저
+`sys.stdout.reconfigure(encoding="utf-8")`로 이를 막아 둡니다. 이 재설정 코드보다 위쪽으로
+새 임포트를 옮기지 마세요.
+
+`Life-Embed-jh/data/life.db`는 Git LFS로 관리됩니다. 그 저장소를 `git lfs pull` 없이 그냥
+클론하면 66MB 실제 DB 대신 133바이트짜리 포인터 텍스트 파일만 받아지고, `/api/predict` 호출
+시 `sqlite3.DatabaseError: file is not a database`로 500 에러가 납니다(이 저장소가 아니라
+`Life-Embed-jh` 쪽 문제입니다).
+
+`FastAPI` 인스턴스에는 `.run()`이 없으므로(Flask와 다름) `py main.py`로 직접 실행하면
+안 되고, 반드시 위의 `uvicorn` 명령으로 실행하세요. (예전에는 Flask 시절 잔재인
+`if __name__ == '__main__': app.run(...)` 블록이 파일 맨 아래 죽은 코드로 남아 있었는데,
+지금은 지워졌습니다.)
 
 Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao Developers 콘솔의 Web
 플랫폼에 `http://127.0.0.1:5000`이 등록되어 있어야 하며, 그렇지 않으면 지도가 아무 오류 없이
@@ -53,9 +66,10 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 호출 → 응답을 재구성해 JSON으로 반환 → 프론트엔드가 지도 핀/카드를 렌더링.
 
 - `main.py` — FastAPI 앱 설정, 정적 파일 서빙(`StaticFiles` 마운트로 프론트엔드 + `data/LH평면도`
-  이미지), 그리고 두 개의 API 라우트를 담당합니다. 라우트 핸들러는 입출력 형태만 다듬고, 실제
-  작업은 모두 `services/`에 위임합니다. `/api/predict` 응답에서 지역명 앞에 `서울특별시`를
-  붙이는 것도 이 파일이 합니다(엔진이 주는 `"구 행정동명"`은 접두어가 없음).
+  이미지), 그리고 네 개의 API 라우트(`/api/predict`, `/api/region`, `/api/region/explain`,
+  `/api/chat`)를 담당합니다. 라우트 핸들러는 입출력 형태만 다듬고, 실제 작업은 모두
+  `services/`에 위임합니다. `/api/predict` 응답에서 지역명 앞에 `서울특별시`를 붙이는 것도
+  이 파일이 합니다(엔진이 주는 `"구 행정동명"`은 접두어가 없음).
 - `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. 다른 추천 엔진으로
   교체하려면 여기 있는 두 개의 import 줄만 바꾸면 됩니다(아래 "교체 가능한 엔진 계약" 참고).
   또한 7개 라이프스타일 지표에 대한 한국어⇄영어 키 매핑과, 핀 클릭 시 필요한 시설 정보
@@ -67,10 +81,45 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
   `find_floorplan(area)`는 *실제로 디스크에 이미지 파일이 존재하는* 평면도 중 면적이 가장
   가까운 것을 선택합니다 — CSV에는 227행이 있지만 그중 66개만 대응하는 이미지 폴더가 있어서,
   면적 차이순으로 정렬한 후보들을 순회하며 실제로 존재하는 경로가 나올 때까지 탐색합니다.
-- `frontend/` — 빌드 단계도, 프레임워크도 없습니다. `index.html`/`search.css`/`search.js`는
-  초기 검색 화면(떠다니는 클릭 가능한 키워드, 자연어 질의 입력창)이고, `style.css`/`script.js`는
-  결과 화면(Kakao 지도, 순위 목록, 핀별 추천 사유 카드, 채팅 패널)입니다. `frontend/menu.js`는
-  우측 상단 메뉴 패널 코드입니다(현재 미완성 — 아래 검토 기록 참고).
+- `services/price.py` — `data/시세_지역별.csv`를 임포트 후 첫 호출 시점에 한 번만 로드합니다
+  (지연 로딩). `apply_budget()`이 `services/engine.py`의 추천 결과에 예산 초과분만큼 감점을
+  얹고, 화면에 보여줄 시세를 붙입니다. 엔진이 주는 만족도 순위 자체는 건드리지 않고 그 위에
+  얹는 방식이라, 엔진 교체와 무관하게 독립적으로 동작합니다.
+- `frontend/` — 빌드 단계도, 프레임워크도 없습니다(다만 아래처럼 ES 모듈로 화면 단위·역할
+  단위로 잘게 나뉘어 있어 나중에 Next.js 등으로 옮길 때 파일 단위 이식이 쉽습니다).
+  `index.html`은 `<script type="module" src="main.js">` 하나만 불러오고, 나머지는
+  `import`로 연결됩니다. 예전의 단일 `script.js`는 화면별로 쪼개져 지금은 존재하지
+  않습니다.
+  - `frontend/main.js` — 모듈 진입점. `ui/*.js` 각 파일을 옆으로 불러와 각자 자기
+    `DOMContentLoaded` 리스너로 스스로 초기화하게 하고, `onclick` 속성이 모듈 스코프
+    함수를 못 찾는 문제 때문에 `runBtn` 클릭 이벤트만 여기서 직접 연결합니다.
+  - `frontend/lib/` — 화면 여러 곳이 같이 쓰는 것들. `api.js`는 서버 호출(`fetch`)을
+    모아 둔 곳(`postPredict`/`postRegion`/`postRegionExplain`/`postChat`) — 주소나
+    헤더가 바뀌면 여기만 고치면 됩니다. `state.js`는 화면 간에 공유하는 값(마지막 추천
+    결과 `state.lastResult`, 마지막 검색어 `state.lastQuery`, 중복 요청 방지용
+    `nextSeq`/`isLatest`)을 담는 상자입니다. `format.js`는 DOM을 건드리지 않고 문자열만
+    다듬는 순수 함수(`escapeAndFormat`, `splitRegionName`)를 모아 둡니다. `.gitignore`의
+    Python용 `lib/` 규칙이 한때 이 폴더를 통째로 가려서 git이 추적하지 못했던 적이
+    있으니(`/lib/`로 루트 한정 완료), 새 `.gitignore` 규칙을 추가할 때 `frontend/lib/`을
+    다시 가리지 않도록 주의하세요.
+  - `frontend/ui/` — 화면 단위로 나뉜 코드. `search.js`(초기 검색 화면 — 떠다니는 클릭
+    가능한 키워드, 자연어 질의 입력창), `result.js`(`runSimulation`/`renderResult` —
+    슬라이더·검색 두 경로가 모두 이 결과 렌더러 하나로 수렴), `map.js`(Kakao 지도 초기화·
+    마커), `reason.js`(핀 클릭 시 뜨는 추천 사유 모달, 레이더 차트), `chat.js`(결과 화면
+    채팅 패널), `deal.js`(거래유형 세그먼트·금액 슬라이더), `menu.js`(우측 상단 메뉴
+    패널 — 로그인/로그아웃은 `localStorage`의 `lifefit-token` 유무로만 판별하는 개발용
+    임시 구현이며, 실제 로그인 API가 없습니다)로 나뉩니다.
+  - CSS도 같은 방식으로 화면 단위 분리를 시작했습니다. `frontend/style.css`(테마 변수,
+    리셋, `.panel` 공통 틀, 좌측 컨트롤 패널 전반의 폼 스타일, 스크롤바·반응형처럼 여러
+    화면이 같이 쓰는 것만 남음)와 `frontend/search.css`(첫 진입 검색 화면 + 결과 화면
+    상단 검색바)는 공용, `frontend/ui/result.css`·`ui/reason.css`·`ui/chat.css`·
+    `ui/menu.css`는 같은 이름의 `ui/*.js`와 1:1로 대응하는 화면별 스타일입니다. CSS에는
+    JS의 `import` 같은 연결 수단이 없어서, 나눈 파일 수만큼 `index.html`에
+    `<link rel="stylesheet">`를 직접 추가해야 합니다(순서: 공용 파일 먼저, 화면별 파일
+    나중 — 같은 우선순위 선택자는 나중에 적은 `<link>`가 이기기 때문). `#map`(`ui/map.js`
+    담당)과 `.seg`/`.seg-btn`(`ui/deal.js` 담당)은 분량이 작아 `style.css`에 남겨 뒀습니다
+    — `ui/*.js`와 `ui/*.css`가 무조건 1:1일 필요는 없고, 파일을 만들 가치가 있는 화면만
+    나눴습니다.
 
 ### API 계약
 
@@ -78,16 +127,19 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
   또는 영어 키 `greenery, safety, transport, commercial, medical, education, culture` 아래의
   슬라이더 값(가중치로 그대로 사용됨) 중 하나입니다. `area`/`builtYear`/`bldgType`도 함께
   받으며, `area`가 59㎡ 이상이거나 `builtYear`가 2015년 이후면 종합 점수(`score`)에 소폭
-  가산점이 붙습니다. 두 경로 모두 `services.engine.get_regions`로 수렴하며, 동일한 형태를
-  반환합니다: `score`, `topRegions`(좌표 포함, `name`에 `서울특별시` 접두어가 붙음),
-  `floorplanPath`, `fallback`(현재 항상 `False`, 실제 폴백 감지는 미구현), `explanation`,
+  가산점이 붙습니다. `dealType`(`매매`/`전세`/`월세`)과 그에 맞는 예산 필드
+  (`salePrice`/`jeonseDeposit`/`wolseDeposit`+`wolseRent`, 전부 만원 단위)는
+  `services/engine.py`가 `services/price.py`의 `apply_budget()`에 그대로 넘겨, 예산을 넘는
+  지역의 순위를 낮추는 데 씁니다. 두 경로 모두 `services.engine.get_regions`로 수렴하며,
+  동일한 형태를 반환합니다: `score`, `topRegions`(좌표 포함, `name`에 `서울특별시` 접두어가
+  붙음), `floorplanPath`, `fallback`(현재 항상 `False`, 실제 폴백 감지는 미구현), `explanation`,
   `weights`(프론트엔드가 슬라이더를 다시 동기화할 수 있도록).
 - `POST /api/region` — 요청 본문 `{ gu, dong }`, 지도 핀 클릭 시 표시되는 모달용으로 인근 시설
   개수/항목(`services.engine.get_facilities`가 주는 `counts`/`items`)을 반환합니다. 핀 클릭 시
   427개 동 전체 점수를 다시 계산하지 않도록 `/api/predict`와 의도적으로 분리되어 있습니다.
-- `frontend/script.js`는 `POST /api/region/explain`(동네별 개별 LLM 설명)과
-  `POST /api/chat`(결과 화면에서의 추가 질문)도 호출하며, `main.py`에 이미 구현되어 있습니다
-  (123~151번째 줄 부근).
+- `frontend/ui/reason.js`는 `POST /api/region/explain`(동네별 개별 LLM 설명)을,
+  `frontend/ui/chat.js`는 `POST /api/chat`(결과 화면에서의 추가 질문)을 호출하며,
+  `main.py`에 이미 구현되어 있습니다(각각 151번째 줄, 169번째 줄 부근).
 
 ### 교체 가능한 엔진 계약
 
@@ -119,26 +171,14 @@ API 키, 토큰, 기타 비밀 정보는 반드시 `.env`(gitignore 처리됨)�
 버그 진단, 수정 전/후 코드 비교, 초보자용 설명처럼 과정을 자세히 풀어 쓰는 기록은
 `study.md`에 적습니다. 여기 CLAUDE.md에는 저장소의 현재 사실 관계만 간결하게 유지합니다.
 
-## 검토 결과 (2026-08-29) — 메뉴 버튼 전환 작업으로 프론트엔드가 전부 멈춰 있음
+## 검토 결과 (2026-08-31) — JS·CSS 화면 단위 분리 완료 이후 점검
 
-`study.md`의 "우측 상단 원형 버튼 → 메뉴 버튼 전환" 계획을 실제 코드와 대조 검토했습니다.
-계획대로 코드 일부(`index.html`의 버튼, `frontend/menu.js`, `search.js`의 이벤트 연결,
-`script.js`/`search.js`의 중복 요청 방지용 `requestSeq`/`isLatest`)가 작성돼 있지만,
-**지금 상태로 브라우저에서 열면 지도·검색·슬라이더·채팅·메뉴가 전부 동작하지 않습니다.**
-확인된 원인은 다음과 같습니다(고치는 방법과 코드는 `study.md`에 정리):
+프론트가 단일 `script.js`/`style.css`에서 `main.js`(진입점) + `lib/{api,state,format}.js`
+(공용) + `ui/{deal,map,reason,chat,result,menu,search}.js`(화면 단위 JS) +
+`ui/{result,reason,chat,menu}.css`(화면 단위 CSS)로 나뉘는 작업이 끝났습니다. 서버를 띄워
+`/`, `/main.js`, `/ui/*.js`, `/ui/*.css`, `/lib/*.js`가 전부 200으로 응답하는 것, 실제
+`/api/predict` 호출이 진짜 추천 결과를 돌려주는 것까지 확인했고, 정상 동작합니다.
 
-- **가장 심각함 — `frontend/script.js`(59, 62번째 줄)와 `frontend/search.js`(207, 217, 220번째
-  줄)에 자리표시자 줄임표(`{ ... }`, 단독 `...`)가 실제 코드로 그대로 남아 있습니다.**
-  유효한 JS 문법이 아니므로 두 파일 모두 파싱 단계에서 `SyntaxError`가 나고, 그 안의 함수가
-  하나도 실행되지 않습니다. 지금 사이트가 안 되는 것처럼 보이는 가장 직접적인 원인입니다.
-- `frontend/menu.js`가 `index.html`의 `<script>` 목록에 추가되지 않았습니다 — `ensureMenu`,
-  `openMenu`, `closeMenu`, `renderMenuItems`, `isLoggedIn`이 정의되지 않은 채로 남아, 메뉴
-  버튼 클릭 시(`search.js:301`) `ReferenceError`가 납니다.
-- `frontend/menu.js`에 `let menuModalEl = null;` 선언이 빠져 있습니다. `ensureMenu()`가
-  처음 호출되자마자 `menuModalEl`을 읽는데 선언 자체가 없어, 스크립트가 포함되더라도
-  `ReferenceError`가 납니다.
-- `.menu-backdrop`/`.menu-panel`/`.menu-item`/`.menu-close`/`.is-open`에 대한 CSS 규칙이
-  `search.css`/`style.css` 어디에도 없습니다 — 위 항목들이 고쳐져도 메뉴가 스타일 없는
-  상자로 보입니다.
-- 기존 "다시 검색"(`reopenSearch()`, `search.js:277`, 함수 자체는 아직 남아 있음) 기능이
-  메뉴 항목 목록 어디에도 들어가지 않아 더 이상 호출할 방법이 없습니다.
+2026-08-30 검토에서 지적됐던 두 가지(`ui/result.js`의 중복 `updateTopRegionsList()`,
+`ui/reason.js`의 `state` 이름 충돌)는 모두 고쳐졌습니다 — `grep`으로 재확인함. CSS 분리도
+선택자가 파일 경계를 넘어 중복 정의되지 않은 것을 확인했습니다.

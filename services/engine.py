@@ -22,8 +22,6 @@ from app.core.db import facilities, facility_counts, region_extras
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
 
-from .price import apply_budget
-
 print("✅ LLM 파이프라인 연결 성공!")
 
 
@@ -51,25 +49,51 @@ def to_korean_weights(user_prefs):
     return weights
 
 
-# 예산 감점 뒤에도 5개를 채우려면 후보가 넉넉해야 한다.
-# 5개만 받아 오면 그 5개 안에서 순서만 바뀐다
-CANDIDATE_K = 25
+def to_housing(prefs):
+    """화면의 건물유형·거래유형·예산 슬라이더를 엔진의 housing 형태로 바꾼다.
+
+    건물유형 드롭다운에서 "건물·거래유형 고려안함"(값 "ANY")을 고르면 가격 조건
+    없이 추천한다 — 이때는 엔진이 시세를 8번째 신호로 얹어 "저렴한 동네를 살짝
+    우대"하는 기본 동작으로 넘어간다(recommend_by_weights 의 housing=None 분기).
+    """
+    bldg = prefs.get("bldgType")
+    deal = prefs.get("dealType")
+    if not bldg or bldg == "ANY" or not deal:
+        return None
+
+    if deal == "매매":
+        예산 = prefs.get("salePrice")
+    elif deal == "전세":
+        예산 = prefs.get("jeonseDeposit")
+    else:  # 월세
+        예산 = prefs.get("wolseRent")
+
+    if not 예산:
+        return None
+
+    targets = {"예산": 예산}
+    if deal == "월세" and prefs.get("wolseDeposit"):
+        targets["보증금"] = prefs["wolseDeposit"]
+
+    return {"건물유형": bldg, "거래유형": deal, "targets": targets}
 
 
 def get_regions(user_prefs):
     query = (user_prefs.get('query') or '').strip()
+    housing = to_housing(user_prefs)
 
     if query:
-        result = search(query, top_k=CANDIDATE_K)
+        # 화면에서 이미 명시적으로 고른 조건이, 검색어 문장에서 애매하게 뽑아낸
+        # 조건보다 신뢰도가 높다고 보고 housing_override 로 우선한다
+        result = search(query, top_k=5, housing_override=housing)
         weights = result["weights"]
         regions = result["regions"]
         explanation = result["explanation"]
     else:
         weights = to_korean_weights(user_prefs)
-        regions = recommend_by_weights(weights, top_k=CANDIDATE_K)
+        regions = recommend_by_weights(weights, top_k=5, housing=housing)
         explanation = ""
 
-    regions = apply_budget(regions, user_prefs, top_k=5)
     return weights, regions, explanation
 
 

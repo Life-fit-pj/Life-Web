@@ -130,6 +130,7 @@
         <option value="단독다가구">단독다가구</option>
         <option value="연립다세대">연립다세대</option>
         <option value="오피스텔">오피스텔</option>
+        <option value="ANY">건물·거래유형 고려안함</option>
       </select>
     </div>
 
@@ -147,7 +148,7 @@
     <!-- 매매 -->
     <div class="weight-row" data-deal-group="매매">
       <div class="weight-top">
-        <span class="wlabel">매매가</span>
+        <span class="wlabel">희망 매매가</span>
         <span class="wval" id="salePriceVal"></span>
       </div>
       <input type="range" id="salePrice" min="10000" max="300000" step="1000" value="58000">
@@ -156,7 +157,7 @@
     <!-- 전세 -->
     <div class="weight-row" data-deal-group="전세">
       <div class="weight-top">
-        <span class="wlabel">전세 보증금</span>
+        <span class="wlabel">희망 전세 보증금</span>
         <span class="wval" id="jeonseDepositVal"></span>
       </div>
       <input type="range" id="jeonseDeposit" min="5000" max="150000" step="1000" value="23000">
@@ -165,7 +166,7 @@
     <!-- 월세 -->
     <div class="weight-row" data-deal-group="월세">
       <div class="weight-top">
-        <span class="wlabel">보증금</span>
+        <span class="wlabel">희망 보증금</span>
         <span class="wval" id="wolseDepositVal"></span>
       </div>
       <input type="range" id="wolseDeposit" min="0" max="100000" step="500" value="3000">
@@ -173,7 +174,7 @@
 
     <div class="weight-row" data-deal-group="월세">
       <div class="weight-top">
-        <span class="wlabel">월 임대료</span>
+        <span class="wlabel">희망 월세</span>
         <span class="wval" id="wolseRentVal"></span>
       </div>
       <input type="range" id="wolseRent" min="10" max="300" step="5" value="60">
@@ -289,7 +290,6 @@
   </div>
 
   <!-- 자바스크립트 -->
-  <!-- 기존 3줄 삭제 -->
   <script type="module" src="main.js"></script>
 
 </body>

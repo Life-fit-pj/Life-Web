@@ -242,7 +242,7 @@ function buildReasonCard(item, weights) {
         </div>
 
         <div class="rc-tab-panel" data-tab-panel="price">
-          <div class="rc-empty">준비 중입니다.</div>
+          ${buildPriceHtml(item)}
         </div>
 
         <div class="rc-tab-panel" data-tab-panel="roadview">
@@ -253,6 +253,68 @@ function buildReasonCard(item, weights) {
       <div class="rc-source">서울 427개 행정동 공공데이터 기준 백분위</div>
 
     </div>`;
+}
+
+
+/** 만원 단위 숫자를 "5억 8,000만원" 형태로 바꾼다 */
+function fmtWon(man) {
+  if (man == null) return null;
+  if (man >= 10000) {
+    const eok = Math.floor(man / 10000);
+    const rest = Math.round(man % 10000);
+    return rest ? `${eok}억 ${rest.toLocaleString()}만원` : `${eok}억원`;
+  }
+  return `${Math.round(man).toLocaleString()}만원`;
+}
+
+/** "주변 시세" 탭 내용을 만든다.
+ *
+ * item.price 는 main.py 가 엔진(Life-Embed-jh)의 attach_price() 결과를
+ * 그대로 실어 보낸 것 — 사용자가 건물유형·거래유형·예산을 하나라도 안
+ * 골랐으면(예: "건물·거래유형 고려안함") housing 조건 자체가 없어서
+ * null 이다(준비 중이 아니라 조건을 안 골랐다는 뜻이라 문구를 구분한다)
+ */
+function buildPriceHtml(item) {
+  const p = item.price;
+  if (!p) {
+    return `<div class="rc-empty">건물유형·거래유형·희망 가격을 고르면 이 동네 시세를 볼 수 있어요.</div>`;
+  }
+
+  // 매매·전세는 "예산" 하나(중앙값)뿐이고, 월세는 "예산"(월세)과 "보증금" 둘 다 있다
+  const rows = p.거래유형 === "월세"
+    ? [["보증금", fmtWon(p.보증금)], ["월 임대료", fmtWon(p.예산)]]
+    : [[p.거래유형 === "매매" ? "매매가" : "전세 보증금", fmtWon(p.예산)]];
+
+  if (p.금액_25 != null && p.금액_75 != null) {
+    rows.push(["분포(25~75%)", `${fmtWon(p.금액_25)} ~ ${fmtWon(p.금액_75)}`]);
+  }
+
+  const rowsHtml = rows
+    .filter(([, value]) => value != null)
+    .map(([label, value]) => `
+      <div class="rc-extra-row">
+        <span class="rc-extra-label">${label}</span>
+        <span class="rc-extra-value">${value}</span>
+      </div>`)
+    .join("");
+
+  // 일치도 = 희망 가격과 얼마나 가까운지 0~100점(100이면 정확히 일치,
+  // 0이면 tolerance 30% 밖). 표본이 너무 적어 계산을 못 한 동네는 null
+  const fitNote = p.일치도 != null
+    ? `<div class="rc-fac-names">희망 가격과의 일치도 ${p.일치도}점</div>`
+    : "";
+
+  // 거래건수·신뢰등급·출처는 시세_지역별_전처리에 그 조합이 없으면 전부 null —
+  // 그럴 땐 이 줄 자체를 안 보여준다(빈 정보를 있는 척 보여주지 않기 위해)
+  const sourceHtml = p.거래건수 != null
+    ? `<div class="rc-fac-names">거래 ${p.거래건수}건 · 신뢰등급 ${p.신뢰등급} · 출처: ${p.출처}</div>`
+    : "";
+
+  return `
+    <div class="rc-fac-head">${p.건물유형} · ${p.거래유형} 시세</div>
+    <div class="rc-extras">${rowsHtml}</div>
+    ${fitNote}
+    ${sourceHtml}`;
 }
 
 
