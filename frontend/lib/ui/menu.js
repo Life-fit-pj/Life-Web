@@ -80,7 +80,7 @@ function renderMenuItems() {
     document.getElementById("menuLogout").hidden = false;   // 2번에서 추가
    }
 
-function openMenu() {
+export function openMenu() {
     const el = ensureMenu();
     renderMenuItems();
     el.classList.add("is-open");

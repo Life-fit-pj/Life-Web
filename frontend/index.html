@@ -246,7 +246,7 @@
     </div>
 
     <!-- 실행 버튼 및 로딩 스피너 -->
-    <button class="run-btn" onclick="runSimulation()">AI 분석 실행</button>
+    <button class="run-btn" id="runBtn">AI 분석 실행</button>
     <div class="loader" id="loading" style="display: none;"></div>
 
   </div>
@@ -285,9 +285,8 @@
   </div>
 
   <!-- 자바스크립트 -->
-  <script src="script.js" defer></script>
-  <script src="menu.js" defer></script>
-  <script src="search.js"></script>
+  <!-- 기존 3줄 삭제 -->
+  <script type="module" src="main.js"></script>
 
 </body>
 </html>

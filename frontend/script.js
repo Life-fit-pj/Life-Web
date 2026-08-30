@@ -1,15 +1,8 @@
-// 요청마다 번호를 붙인다.
-// 검색을 연달아 하면 응답이 보낸 순서대로 오지 않는다.
-// 번호가 최신이 아니면 그 응답은 버려서 과거 결과가 화면에 남는 것을 막는다
-let requestSeq = 0;
+import { postPredict, postRegion, postRegionExplain, postChat } from "./lib/api.js";
 
-function nextSeq() {
-  return ++requestSeq;
-}
-
-function isLatest(seq) {
-  return seq === requestSeq;
-}
+import { postPredict, postRegion, postRegionExplain, postChat } from "./lib/api.js";
+import { state, nextSeq, isLatest } from "./lib/state.js";
+import { escapeAndFormat, splitRegionName } from "./lib/format.js";
 
 let map = null;
 let currentMarkers = []; // 지도 위의 마커 및 뱃지를 관리하는 배열
@@ -109,7 +102,7 @@ function initKakaoMap() {
 }
 
 // 2. [AI 분석 실행] 버튼 클릭 시 실행되는 메인 함수
-async function runSimulation() {
+export async function runSimulation() {
   const loadingEl = document.getElementById('loading');
   if (loadingEl) loadingEl.style.display = 'block';
 
@@ -132,17 +125,10 @@ async function runSimulation() {
     culture: document.getElementById('culture')?.value || 3,
   };
 
-  try {
+  
     // API 주소는 상대 경로로. localhost 고정이면 배포할 때 못 쓴다
-    const response = await fetch('/api/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) throw new Error("서버 응답 에러");
-
-    const data = await response.json();
+  try {
+    const data = await postPredict(payload);
     if (!isLatest(seq)) return;     // 그 사이 새 요청이 있었으면 버린다
 
     renderResult(data);
@@ -163,11 +149,11 @@ async function runSimulation() {
  * 예전에는 검색이 슬라이더 분석을 다시 실행해서 API 가 두 번 불렸고,
  * 두 번째 결과가 첫 결과를 덮어써 LLM 설명이 버려졌다
  */
-function renderResult(data) {
+export function renderResult(data) {
   if (!data) return;
 
-  window.LAST_QUERY = data.query || "";
-  LAST_RESULT = data;
+  state.lastQuery = data.query || "";
+  state.lastResult = data;
   initChatWithResult(data); // 채팅이 이 결과를 근거로 답한다
 
   // ① 주거 만족도 점수
@@ -387,23 +373,14 @@ async function loadFacilities(fullName) {
   const box = document.getElementById("rcFacility");
   if (!box) return;
 
-  // "서울특별시 노원구 중계1동" → ["노원구", "중계1동"]
-  const parts = fullName.replace("서울특별시 ", "").split(" ");
-  const gu = parts[0];
-  const dong = parts.slice(1).join(" ");
+  const { gu, dong } = splitRegionName(fullName);
 
   try {
-    const res = await fetch("/api/region", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gu, dong }),
-    });
-    if (!res.ok) throw new Error("조회 실패");
-
-    const data = await res.json();
+    const data = await postRegion(gu, dong);
     box.innerHTML = buildFacilityHtml(data);
+  } 
 
-  } catch (err) {
+    catch (err) {
     console.error(err);
     box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
   }
@@ -415,26 +392,12 @@ async function loadRegionExplain(item, weights) {
   const box = document.getElementById("rcLlm");
   if (!box) return;
 
-  const parts = item.name.replace("서울특별시 ", "").split(" ");
-  const gu = parts[0];
-  const dong = parts.slice(1).join(" ");
+  const { gu, dong } = splitRegionName(item.name);
 
   box.innerHTML = `<div class="rc-loading">이 동네가 왜 맞는지 정리하는 중...</div>`;
 
   try {
-    const res = await fetch("/api/region/explain", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        gu, dong,
-        query: window.LAST_QUERY || "",
-        weights: weights || null,
-        scores: item.scores || null,
-      }),
-    });
-    if (!res.ok) throw new Error("설명 요청 실패");
-
-    const data = await res.json();
+    const data = await postRegionExplain(gu, dong, state.lastQuery, weights, item.scores);
     if (!data.explanation) { box.innerHTML = ""; return; }
 
     box.innerHTML = `
@@ -445,15 +408,6 @@ async function loadRegionExplain(item, weights) {
     console.error(err);
     box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
   }
-}
-
-/** LLM 이 만든 글을 화면에 넣기 전에 다듬는다 */
-function escapeAndFormat(text) {
-  return text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")   // 태그 주입 방지
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .trim()
-    .replace(/\n/g, "<br>");
 }
 
 
@@ -776,11 +730,6 @@ function buildExtraLines(e) {
 
 // ===== 채팅 패널 =====
 
-// 서버는 요청 사이에 아무것도 기억하지 않는다.
-// 그래서 지금 화면에 떠 있는 추천 결과를 여기에 들고 있다가 질문할 때 같이 보낸다
-let LAST_RESULT = null;
-
-
 function openChat() {
   document.getElementById("chatPanel").classList.add("open");
   setTimeout(() => document.getElementById("chatInput").focus(), 300);
@@ -828,15 +777,6 @@ function initChatWithResult(data) {
     "bot"
   );
 
-  
-  /** 가장 높은 지표 이름을 돌려준다 */
-function topWeightLabel(weights) {
-  if (!weights) return "전체 조건";
-  const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
-  return sorted.length ? sorted[0][0] : "전체 조건";
-}
-
-
   // LLM 설명문은 마크다운(**강조**)이 섞여 오므로 그대로 넣으면 안 된다.
   // textContent 를 쓰는 addChatMsg 대신 따로 처리한다
   if (data.explanation) {
@@ -848,6 +788,13 @@ function topWeightLabel(weights) {
 
   addChatMsg("궁금한 점을 물어보세요.", "bot");
   body.scrollTop = body.scrollHeight;
+}
+
+/** 가장 높은 지표 이름을 돌려준다 */
+function topWeightLabel(weights) {
+  if (!weights) return "전체 조건";
+  const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+  return sorted.length ? sorted[0][0] : "전체 조건";
 }
 
 
@@ -866,18 +813,7 @@ async function sendChat() {
   const loading = addChatMsg("생각하는 중...", "loading");
 
   try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        regions: LAST_RESULT ? LAST_RESULT.topRegions : null,
-        weights: LAST_RESULT ? LAST_RESULT.weights : null,
-      }),
-    });
-    if (!res.ok) throw new Error("서버 응답 오류 " + res.status);
-
-    const data = await res.json();
+    const data = await postChat(question, state.lastResult?.topRegions, state.lastResult?.weights);
     loading.remove();
     addChatMsg(data.answer || "답을 만들지 못했어요.", "bot");
 

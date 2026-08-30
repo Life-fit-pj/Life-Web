@@ -4,6 +4,11 @@
    만들어 준다. 그 값을 슬라이더에 반영하고 결과 화면으로 넘어간다.
    ========================================================= */
 
+import { postPredict } from "../lib/api.js";
+import { nextSeq, isLatest } from "../lib/state.js";
+import { renderResult } from "./result.js";
+import { openMenu } from "./menu.js";
+
 // 배경에 떠다닐 단어들. 클릭하면 검색창에 들어간다.
 // 우리 7개 지표로 답할 수 있는 것만 넣는다 —
 // 답 못 하는 걸 예시로 주면 첫인상을 망친다
@@ -32,7 +37,7 @@ const SLIDER_ID = {
 /**
  * 단어를 화면에 흩뿌린다.
  * 두 가지를 피한다.
- *   1) 중앙make(검색창 영역) — 글자가 검색창과 겹치지 않게
+ *   1) 중앙 부근(검색창 영역) — 글자가 검색창과 겹치지 않게
  *   2) 이미 놓인 단어 근처 — 단어끼리 겹쳐 읽히지 않게
  */
 function placeWords() {
@@ -204,16 +209,8 @@ async function runSearch(query, from = "screen") {
   const stopSteps = showSteps(status);    // 진행 문구 시작
 
   try {
-    const res = await fetch("/api/predict", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: query }),
-    });
-
-    if (!res.ok) throw new Error("서버 응답 오류 " + res.status);
-    
-    const data = await res.json();
-    if (!isLatest(seq)) return;     // 오래된 응답은 버린다
+    const data = await postPredict({ query: query });
+    if (!isLatest(seq)) return;   // 오래된 응답은 버린다
 
     stopSteps();
     applyWeights(data.weights);            // 슬라이더에 반영
