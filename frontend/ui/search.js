@@ -9,6 +9,7 @@ import { nextSeq, isLatest } from "../lib/state.js";
 import { renderResult } from "./result.js";
 import { openMenu } from "./menu.js";
 
+
 // 배경에 떠다닐 단어들. 클릭하면 검색창에 들어간다.
 // 우리 7개 지표로 답할 수 있는 것만 넣는다 —
 // 답 못 하는 걸 예시로 주면 첫인상을 망친다

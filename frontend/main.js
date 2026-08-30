@@ -13,6 +13,8 @@ import "./ui/search.js";
 
 import { runSimulation } from "./ui/result.js";
 
+
+// onclick 속성은 모듈 안 함수를 못 찾는다. 여기서 직접 연결한다
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("runBtn")?.addEventListener("click", runSimulation);
 });
