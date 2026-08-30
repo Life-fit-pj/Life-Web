@@ -1,0 +1,171 @@
+/*
+채팅패널 전체
+*/
+
+/* ===== 채팅 패널 ===== */
+
+#chatToggle {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  /* left:50% 는 버튼의 왼쪽 끝을 중앙에 두는 것이라
+     버튼 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
+  transform: translateX(-50%);
+  z-index: 8000;
+  width: 52px;
+  height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--navy);
+  color: var(--bg);
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.2s, transform 0.15s;
+}
+
+#chatToggle:hover {
+  background: var(--accent);
+  color: var(--bg);
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: var(--shadow), var(--glow);   /* ← 추가 */
+}
+
+
+/* 패널 본체 */
+#chatPanel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 8500;
+  width: min(400px, 92vw);
+
+  display: flex;
+  flex-direction: column;     /* 머리 · 본문 · 입력창을 세로로 쌓는다 */
+
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: -8px 0 30px rgba(20, 33, 61, 0.12);
+
+  /* 평소엔 화면 밖(오른쪽)에 있다가 .open 이 붙으면 미끄러져 들어온다 */
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+#chatPanel.open {
+  transform: translateX(0);
+}
+
+
+/* 머리부분 */
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.chat-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+#chatClose {
+  border: none;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+#chatClose:hover { color: var(--ink); }
+
+/* 대화내용 */
+.chat-body {
+  flex: 1;                    /* 남는 공간을 전부 차지 */
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-msg {
+  max-width: 85%;
+  padding: 10px 13px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;      /* 줄바꿈을 그대로 살린다 */
+}
+
+/* 답변은 왼쪽 */
+.chat-msg.bot {
+  align-self: flex-start;
+  background: var(--surface-2);     /* #fff → */
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+
+/* 내 질문은 오른쪽 */
+.chat-msg.user {
+  align-self: flex-end;
+  background: var(--navy);
+  color: var(--bg);
+}
+
+/* 답을 기다리는 중 */
+.chat-msg.loading {
+  align-self: flex-start;
+  color: var(--muted);
+  font-style: italic;
+  background: none;
+  border: none;
+}
+
+/* 입력창 */
+.chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+#chatInput {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: var(--bg);            /* ← 추가 */
+  color: var(--text);
+}
+
+#chatInput:focus { border-color: var(--amber); }
+
+#chatSend {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--navy);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#chatSend:hover { background: var(--amber); }
+
+#chatSend:disabled {
+  background: var(--line-strong);
+  cursor: default;
+}
+

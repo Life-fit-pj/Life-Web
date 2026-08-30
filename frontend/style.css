@@ -1,3 +1,13 @@
+/*
+테마 변수(`:root`, `[data-theme="dark"]`), 
+리셋(`*`, `html,body`, `body`), 
+`.panel` 공통 틀, 
+좌측 컨트롤 패널 전체(슬라이더·select·run-btn·loader — 특정 화면 하나가 아니라 여러 슬라이더가 같이 쓰는 기본 폼 스타일), 
+스크롤바·반응형, 
+placeholder 공통 색상 규칙
+*/
+
+
 /* ===== 색 테마 =====
    낮은 자연·편안함, 밤은 모던을 목표로 한다.
    색만 바꾸는 것이 아니라 그림자·발광 같은 질감도 함께 바꾼다.
@@ -98,6 +108,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+
 /* ==========================================
    1. 카카오 지도 스타일
    ========================================== */
@@ -113,6 +124,7 @@ body {
   filter: var(--map-filter);
   transition: filter 0.4s ease;
 }
+
 
 /* ==========================================
    2. 상단 헤더
@@ -170,6 +182,7 @@ h1 em {
   color: var(--ink);
 }
 
+
 /* ==========================================
    3. 패널 공통
    ========================================== */
@@ -183,6 +196,7 @@ h1 em {
   backdrop-filter: blur(8px);
   box-shadow: var(--shadow);
 }
+
 
 /* ==========================================
    4. 좌측 컨트롤 패널
@@ -220,7 +234,9 @@ h1 em {
   box-shadow: var(--glow);
 }
 
+
 /* 입력 컨트롤 스타일 */
+
 .weight-row {
   margin-bottom: 14px;
 }
@@ -258,7 +274,9 @@ select#bldgType {
   cursor: pointer;
 }
 
+
 /* 거래 유형 선택. 셋 중 하나라 select 보다 버튼이 빠르다 */
+
 .seg {
   display: flex;
   gap: 4px;
@@ -289,7 +307,9 @@ select#bldgType {
   color: var(--bg);
 }
 
+
 /* Range Input Cross-Browser Customization */
+
 input[type=range] {
   -webkit-appearance: none;
   appearance: none;
@@ -335,6 +355,7 @@ input[type=range]::-moz-range-thumb {
   margin: 20px 0;
 }
 
+
 /* AI 분석 버튼 */
 .run-btn {
   margin-top: 16px;
@@ -356,6 +377,7 @@ input[type=range]::-moz-range-thumb {
   transform: translateY(-1px);
 }
 
+
 /* 로딩 스피너 */
 .loader {
   width: 24px;
@@ -369,141 +391,6 @@ input[type=range]::-moz-range-thumb {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* ==========================================
-   5. 우측 결과 및 평면도 패널
-   ========================================== */
-.rank-panel {
-  top: 150px;
-  right: 24px;
-  width: 330px;
-  max-height: calc(100vh - 182px);
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* 종합 점수 상자 */
-.main-score-box {
-  background: var(--card-2);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 18px;
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.main-score-box p {
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.main-score-box h3 {
-  margin: 0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 28px;
-  color: var(--amber);
-  font-weight: 700;
-  text-shadow: var(--glow);
-}
-
-.rank-head {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.rank-scroll {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 220px; /* 5개 항목이 잘 보이도록 스크롤 영역 확보 */
-  overflow-y: auto;
-  margin-bottom: 20px;
-  padding-right: 4px;
-}
-
-.list-item {
-  padding: 12px 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.list-item:hover, .list-item.active {
-  border-color: var(--amber);
-  background: var(--amber-soft);
-}
-
-.li-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.rank {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--amber);
-  width: 14px;
-}
-
-.list-name {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--navy);
-}
-
-/* 평면도 영역 */
-.floorplan-area {
-  border-top: 1px solid var(--line);
-  padding-top: 20px;
-}
-
-.floorplan-area h4 {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--navy);
-  font-weight: 700;
-}
-
-.placeholder {
-  padding: 30px;
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--muted);
-  background: var(--card-2);
-  border-radius: 8px;
-  border: 1px dashed var(--line-strong);
-}
-
-.floorplan-img {
-  width: 100%;
-  height: auto;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--surface-2);
-}
-
-.filename-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
-  color: var(--muted);
-  margin-top: 8px;
-  word-break: break-all;
-  line-height: 1.4;
 }
 
 
@@ -537,543 +424,6 @@ input[type=range]::-moz-range-thumb {
   }
 }
 
-/* ===== 추천 사유 패널 ===== */
-
-.reason-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9500;                 /* 검색 화면(9000)보다 위 */
-  background: rgba(30, 26, 22, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  /* 평소엔 숨어 있다가 .is-open 이 붙으면 나타난다 */
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.25s ease, visibility 0.25s;
-}
-
-.reason-backdrop.is-open {
-  opacity: 1;
-  visibility: visible;
-}
-
-.reason-modal {
-  position: relative;
-  width: min(460px, 92vw);
-  max-height: 86vh;
-  overflow-y: auto;
-  background: var(--surface-2);
-  color: var(--text);
-  border-radius: 18px;
-  padding: 28px 26px 22px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-
-  transform: translateY(14px);
-  transition: transform 0.25s ease;
-}
-
-.reason-backdrop.is-open .reason-modal {
-  transform: translateY(0);
-}
-
-.reason-close {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  border: none;
-  background: none;
-  font-size: 26px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.reason-close:hover { color: var(--text); }
-
-
-/* ### 카드 머리 ### */
-
-.rc-eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: var(--amber);
-  margin-bottom: 6px;
-}
-
-.rc-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.rc-name {
-  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
-  font-size: 24px;
-  color: var(--text);
-}
-
-.rc-score {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--amber);
-}
-
-.rc-score span {
-  display: block;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  text-align: right;
-}
-
-
-/* ### 사유 문장 ### */
-
-.rc-reason {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 18px;
-}
-
-.rc-headline {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.5;
-}
-
-.rc-sub {
-  margin-top: 6px;
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.rc-sub b { color: var(--amber); }
-
-
-/* ### 지표줄 ###*/
-
-.rc-row {
-  display: grid;
-  /* grid : 네 칸을 정해두면 지표마다 글자 길이가 달라도 세로로 줄이 맞는다. */
-  /* 이름 / 점 / 문구 / 백분위 — 네 칸으로 나눈다 */
-  grid-template-columns: 78px auto 1fr 62px;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.rc-row:last-child { border-bottom: none; }
-
-.rc-row-name {
-  font-size: 13px;
-  color: var(--text);
-}
-
-/* 점 5개 */
-.rc-dots { display: flex; gap: 4px; }
-
-.rc-dots i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--line);          /* 꺼진 점 */
-}
-
-.rc-dots.over  i.on { background: var(--good); }
-.rc-dots.match i.on { background: var(--amber); }
-.rc-dots.under i.on { background: var(--muted); }
-
-.rc-word { font-size: 12px; }
-.rc-word.over  { color: var(--good); }
-.rc-word.match { color: var(--amber); }
-.rc-word.under { color: var(--muted); }
-
-.rc-pct {
-  font-size: 11px;
-  color: var(--muted);
-  text-align: right;
-}
-
-.rc-source {
-  margin-top: 16px;
-  font-size: 11px;
-  color: var(--muted);
-  text-align: center;
-}
-
-
-.rc-loading {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.rc-fac-head {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--amber);
-  margin-bottom: 8px;
-}
-
-.rc-fac-summary {
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.6;
-}
-
-.rc-fac-names {
-  margin-top: 6px;
-  font-size: 11.5px;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.rc-extras {
-  margin-top: 4px;
-}
-
-.rc-extra-row {
-  display: grid;
-  grid-template-columns: 96px 110px 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  font-size: 12.5px;
-}
-
-.rc-extra-label { color: var(--text); }
-.rc-extra-value { color: var(--text); font-weight: 600; }
-.rc-extra-note  { color: var(--muted); font-size: 11.5px; }
-
-.rc-llm {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-
-.rc-llm:empty {
-  border-top: none;
-  margin: 0;
-  padding: 0;
-}
-
-.rc-llm-body {
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text);
-}
-
-.rc-llm-body b { color: var(--text); }
-
-
-/* ### 탭 (5점 점수표 / 생활 여건 / 주변 시세 / 로드뷰) ### */
-
-.rc-tabs {
-  margin-top: 16px;
-}
-
-.rc-tab-heads {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--line);
-}
-
-.rc-tab-head {
-  flex: 1;
-  padding: 8px 0;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.rc-tab-head.is-active {
-  color: var(--text);
-  font-weight: 600;
-  border-bottom-color: var(--accent);
-}
-
-.rc-tab-panel { display: none; padding-top: 14px; }
-.rc-tab-panel.is-active { display: block; }
-
-.rc-empty {
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-  padding: 20px 0;
-}
-
-.rc-roadview {
-  width: 100%;
-  height: 220px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--card);
-}
-
-
-/* ===== 채팅 패널 ===== */
-
-#chatToggle {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  /* left:50% 는 버튼의 왼쪽 끝을 중앙에 두는 것이라
-     버튼 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
-  transform: translateX(-50%);
-  z-index: 8000;
-  width: 52px;
-  height: 52px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--navy);
-  color: var(--bg);
-  font-size: 20px;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: background 0.2s, transform 0.15s;
-}
-
-#chatToggle:hover {
-  background: var(--accent);
-  color: var(--bg);
-  transform: translateX(-50%) translateY(-2px);
-  box-shadow: var(--shadow), var(--glow);   /* ← 추가 */
-}
-
-
-/* 패널 본체 */
-#chatPanel {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 8500;
-  width: min(400px, 92vw);
-
-  display: flex;
-  flex-direction: column;     /* 머리 · 본문 · 입력창을 세로로 쌓는다 */
-
-  background: var(--paper);
-  border-left: 1px solid var(--line);
-  box-shadow: -8px 0 30px rgba(20, 33, 61, 0.12);
-
-  /* 평소엔 화면 밖(오른쪽)에 있다가 .open 이 붙으면 미끄러져 들어온다 */
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-}
-
-#chatPanel.open {
-  transform: translateX(0);
-}
-
-
-/* 머리부분 */
-.chat-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
-}
-
-.chat-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--navy);
-}
-
-#chatClose {
-  border: none;
-  background: none;
-  font-size: 24px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-#chatClose:hover { color: var(--ink); }
-
-/* 대화내용 */
-.chat-body {
-  flex: 1;                    /* 남는 공간을 전부 차지 */
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chat-msg {
-  max-width: 85%;
-  padding: 10px 13px;
-  border-radius: 12px;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;      /* 줄바꿈을 그대로 살린다 */
-}
-
-/* 답변은 왼쪽 */
-.chat-msg.bot {
-  align-self: flex-start;
-  background: var(--surface-2);     /* #fff → */
-  border: 1px solid var(--line);
-  color: var(--text);
-}
-
-/* 내 질문은 오른쪽 */
-.chat-msg.user {
-  align-self: flex-end;
-  background: var(--navy);
-  color: var(--bg);
-}
-
-/* 답을 기다리는 중 */
-.chat-msg.loading {
-  align-self: flex-start;
-  color: var(--muted);
-  font-style: italic;
-  background: none;
-  border: none;
-}
-
-/* 입력창 */
-.chat-input {
-  display: flex;
-  gap: 8px;
-  padding: 12px 14px;
-  border-top: 1px solid var(--line);
-  background: var(--surface-2);
-}
-
-#chatInput {
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  background: var(--bg);            /* ← 추가 */
-  color: var(--text);
-}
-
-#chatInput:focus { border-color: var(--amber); }
-
-#chatSend {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--navy);
-  color: var(--bg);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-#chatSend:hover { background: var(--amber); }
-
-#chatSend:disabled {
-  background: var(--line-strong);
-  cursor: default;
-}
-
-
-/* ===== 상단 검색창 ===== */
-
-.top-search-wrap {
-  position: fixed;
-  top: 22px;
-  left: 50%;
-  /* left:50% 는 왼쪽 끝을 중앙에 두는 것이라
-     자기 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
-  transform: translateX(-50%);
-  z-index: 20;                /* 헤더(5)보다 위, 검색 화면(9000)보다 아래 */
-  width: min(520px, 42vw);
-}
-
-.top-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px 7px 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: var(--blur);
-  backdrop-filter: blur(8px);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  pointer-events: auto; 
-}
-
-/* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
-.top-search:focus-within {
-  border-color: var(--shadow), var(--glow);
-  box-shadow: 0 6px 24px rgba(201, 122, 43, 0.18);
-}
-
-.ts-icon {
-  font-size: 14px;
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-#topSearchInput {
-  flex: 1;                    /* 남는 공간을 다 차지 */
-  min-width: 0;               /* flex 안의 input 이 넘치지 않게 */
-  border: none;
-  outline: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 13.5px;
-  color: var(--text);
-}
-
-#topSearchBtn {
-  flex-shrink: 0;
-  padding: 8px 18px;
-  border: none;
-  border-radius: 999px;
-  background: var(--navy);
-  color: var(--bg);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-#topSearchBtn:hover { background: var(--amber); }
-
-#topSearchBtn:disabled {
-  background: var(--line-strong);
-  cursor: default;
-}
-
-.ts-status {
-  margin: 7px 0 0;
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--muted);
-  /* 문구가 없어도 자리를 지켜 화면이 흔들리지 않게 한다 */
-  min-height: 16px;
-}
-
-/* 화면이 좁으면 좌우 패널과 겹치므로 숨긴다.
-   그때는 우상단 🔍 버튼으로 검색 화면에 가면 된다 */
-@media (max-width: 1100px) {
-  .top-search-wrap { display: none; }
-}
 
 /* 입력칸 안내 문구.
    opacity 를 1 로 두는 이유 — 파이어폭스가 기본으로 흐리게 만든다 */
@@ -1083,123 +433,3 @@ input[type=range]::-moz-range-thumb {
   color: var(--text-muted);
   opacity: 1;
 }
-
-.rc-chart {
-  height: 240px;
-  margin: 4px 0 14px;
-}
-
-/* 메뉴창 */
-#menuToggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 8000;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-}
-
-#menuToggle:hover { background: var(--accent-soft); }
-
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  background: transparent;
-  z-index: 9000;
-  display: none;
-}
-.menu-backdrop.is-open { display: block; }
-
-.coming-soon-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 9500;               /* 메뉴(.menu-backdrop, 9000)보다 위에 뜨도록 */
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-.coming-soon-backdrop.is-open { display: flex; }
-
-.coming-soon-panel {
-  position: relative;
-  width: min(320px, 90vw);
-  background: var(--surface-2);
-  border-radius: 16px;
-  padding: 28px 24px;
-  box-shadow: var(--shadow);
-  text-align: center;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.coming-soon-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.menu-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  height: 100%;
-  width: 260px;
-  background: var(--surface-2);
-  padding: 24px 16px;
-  box-shadow: var(--shadow);
-}
-
-.menu-item {
-  display: block;
-  padding: 12px 8px;
-  color: var(--text);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line);
-}
-
-.menu-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.menu-admin-link {
-  display: block;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-size: 11px;
-  color: var(--text-muted);
-  text-align: center;
-  text-decoration: none;
-}
-.menu-admin-link:hover { color: var(--text); }
-
-.menu-logout-link {
-  display: block;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--text-muted);
-  text-align: center;
-  text-decoration: none;
-}
-.menu-logout-link:hover { color: var(--text); }
-.menu-logout-link[hidden] { display: none; }
