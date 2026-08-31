@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>LIFE,FIT 관리자</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    .tabs { display: flex; gap: 8px; padding: 10px; }
+    .tab.on { font-weight: bold; text-decoration: underline; }
+    .shell { display: flex; height: calc(100vh - 50px); }
+    .shell[hidden] { display: none; }
+    .side { width: 260px; overflow-y: auto; border-right: 1px solid #ccc; padding: 8px; }
+    .row { padding: 6px; cursor: pointer; }
+    .row:hover { background: #eee; }
+    main { flex: 1; padding: 16px; overflow-y: auto; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .wide { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+
+  <!-- 4-3에서 여기에 탭·목록·폼 화면을 채운다 -->
+  <div class="tabs">
+    <button class="tab" data-tab="member" onclick="showTab('member')">회원</button>
+    <button class="tab" data-tab="region" onclick="showTab('region')">행정동</button>
+  </div>
+
+  <div class="shell" id="view-member">
+    <aside class="side">
+      <input id="member-search" placeholder="이름 검색" oninput="filterMembers()">
+      <div id="member-rows"></div>
+    </aside>
+    <main id="member-board">
+      <div class="empty">회원을 선택하세요</div>
+    </main>
+  </div>
+
+  <div class="shell" id="view-region" hidden>
+    <aside class="side">
+      <input id="region-search" placeholder="동 이름 검색" oninput="filterRegions()">
+      <div id="region-rows"></div>
+    </aside>
+    <main id="region-board">
+      <div class="empty">행정동을 선택하세요</div>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = '/api/admin';
+
+    // 모든 요청이 이 함수를 지난다. 6단계에서 토큰을 붙일 때도 여기 한 줄만 고치면 된다
+    const api = async (path, options = {}) => {
+      const res = await fetch(API_BASE + path, options);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    };
+
+    // HTML 로 해석될 글자를 막는다
+    const esc = s => (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+    function field(label, name, value, {type = 'input', options = null, wide = false} = {}) {
+      const box = options
+        ? `<select name="${name}">${options.map(o =>
+            `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
+        : type === 'textarea'
+          ? `<textarea name="${name}">${esc(value ?? '')}</textarea>`
+          : `<input name="${name}" value="${esc(String(value ?? ''))}"
+               ${type === 'number' ? 'type="number" min="0"' : ''}>`;
+      return `<div class="${wide ? 'wide' : ''}">
+        <label>${label}</label>${box}<div class="err" data-err="${name}"></div></div>`;
+    }
+
+    let membersLoaded = false;
+    let regionsLoaded = false;
+
+    function showTab(name) {
+      document.getElementById('view-member').hidden = name !== 'member';
+      document.getElementById('view-region').hidden = name !== 'region';
+      document.querySelectorAll('.tab').forEach(t =>
+        t.classList.toggle('on', t.dataset.tab === name));
+
+      if (name === 'member' && !membersLoaded) loadMembers();
+      if (name === 'region' && !regionsLoaded) loadRegions();
+    }
+
+    // 회원목록
+    let members = [];
+
+    async function loadMembers() {
+      members = await api('/members');
+      membersLoaded = true;
+      renderMemberRows(members);
+    }
+
+    function renderMemberRows(list) {
+      document.getElementById('member-rows').innerHTML = list.map(m => `
+        <div class="row" onclick="openMember('${m.customer_id}')">
+          ${esc(m.customer_id)} ${esc(m.name)}
+        </div>`).join('');
+    }
+
+    function filterMembers() {
+      const q = document.getElementById('member-search').value.trim();
+      renderMemberRows(members.filter(m => (m.name + m.customer_id).includes(q)));
+    }
+
+    // 회원 한 명 상세
+    async function openMember(id) {
+      const data = await api('/members/' + id);
+      const { customer, preferences, persona } = data;
+
+      const customerFields = Object.entries(customer)
+        .filter(([k]) => k !== 'customer_id')
+        .map(([k, v]) => field(k, k, v)).join('');
+
+      const prefFields = Object.entries(preferences)
+        .map(([k, v]) => field(k, k, v, { type: 'number' })).join('');
+
+      const personaFields = Object.entries(persona)
+        .map(([k, v]) => field(k, k, v, { type: 'textarea', wide: true })).join('');
+
+      document.getElementById('member-board').innerHTML = `
+        <h3>${esc(customer.customer_id)}</h3>
+        <div class="grid">${customerFields}</div>
+        <div class="grid">${prefFields}</div>
+        <div class="grid">${personaFields}</div>
+        <button onclick="alert('저장은 5단계에서 연결')">저장</button>
+      `;
+    }
+
+    // 행정동
+    let regions = [];
+
+    async function loadRegions() {
+      regions = await api('/regions');
+      regionsLoaded = true;
+      renderRegionRows(regions);
+    }
+
+    function renderRegionRows(list) {
+      document.getElementById('region-rows').innerHTML = list.map(r => `
+        <div class="row" onclick="openRegion('${r.구}', '${r.행정동명}')">
+          ${esc(r.구)} ${esc(r.행정동명)}
+        </div>`).join('');
+    }
+
+    function filterRegions() {
+      const q = document.getElementById('region-search').value.trim();
+      renderRegionRows(regions.filter(r => (r.구 + r.행정동명).includes(q)));
+    }
+
+    async function openRegion(gu, dong) {
+      const data = await api(`/regions/${gu}/${dong}`);
+      const fields = Object.entries(data)
+        .filter(([k]) => k !== '구' && k !== '행정동명')
+        .map(([k, v]) => field(k, k, v, { type: 'number' })).join('');
+
+      document.getElementById('region-board').innerHTML = `
+        <h3>${esc(data.구)} ${esc(data.행정동명)}</h3>
+        <div class="grid">${fields}</div>
+        <button onclick="alert('저장은 5단계에서 연결')">저장</button>
+      `;
+    }
+
+    showTab('member');
+  </script>
+
+</body>
+</html>
