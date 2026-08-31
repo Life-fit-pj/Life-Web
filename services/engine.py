@@ -21,7 +21,8 @@ from app.core.db import facilities, facility_counts, region_extras
 from app.features.pipeline_api import search, recommend_by_weights
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
-from app.features.admin import get_member, list_members, get_region, list_regions
+from app.features.admin import get_member, list_members, get_region, list_regions, update_member, update_region
+
 
 print("✅ LLM 파이프라인 연결 성공!")
 

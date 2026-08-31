@@ -6,7 +6,7 @@ GET  /api/admin/regions/{gu}/{dong}      행정동 하나의 지표 12개
 """
 
 from fastapi import APIRouter, HTTPException
-from services.engine import get_member, list_members, get_region, list_regions
+from services.engine import get_member, list_members, get_region, list_regions, update_member, update_region
 
 router = APIRouter(prefix="/api/admin", tags=["관리자"])
 
@@ -35,3 +35,20 @@ def admin_region(gu: str, dong: str):
     if found is None:
         raise HTTPException(status_code=404, detail="그런 행정동이 없다")
     return found
+
+
+# 회원정보/지역 수정
+@router.patch("/members/{customer_id}")
+def admin_update_member(customer_id: str, patch: dict):
+    updated = update_member(customer_id, patch)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    return updated
+
+
+@router.patch("/regions/{gu}/{dong}")
+def admin_update_region(gu: str, dong: str, patch: dict):
+    updated = update_region(gu, dong, patch)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="그런 행정동이 없다")
+    return updated

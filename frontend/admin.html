@@ -124,9 +124,29 @@
         <div class="grid">${customerFields}</div>
         <div class="grid">${prefFields}</div>
         <div class="grid">${personaFields}</div>
-        <button onclick="alert('저장은 5단계에서 연결')">저장</button>
+        <button onclick="saveMember('${customer.customer_id}')">저장</button>
       `;
     }
+
+    async function saveMember(id) {
+      const inputs = document.querySelectorAll('#member-board input, #member-board textarea');
+      const patch = {};
+      inputs.forEach(el => {
+        patch[el.name] = el.type === 'number' ? Number(el.value) : el.value;
+      });
+
+      await api('/members/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+
+      members = await api('/members');     // 목록도 최신화 (이름 바뀐 걸 반영)
+      renderMemberRows(members);
+      openMember(id);                      // 저장된 값으로 폼 다시 채움
+      alert('저장됨');
+    }
+
 
     // 행정동
     let regions = [];
@@ -158,8 +178,23 @@
       document.getElementById('region-board').innerHTML = `
         <h3>${esc(data.구)} ${esc(data.행정동명)}</h3>
         <div class="grid">${fields}</div>
-        <button onclick="alert('저장은 5단계에서 연결')">저장</button>
+        <button onclick="saveRegion('${data.구}', '${data.행정동명}')">저장</button>
       `;
+    }
+
+    async function saveRegion(gu, dong) {
+      const inputs = document.querySelectorAll('#region-board input');
+      const patch = {};
+      inputs.forEach(el => { patch[el.name] = Number(el.value); });
+
+      await api(`/regions/${gu}/${dong}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+
+      openRegion(gu, dong);
+      alert('저장됨');
     }
 
     showTab('member');
