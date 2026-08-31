@@ -17,10 +17,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
-from app.features.pipeline_api import search, recommend_by_weights
 from app.core.db import facilities, facility_counts, region_extras
+from app.features.pipeline_api import search, recommend_by_weights
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
+from app.features.admin import get_member, list_members, get_region, list_regions
 
 print("✅ LLM 파이프라인 연결 성공!")
 
