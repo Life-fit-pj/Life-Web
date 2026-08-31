@@ -125,15 +125,19 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 
 - `POST /api/predict` — 요청 본문은 `{ query: "..." }`(LLM이 텍스트를 7개 지표 가중치로 변환)
   또는 영어 키 `greenery, safety, transport, commercial, medical, education, culture` 아래의
-  슬라이더 값(가중치로 그대로 사용됨) 중 하나입니다. `area`/`builtYear`/`bldgType`도 함께
-  받으며, `area`가 59㎡ 이상이거나 `builtYear`가 2015년 이후면 종합 점수(`score`)에 소폭
-  가산점이 붙습니다. `dealType`(`매매`/`전세`/`월세`)과 그에 맞는 예산 필드
-  (`salePrice`/`jeonseDeposit`/`wolseDeposit`+`wolseRent`, 전부 만원 단위)는
-  `services/engine.py`가 `services/price.py`의 `apply_budget()`에 그대로 넘겨, 예산을 넘는
-  지역의 순위를 낮추는 데 씁니다. 두 경로 모두 `services.engine.get_regions`로 수렴하며,
+  슬라이더 값(가중치로 그대로 사용됨) 중 하나입니다. `area`/`bldgType`도 함께 받으며, `area`가
+  59㎡ 이상이면 종합 점수(`score`)에 소폭 가산점이 붙습니다. `dealType`(`매매`/`전세`/`월세`)과
+  그에 맞는 예산 필드(`salePrice`/`jeonseDeposit`/`wolseDeposit`+`wolseRent`, 전부 만원 단위)는
+  `services/engine.py`의 `to_housing()`이 엔진의 `housing` 형태로 바꿔 `search`/
+  `recommend_by_weights`에 그대로 넘기고, 엔진이 그 조건에 맞는 동만 추려 순위를 매깁니다
+  (예전에는 이 저장소의 `services/price.py`가 따로 예산 초과분을 감점했으나 지금은 삭제되어
+  없음 — 엔진이 필터링까지 전담). 두 경로 모두 `services.engine.get_regions`로 수렴하며,
   동일한 형태를 반환합니다: `score`, `topRegions`(좌표 포함, `name`에 `서울특별시` 접두어가
   붙음), `floorplanPath`, `fallback`(현재 항상 `False`, 실제 폴백 감지는 미구현), `explanation`,
-  `weights`(프론트엔드가 슬라이더를 다시 동기화할 수 있도록).
+  `weights`(프론트엔드가 슬라이더를 다시 동기화할 수 있도록), `housing`(검색어 경로에서 LLM이
+  읽어낸 건물유형·거래유형·예산 조건 — `{건물유형, 거래유형, targets:{예산, 보증금?}}` 또는
+  가격 언급이 없었으면 `null`. `frontend/ui/search.js`의 `applyHousing()`이 이 값으로 "건축"
+  패널을 동기화한다. 슬라이더 경로에서는 화면 값과 이미 같으므로 항상 `null`).
 - `POST /api/region` — 요청 본문 `{ gu, dong }`, 지도 핀 클릭 시 표시되는 모달용으로 인근 시설
   개수/항목(`services.engine.get_facilities`가 주는 `counts`/`items`)을 반환합니다. 핀 클릭 시
   427개 동 전체 점수를 다시 계산하지 않도록 `/api/predict`와 의도적으로 분리되어 있습니다.

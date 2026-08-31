@@ -61,7 +61,6 @@ class PredictRequest(BaseModel):
     culture: int = 3
 
     area: int = 59
-    builtYear: int = 2015
     bldgType: str | None = None
 
     dealType: str | None = None
@@ -104,8 +103,8 @@ def predict(body: PredictRequest):
     # services 는 사전을 기대하므로 모델을 사전으로 바꿔 넘긴다
     prefs = body.model_dump()
 
-    weights, regions, explanation = get_regions(prefs)
-
+    weights, regions, explanation, extracted_housing = get_regions(prefs)
+    
     top_regions = []
     for idx, r in enumerate(regions):
         gu, dong = r["name"].split(" ", 1)
@@ -118,14 +117,12 @@ def predict(body: PredictRequest):
             "lng": lng,
             "score": r["total"],
             "scores": r["scores"],
-            "price": r.get("price"),   # housing 조건이 없었으면 None
+            "price": r.get("price"),   # housing 조건이 없었으면 None — 프론트에서 탭을 숨기거나 안내문으로 대체
         })
 
     # 가중치 합이 클수록 높은 점수
     base_score = 40 + sum(weights.values()) * 1.3
     if body.area >= 59:
-        base_score += 5
-    if body.builtYear >= 2015:
         base_score += 5
 
     return {
@@ -136,6 +133,7 @@ def predict(body: PredictRequest):
         "fallback": False,
         "explanation": explanation,
         "weights": weights,
+        "housing": extracted_housing,   # {"건물유형":"아파트","거래유형":"매매","targets":{"예산":40000}} 또는 null
     }
 
 

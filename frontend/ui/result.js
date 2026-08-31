@@ -22,7 +22,6 @@ export async function runSimulation() {
     wolseDeposit: priceAny ? null : Number(document.getElementById('wolseDeposit')?.value || 3000),
     wolseRent: priceAny ? null : Number(document.getElementById('wolseRent')?.value || 60),
     area: document.getElementById('area')?.value || 59,
-    builtYear: document.getElementById('builtYear')?.value || 2015,
     greenery: document.getElementById('greenery')?.value || 3,
     safety: document.getElementById('safety')?.value || 3,
     transport: document.getElementById('transport')?.value || 3,

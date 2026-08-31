@@ -1,5 +1,6 @@
 let menuModalEl = null;
 let comingSoonEl = null;
+let authModalEl = null;
 
 // 메뉴 패널 DOM을 처음 열릴 때 한 번만 만든다.
 function ensureMenu() {
@@ -10,7 +11,6 @@ function ensureMenu() {
         <nav class="menu-panel">
             <button class="menu-close" aria-label="닫기">&times;</button>
             <div class="menu-items" id="menuItems"></div>
-            <a class="menu-logout-link" href="#" id="menuLogout" hidden>로그아웃</a>
             <a class="menu-admin-link" href="admin.html">관리자 페이지 (개발용)</a>
         </nav>
     `;
@@ -22,48 +22,17 @@ function ensureMenu() {
     });
     menuModalEl.querySelector(".menu-close").addEventListener("click", closeMenu);
 
-    // 로그아웃: 토큰을 지우고 목록을 다시 그린다 (로그인 전 화면으로 전환)
-    menuModalEl.querySelector("#menuLogout").addEventListener("click", (e) => {
-        e.preventDefault();
-        localStorage.removeItem("lifefit-token");
-        renderMenuItems();
-    });
-
     return menuModalEl;
 }
 
 
-// 로그인 여부를 판별. 
-// 실제 로그인 API가 생기기 전까지는 `localStorage`에 토큰이 있는지만 확인하는 임시 버전으로 시작해도 됩니다
-// (2단계에서 진짜 로그인 API가 생기면 이 값을 그 응답으로 채워 넣게 됨)
-function isLoggedIn() {
-    return !!localStorage.getItem("lifefit-token");
-}
-
-
-// `isLoggedIn()` 결과에 따라 메뉴 항목을 다르게 그린다.
-// 관리자 페이지는 로그인만으로는 부족하고 "이 사람이 관리자인가"까지확인해야 하니,
-// 나중에 `isAdmin()` 같은 별도 체크를 추가해서 일반로그인 사용자에게는 이 항목 자체를 안 보여주는 게 맞습니다(지금은 뼈대만 잡아두는 단계라 우선 넣어둠).
+// 로그인/회원가입은 헤더의 별도 버튼(#loginToggle)으로 옮겼기 때문에,
+// 이 메뉴에는 실제 로그인 여부와 무관하게 로그인 이후 항목만 상시로 보여준다.
+// 관리자 페이지는 로그인만으로는 부족하고 "이 사람이 관리자인가"까지 확인해야 하니,
+// 나중에 `isAdmin()` 같은 별도 체크를 추가해서 일반 사용자에게는 이 항목 자체를 안 보여주는 게 맞다
+// (지금은 뼈대만 잡아두는 단계라 menu-admin-link를 우선 그대로 둠).
 function renderMenuItems() {
     const box = document.getElementById("menuItems");
-
-    if (!isLoggedIn()) {
-        box.innerHTML = `
-            <a class="menu-item" href="signup.html">회원가입</a>
-            <a class="menu-item" href="#" id="menuLogin">로그인</a>
-        `;
-
-        document.getElementById("menuLogin").addEventListener("click", (e) => {
-            // href="#" 때문에 브라우저가 페이지 맨 위로 이동하려는 걸 막는다
-            e.preventDefault();
-            // TODO: 실제 로그인 API가 생기면 이 두 줄을 서버 호출로 바꾼다.
-            // 지금은 로그인 후 화면을 미리 확인해 보기 위한 개발용 임시 로그인이다.
-            localStorage.setItem("lifefit-token", "dev-fake-token");
-            renderMenuItems();   // 패널을 닫지 않고 목록만 다시 그린다
-        });
-        document.getElementById("menuLogout").hidden = true;   // 2번에서 추가
-        return;
-    }
 
     box.innerHTML = `
         <a class="menu-item" href="#" data-feature="마이페이지">마이페이지</a>
@@ -77,8 +46,7 @@ function renderMenuItems() {
             openComingSoon(link.dataset.feature);
         });
     });
-    document.getElementById("menuLogout").hidden = false;   // 2번에서 추가
-   }
+}
 
 export function openMenu() {
     const el = ensureMenu();
@@ -89,6 +57,47 @@ export function openMenu() {
 function closeMenu() {
     if (!menuModalEl) return;
     menuModalEl.classList.remove("is-open");
+}
+
+// 헤더 "로그인" 버튼을 누르면 뜨는 안내 모달.
+// 로그인/회원가입 둘 다 실제 기능이 없어서 "준비중" 문구만 보여준다.
+// 크기는 맵 핀 클릭 시 뜨는 .reason-modal(ui/reason.css)과 동일하게 맞췄다.
+function ensureAuthModal() {
+    if (authModalEl) return authModalEl;
+
+    authModalEl = document.createElement("div");
+    authModalEl.className = "auth-backdrop";
+    authModalEl.innerHTML = `
+        <div class="auth-modal">
+            <button class="auth-close" aria-label="닫기">&times;</button>
+            <div class="auth-section">
+                <h3 class="auth-title">로그인</h3>
+                <p class="auth-notice">🔒 로그인 기능은 아직 준비 중입니다.</p>
+            </div>
+            <div class="auth-divider"></div>
+            <div class="auth-section">
+                <h3 class="auth-title">회원가입</h3>
+                <p class="auth-notice">✍️ 회원가입 기능은 아직 준비 중입니다.</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(authModalEl);
+
+    authModalEl.addEventListener("click", (e) => {
+        if (e.target === authModalEl) closeAuthModal();
+    });
+    authModalEl.querySelector(".auth-close").addEventListener("click", closeAuthModal);
+
+    return authModalEl;
+}
+
+export function openAuthModal() {
+    ensureAuthModal().classList.add("is-open");
+}
+
+function closeAuthModal() {
+    if (!authModalEl) return;
+    authModalEl.classList.remove("is-open");
 }
 
 // 아직 안 만든 화면으로 이동하려 할 때 보여주는 공용 안내창.

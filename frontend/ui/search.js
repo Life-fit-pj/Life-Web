@@ -7,7 +7,7 @@
 import { postPredict } from "../lib/api.js";
 import { nextSeq, isLatest } from "../lib/state.js";
 import { renderResult } from "./result.js";
-import { openMenu } from "./menu.js";
+import { openMenu, openAuthModal } from "./menu.js";
 
 
 // 배경에 떠다닐 단어들. 클릭하면 검색창에 들어간다.
@@ -27,12 +27,52 @@ const VISIBLE_COUNT = 14;   // 한 번에 화면에 띄울 개수. 나머지는 
 const PULL_RADIUS = 140;    // 마우스가 이 거리(px) 안에 오면 반응
 const PULL_MAX = 18;        // 최대로 끌려오는 거리(px)
 
-// 서버가 주는 한국어 지표명 → 슬라이더 id
+// 서버가 준 한국어 지표명 → 슬라이더 id (기존에 이미 있음, 참고용)
 const SLIDER_ID = {
   "녹지": "greenery", "안전": "safety", "교통": "transport",
   "상권": "commercial", "의료": "medical", "교육": "education",
   "문화": "culture",
 };
+
+// 거래유형 → 그 유형이 쓰는 예산 슬라이더 id
+const PRICE_SLIDER_ID = { "매매": "salePrice", "전세": "jeonseDeposit", "월세": "wolseRent" };
+
+/** 검색어에서 LLM이 읽어낸 건물유형·거래유형·예산을 "건축" 패널에 반영한다.
+ *  가격 언급이 없었던 검색이면 housing이 null이라 아무것도 안 건드린다 */
+function applyHousing(housing) {
+  if (!housing) return;
+
+  const bldg = document.getElementById("bldgType");
+  if (bldg && housing.건물유형) {
+    bldg.value = housing.건물유형;
+    // change 이벤트를 직접 일으켜야 deal.js의 updatePriceAnyState() 같은
+    // 연결된 로직도 같이 갱신된다 (applyWeights가 input 이벤트를 쏘는 것과 같은 이유)
+    bldg.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  if (housing.거래유형) {
+    // 이미 initDealType()(ui/deal.js)이 걸어둔 클릭 핸들러를 그대로 태운다 —
+    // is-on 클래스 토글과 showDealGroup()까지 한 번에 해결된다
+    document.querySelector(`.seg-btn[data-deal="${housing.거래유형}"]`)?.click();
+  }
+
+  const targets = housing.targets || {};
+  const sliderId = PRICE_SLIDER_ID[housing.거래유형];
+  if (sliderId && targets.예산 != null) {
+    const slider = document.getElementById(sliderId);
+    if (slider) {
+      slider.value = targets.예산;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+  if (housing.거래유형 === "월세" && targets.보증금 != null) {
+    const slider = document.getElementById("wolseDeposit");
+    if (slider) {
+      slider.value = targets.보증금;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+}
 
 
 /**
@@ -215,8 +255,8 @@ async function runSearch(query, from = "screen") {
 
     stopSteps();
     applyWeights(data.weights);            // 슬라이더에 반영
+    applyHousing(data.housing);            // "건축" 패널에 반영 — 가격 언급 없었으면 아무 일도 안 함
     renderResult(data);                    // 같은 응답으로 결과 화면 채우기
-    fillTopSearch(query);
 
     // 무엇을 읽었는지 알려 준다
     status.textContent = topLabel(data.weights) + " 조건으로 찾았어요";
@@ -305,6 +345,7 @@ function bindEvents() {
 
   document.getElementById("skipSearch").addEventListener("click", closeSearch);
   document.getElementById("menuToggle").addEventListener("click", openMenu);
+  document.getElementById("loginToggle").addEventListener("click", openAuthModal);
 }
 
 // 페이지가 다 읽히면 시작한다

@@ -52,9 +52,8 @@ def to_korean_weights(user_prefs):
 def to_housing(prefs):
     """화면의 건물유형·거래유형·예산 슬라이더를 엔진의 housing 형태로 바꾼다.
 
-    건물유형 드롭다운에서 "건물·거래유형 고려안함"(값 "ANY")을 고르면 가격 조건
-    없이 추천한다 — 이때는 엔진이 시세를 8번째 신호로 얹어 "저렴한 동네를 살짝
-    우대"하는 기본 동작으로 넘어간다(recommend_by_weights 의 housing=None 분기).
+    '가격 상관없음'이면 bldgType/dealType 이 이미 None 으로 온다
+    (frontend/ui/result.js 의 isPriceAny() 처리 — 그대로 유지).
     """
     bldg = prefs.get("bldgType")
     deal = prefs.get("dealType")
@@ -81,20 +80,22 @@ def to_housing(prefs):
 def get_regions(user_prefs):
     query = (user_prefs.get('query') or '').strip()
     housing = to_housing(user_prefs)
+    extracted_housing = None   # 검색어 경로에서만 채워진다
 
     if query:
-        # 화면에서 이미 명시적으로 고른 조건이, 검색어 문장에서 애매하게 뽑아낸
-        # 조건보다 신뢰도가 높다고 보고 housing_override 로 우선한다
         result = search(query, top_k=5, housing_override=housing)
         weights = result["weights"]
         regions = result["regions"]
         explanation = result["explanation"]
+        extracted_housing = result.get("housing")
     else:
+        # 슬라이더 경로는 애초에 화면 값 그대로 housing을 만들었으니
+        # 다시 화면에 되돌려줄 필요가 없다 (이미 일치함)
         weights = to_korean_weights(user_prefs)
         regions = recommend_by_weights(weights, top_k=5, housing=housing)
         explanation = ""
 
-    return weights, regions, explanation
+    return weights, regions, explanation, extracted_housing
 
 
 def get_facilities(gu, dong, limit=5):
@@ -117,10 +118,11 @@ def get_chat_answer(question, regions=None, weights=None, history=None):
 
 
 if __name__ == "__main__":
-    w, r, e = get_regions({"query": "애들 학원 보내기 좋은 곳"})
+    w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})
     print(w)
     for x in r:
         print(f"   {x['name']} {x['total']}")
     print(e[:120])
+    print("housing:", h)
     print()
     print(get_facilities("노원구", "중계1동")["counts"])

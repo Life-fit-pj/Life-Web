@@ -36,6 +36,450 @@
 
 ---
 
+# (2026-08-31) 위 가이드대로 직접 고친 것 점검 — 빠진 것 2개 + 준공년도 죽은 코드 삭제
+
+바로 아래 항목("건축 패널이 안 바뀌는 이유")의 가이드를 보고 사용자님이 4개 파일
+(`pipeline_api.py`/`engine.py`/`main.py`/`search.js`)을 직접 고쳤다. 그걸 점검해
+달라는 요청을 받고 하나씩 대조해 봤다.
+
+## 잘된 것
+
+`Life-Embed-jh/app/features/pipeline_api.py`의 `search()` 반환값에 `"housing": housing`
+추가, `main.py`의 `weights, regions, explanation, extracted_housing = get_regions(prefs)`
++ 응답에 `"housing": extracted_housing` 추가, `frontend/ui/search.js`의 `applyHousing()`
+함수와 `runSearch()`에서의 호출 — 가이드에 적힌 그대로 정확히 반영되어 있었다.
+
+## 빠진 것 1 — `services/engine.py`에 `get_regions`가 두 번 정의되어 있었음
+
+가이드의 "원본"과 "수정" 코드 블록을 각각 복사해 붙여넣으면서, 원본 블록을 지우지
+않고 그 위에 수정 블록을 이어 붙인 것으로 보인다. 그 결과 파일에 같은 이름의 함수가
+두 번 있었다:
+
+```python
+# services/engine.py (수정하신 상태, 80~102번째 줄)
+def get_regions(user_prefs):
+    query = (user_prefs.get('query') or '').strip()
+    housing = to_housing(user_prefs)
+
+def get_regions(user_prefs):                          # ← 바로 위와 이름이 같다
+    query = (user_prefs.get('query') or '').strip()
+    housing = to_housing(user_prefs)
+    extracted_housing = None
+    ...
+    return weights, regions, explanation, extracted_housing
+```
+
+파이썬은 같은 이름의 함수를 다시 `def` 하면 에러 없이 뒤엣것으로 덮어쓴다. 그래서
+실제 동작(서버가 부르는 건 항상 마지막 정의)은 멀쩡했지만, 앞의 3줄짜리 `def`는
+아무도 안 부르는 죽은 코드로 남아 있었다 — 다음에 이 함수를 읽는 사람이 "어느 게
+진짜지?" 헷갈리게 되는 상태. 앞의 죽은 정의를 지웠다.
+
+## 빠진 것 2 — `get_regions()` 맨 아래 스모크 체크가 옛날 3개짜리 반환값을 기대하고 있었음
+
+`get_regions()`의 반환값이 3개(`weights, regions, explanation`)에서 4개
+(`..., extracted_housing`)로 늘었는데, 파일 맨 아래 `if __name__ == "__main__":`
+블록은 여전히 3개로 받고 있었다:
+
+```python
+# services/engine.py (원본)
+if __name__ == "__main__":
+    w, r, e = get_regions({"query": "애들 학원 보내기 좋은 곳"})
+```
+
+이 상태로 `py services/engine.py`(README·CLAUDE.md가 안내하는 단독 점검 명령)를
+돌리면 `ValueError: too many values to unpack (expected 3)`로 바로 죽는다. `main.py`를
+거쳐 브라우저로 쓸 때는 어차피 함수를 이렇게 안 부르니 못 알아챈 것 — 이런 이유로
+"스모크 체크가 따로 있는" 파일은 그 스모크 체크도 같이 고쳐야 놓치지 않는다. 4개를
+받게 고치고, 새로 생긴 `housing` 값도 확인 삼아 같이 출력하게 했다:
+
+```python
+# services/engine.py (수정)
+if __name__ == "__main__":
+    w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})
+    ...
+    print("housing:", h)
+```
+
+## 준공년도(`builtYear`) 죽은 코드 삭제
+
+요청대로 "이제 안 쓸" `builtYear`(준공년도) 관련 코드를 지웠다. 애초에 `index.html`에
+이 값을 조절하는 슬라이더(`#builtYear`)가 없어서, `frontend/ui/result.js`가 보내던
+`builtYear` 값은 항상 `document.getElementById('builtYear')`가 `null`이라 `|| 2015`
+기본값만 매번 보내고 있었다 — 즉 사용자가 뭘 하든 절대 안 바뀌는, 있으나 마나 한
+필드였다. 지운 곳 세 군데:
+
+- `main.py` — `PredictRequest`의 `builtYear: int = 2015` 필드, `predict()` 안의
+  `if body.builtYear >= 2015: base_score += 5` 가산점 로직.
+- `frontend/ui/result.js` — `payload`에서 `builtYear: document.getElementById('builtYear')?.value || 2015,` 줄.
+- `CLAUDE.md` — API 계약 설명에서 `builtYear` 언급 제거(겸사겸사 이미 지워진
+  `services/price.py`를 참조하던 낡은 문장도 지금 상태에 맞게 고쳤다).
+
+## 확인한 것
+
+- `py -m py_compile main.py services/engine.py`, `py -m py_compile pipeline_api.py`,
+  `node --check`(search.js/result.js) 전부 문법 통과.
+- 서버를 띄워 슬라이더 경로(`/api/predict`에 `query` 없이 요청) → `housing` 키가
+  응답에 있고 값은 `null`(의도대로), 200 응답 확인.
+- 검색어 경로 — `"4억짜리 아파트 매매로 조용한 동네"`로 실제 LLM 호출까지 태워봤더니
+  `housing: {"건물유형": "아파트", "거래유형": "매매", "targets": {"예산": 40000}}`로
+  정확히 돌아옴. 바로 아래 가이드가 의도한 대로 프론트가 "건축" 패널을 갱신할 수 있는
+  상태가 됐다는 뜻.
+
+---
+
+# (2026-08-31) 검색어로 찾을 때 "건축(Architecture)" 패널이 안 바뀌는 이유 + 고치는 법
+
+## 증상
+
+좌측 패널은 두 구역으로 나뉜다 — "🏠 건축"(건물 유형·거래 유형·가격·건축 면적)과
+"🌳 환경"/"🏥 인프라"(녹지·안전·교통·상권·의료·교육·문화 7개 슬라이더). 검색창에
+"4억짜리 아파트 매매로 조용한 동네" 처럼 문장을 쳐서 찾으면, 아래쪽 7개 슬라이더는
+LLM이 읽은 값대로 움직이는데 위쪽 "건축" 구역(건물 유형 드롭다운, 거래 유형 버튼,
+가격 슬라이더)은 검색 전 상태 그대로 남아있다.
+
+## 원인 — LLM이 이미 읽어내고 있는데, 그 값을 프론트까지 아무도 안 넘겨준다
+
+**1) 엔진(`Life-Embed-jh`)은 이미 건물유형·거래유형·예산을 검색어에서 뽑아내고 있다.**
+`Life-Embed-jh/pipeline/weights.py`의 `SYSTEM_PROMPT`(46~52번째 줄)가 Claude에게
+"건물유형/거래유형/예산/보증금도 같이 뽑아라"라고 시키고, `ask_claude()`가 그 값을
+`draft` 딕셔너리에 담아 돌려준다. `Life-Embed-jh/app/features/pipeline_api.py`의
+`search()`(115~122번째 줄)가 이 `draft`로 `housing` 변수를 만든다:
+
+```python
+# Life-Embed-jh/app/features/pipeline_api.py (현재)
+housing = housing_override
+if housing is None and draft.get("건물유형") and draft.get("거래유형") and draft.get("예산"):
+    targets = {"예산": draft["예산"]}
+    if draft["거래유형"] == "월세" and draft.get("보증금"):
+        targets["보증금"] = draft["보증금"]
+    housing = {"건물유형": draft["건물유형"], "거래유형": draft["거래유형"], "targets": targets}
+```
+
+이 `housing`은 실제로 추천 순위에는 반영된다(`recommend_by_weights(weights, housing=housing)`
+에 그대로 넘어가 "그 조건에 맞는 동만 추리는" 필터로 쓰임). **문제는 `search()`의
+맨 끝 반환값에 이 `housing`이 빠져 있다는 것**이다:
+
+```python
+# Life-Embed-jh/app/features/pipeline_api.py (현재, 131~137번째 줄)
+return{
+    "query": query,
+    "persona_query": persona_query,
+    "weights": weights,
+    "regions": detailed,
+    "explanation": text,
+    # ← housing이 여기 없다. 계산은 다 해놓고 버린다
+}
+```
+
+**2) 이 저장소(`Life-Web`)도 검색어 요청에 화면의 현재 슬라이더 값을 아예 안 보낸다.**
+`frontend/ui/search.js`의 `runSearch()`는 `postPredict({ query: query })`만 보낸다
+(`bldgType`/`dealType`/가격 필드 없음). `main.py`의 `PredictRequest`는 이 필드들에
+전부 기본값 `None`을 갖고 있어서, `services/engine.py`의 `to_housing()`이 항상 `None`을
+돌려주고(`bldg`가 없으니), 결과적으로 `housing_override=None`으로 `search()`가 불려서
+1번의 "검색어에서 뽑은 조건"이 그대로 쓰인다 — **여기까지는 의도대로 동작한다.**
+
+**3) 그런데 `main.py`가 프론트로 돌려주는 응답(`weights`)에는 7개 지표만 있다.**
+`services/engine.py`의 `get_regions()`도 `search()`가 돌려준 값 중
+`weights`/`regions`/`explanation` 셋만 꺼내 쓰고, `main.py`의 `/api/predict` 응답도
+`"weights": weights`(7개 지표)만 내려준다. 그래서 `frontend/ui/search.js`의
+`applyWeights(data.weights)`는 7개 슬라이더만 갱신할 수 있고, "건축" 구역을 갱신할
+재료 자체가 애초에 응답 안에 없다.
+
+**요약**: LLM이 "4억짜리 아파트 매매"를 정확히 읽어서 추천 순위에는 반영하고 있지만,
+그 사실을 화면에 "우리가 이렇게 이해했어요"라고 보여줄 통로가 없어서, 사용자 눈에는
+건축 패널이 검색과 무관하게 멈춰 있는 것처럼 보인다.
+
+## 고치는 법 — 세 파일을 순서대로
+
+### 1) `Life-Embed-jh/app/features/pipeline_api.py` — `search()`가 `housing`도 돌려주게
+
+이미 계산해 둔 `housing` 변수를 반환값에 한 줄만 추가하면 된다.
+
+```python
+# 수정 (131~138번째 줄)
+return{
+    "query": query,
+    "persona_query": persona_query,
+    "weights": weights,
+    "regions": detailed,
+    "explanation": text,
+    "housing": housing,   # 검색어에서 뽑아낸(또는 화면에서 넘어온) 조건. 가격 언급이 없었으면 None
+}
+```
+
+`Life-Web`이 아니라 `Life-Embed-jh` 저장소 파일이라는 점 주의 — `CLAUDE.md`에 적힌
+"어떤 엔진이든 두 함수만 계약대로 노출하면 교체 가능"이라는 규칙에서 `housing`은 원래
+계약에 없는 필드지만, 없어도 프론트가 그냥 무시하니 추가해도 계약을 깨지 않는다.
+
+### 2) `Life-Web/services/engine.py` — `get_regions()`가 `housing`을 한 단계 더 전달
+
+```python
+# 원본
+def get_regions(user_prefs):
+    query = (user_prefs.get('query') or '').strip()
+    housing = to_housing(user_prefs)
+
+    if query:
+        result = search(query, top_k=5, housing_override=housing)
+        weights = result["weights"]
+        regions = result["regions"]
+        explanation = result["explanation"]
+    else:
+        weights = to_korean_weights(user_prefs)
+        regions = recommend_by_weights(weights, top_k=5, housing=housing)
+        explanation = ""
+
+    return weights, regions, explanation
+```
+
+```python
+# 수정
+def get_regions(user_prefs):
+    query = (user_prefs.get('query') or '').strip()
+    housing = to_housing(user_prefs)
+    extracted_housing = None   # 검색어 경로에서만 채워진다
+
+    if query:
+        result = search(query, top_k=5, housing_override=housing)
+        weights = result["weights"]
+        regions = result["regions"]
+        explanation = result["explanation"]
+        extracted_housing = result.get("housing")
+    else:
+        # 슬라이더 경로는 애초에 화면 값 그대로 housing을 만들었으니
+        # 다시 화면에 되돌려줄 필요가 없다 (이미 일치함)
+        weights = to_korean_weights(user_prefs)
+        regions = recommend_by_weights(weights, top_k=5, housing=housing)
+        explanation = ""
+
+    return weights, regions, explanation, extracted_housing
+```
+
+**반환값이 3개에서 4개로 늘어난다** — 이 함수를 부르는 곳(`main.py`) 딱 한 군데만
+같이 고치면 된다.
+
+### 3) `Life-Web/main.py` — 응답에 `housing` 필드 추가
+
+```python
+# 원본 (predict() 안)
+    weights, regions, explanation = get_regions(prefs)
+```
+
+```python
+# 수정
+    weights, regions, explanation, extracted_housing = get_regions(prefs)
+```
+
+그리고 맨 아래 반환하는 딕셔너리에 한 줄 추가:
+
+```python
+# 원본
+    return {
+        "score": round(min(98.5, max(30.0, base_score)), 1),
+        "query": body.query or "",
+        "topRegions": top_regions,
+        "floorplanPath": find_floorplan(body.area),
+        "fallback": False,
+        "explanation": explanation,
+        "weights": weights,
+    }
+```
+
+```python
+# 수정
+    return {
+        "score": round(min(98.5, max(30.0, base_score)), 1),
+        "query": body.query or "",
+        "topRegions": top_regions,
+        "floorplanPath": find_floorplan(body.area),
+        "fallback": False,
+        "explanation": explanation,
+        "weights": weights,
+        "housing": extracted_housing,   # {"건물유형":"아파트","거래유형":"매매","targets":{"예산":40000}} 또는 null
+    }
+```
+
+### 4) `frontend/ui/search.js` — 받은 `housing`으로 "건축" 패널을 실제로 갱신
+
+`applyWeights(data.weights)`가 7개 슬라이더를 갱신하는 것과 똑같은 자리에,
+"건축" 패널을 갱신하는 짝 함수를 하나 추가한다.
+
+```js
+// 서버가 준 한국어 지표명 → 슬라이더 id (기존에 이미 있음, 참고용)
+const SLIDER_ID = {
+  "녹지": "greenery", "안전": "safety", "교통": "transport",
+  "상권": "commercial", "의료": "medical", "교육": "education",
+  "문화": "culture",
+};
+
+// 거래유형 → 그 유형이 쓰는 예산 슬라이더 id
+const PRICE_SLIDER_ID = { "매매": "salePrice", "전세": "jeonseDeposit", "월세": "wolseRent" };
+
+/** 검색어에서 LLM이 읽어낸 건물유형·거래유형·예산을 "건축" 패널에 반영한다.
+ *  가격 언급이 없었던 검색이면 housing이 null이라 아무것도 안 건드린다 */
+function applyHousing(housing) {
+  if (!housing) return;
+
+  const bldg = document.getElementById("bldgType");
+  if (bldg && housing.건물유형) {
+    bldg.value = housing.건물유형;
+    // change 이벤트를 직접 일으켜야 deal.js의 updatePriceAnyState() 같은
+    // 연결된 로직도 같이 갱신된다 (applyWeights가 input 이벤트를 쏘는 것과 같은 이유)
+    bldg.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  if (housing.거래유형) {
+    // 이미 initDealType()(ui/deal.js)이 걸어둔 클릭 핸들러를 그대로 태운다 —
+    // is-on 클래스 토글과 showDealGroup()까지 한 번에 해결된다
+    document.querySelector(`.seg-btn[data-deal="${housing.거래유형}"]`)?.click();
+  }
+
+  const targets = housing.targets || {};
+  const sliderId = PRICE_SLIDER_ID[housing.거래유형];
+  if (sliderId && targets.예산 != null) {
+    const slider = document.getElementById(sliderId);
+    if (slider) {
+      slider.value = targets.예산;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+  if (housing.거래유형 === "월세" && targets.보증금 != null) {
+    const slider = document.getElementById("wolseDeposit");
+    if (slider) {
+      slider.value = targets.보증금;
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+}
+```
+
+그리고 `runSearch()` 안에서 `applyWeights`를 부르는 바로 옆 줄에 추가:
+
+```js
+// 원본 (runSearch 안)
+    stopSteps();
+    applyWeights(data.weights);            // 슬라이더에 반영
+    renderResult(data);                    // 같은 응답으로 결과 화면 채우기
+```
+
+```js
+// 수정
+    stopSteps();
+    applyWeights(data.weights);            // 슬라이더에 반영
+    applyHousing(data.housing);            // "건축" 패널에 반영 — 가격 언급 없었으면 아무 일도 안 함
+    renderResult(data);                    // 같은 응답으로 결과 화면 채우기
+```
+
+## 확인할 것
+
+1. 검색창에 "4억짜리 아파트 매매로" 처럼 건물유형·거래유형·가격이 다 들어간 문장을
+   넣고 검색 → 건물 유형 드롭다운이 "아파트", 거래 유형 버튼이 "매매"로 바뀌고
+   매매가 슬라이더가 40000(4억) 근처로 움직이는지.
+2. 가격 언급이 전혀 없는 문장("조용한 동네")으로 검색 → "건축" 패널이 검색 전 상태
+   그대로 유지되는지(`housing`이 `null`이라 `applyHousing`이 아무것도 안 건드려야 함).
+3. 좌측 패널에서 슬라이더를 직접 조절해 "AI 분석 실행" 버튼을 누르는 기존 경로는
+   전혀 안 건드렸으니, 그대로 잘 동작하는지만 회귀 확인.
+
+## 이번엔 안 되는 것 — "건축 면적" 슬라이더
+
+같은 패널 안의 면적(`#area`) 슬라이더는 이번 수정 대상이 아니다.
+`Life-Embed-jh/pipeline/weights.py`의 `SYSTEM_PROMPT`(16~57번째 줄)가 Claude에게
+시키는 것 자체에 면적이 없어서 — 검색어에 "59제곱미터 이상"이라고 써도 LLM이 애초에
+그 값을 안 뽑는다. 이것까지 되게 하려면 `Life-Embed-jh`의 `SYSTEM_PROMPT`와
+`ask_claude()`의 파싱 로직에 면적 항목을 추가하는 별도 작업이 필요하다(이번 것보다
+범위가 크다 — 프롬프트 수정 + JSON 스키마 확장 + `search()` 반환값에 실어 보내는 것까지
+전부 새로 해야 함). 지금 당장 필요하면 별도로 요청해서 진행하는 게 좋다.
+
+(원래 여기 같이 있던 준공년도(`builtYear`) 슬라이더는 애초에 화면에 없던 죽은 코드였다
+— 위에 나오는 "빠진 것 2개 + 준공년도 죽은 코드 삭제" 항목에서 지웠다.)
+
+---
+
+# (2026-08-31) 로그인 버튼을 헤더 밖으로 분리 + 메뉴는 "로그인 이후" 화면만 상시 노출
+
+## 요청받은 것
+
+1. 메뉴(햄버거) 패널에서 회원가입 링크를 없애고, 로그인 버튼을 패널 밖 헤더 쪽으로 뺀다.
+2. 메뉴 패널에는 항상 "로그인 이후" 항목(마이페이지·검색 기록·좋아요·원본 데이터)만 보인다
+   — 실제 로그인 여부를 더 이상 안 본다.
+3. 로그인 버튼을 누르면 모달이 뜨고, 그 안에 로그인 섹션 + 회원가입 섹션이 위아래로
+   같이 들어간다. 아직 둘 다 기능이 없으니 "준비중" 문구만 보여준다.
+4. 그 모달 크기는 맵 핀 클릭 시 뜨는 추천 사유 모달(`.reason-modal`)과 동일하게.
+5. 로그인 버튼 색은 낮/밤 테마 상관없이 항상 노란색.
+
+## 왜 `isLoggedIn()`/`localStorage` 토큰 로직을 통째로 지웠는가
+
+원래 메뉴는 `localStorage`의 `lifefit-token` 유무로 로그인 전/후 항목을 바꿔 그렸고,
+"로그인" 링크를 누르면 가짜 토큰을 저장해 로그인 후 화면을 미리보기 하는 개발용 트릭이
+있었습니다(`menu.js`의 옛 `isLoggedIn()`/`menuLogin`/`menuLogout`).
+
+이번 요청대로 메뉴가 실제 로그인 여부와 무관하게 "로그인 이후" 화면만 항상 보여주게
+되면, 그 화면을 바꿔주던 토큰 로직은 더 이상 아무것도 하지 않는 죽은 코드가 됩니다.
+로그인 버튼도 실제로 로그인시키는 대신 "준비중" 모달만 띄우므로, 토큰을 만드는 경로
+자체가 사라졌습니다. 그래서 `isLoggedIn()` 함수, `menuLogin`/`menuLogout` 엘리먼트,
+관련 CSS(`.menu-logout-link`)를 전부 지웠습니다 — 나중에 진짜 로그인 API가 생기면,
+그때는 헤더의 `#loginToggle` 버튼이 로그인 상태(로그인/로그아웃 표시)를 갖게 될
+것이므로, 그 시점에 이 자리에 새로 만들면 됩니다.
+
+## 무엇을 고쳤는지
+
+**`frontend/index.html`** — `#menuToggle` 버튼만 있던 자리를 `#topActions`라는
+플렉스 상자로 감싸고, 그 안에 `#loginToggle`(로그인 버튼)과 `#menuToggle`을 나란히
+뒀습니다. 스크린샷 속 레이아웃(로그인 버튼 + 원형 메뉴 버튼이 우측 상단에 나란히)이
+이 상자 하나로 만들어집니다.
+
+```html
+<!-- 원본 -->
+<button id="menuToggle" title="메뉴">☰</button>
+
+<!-- 수정 -->
+<div id="topActions">
+  <button id="loginToggle">로그인</button>
+  <button id="menuToggle" title="메뉴">☰</button>
+</div>
+```
+
+**`frontend/ui/menu.css`** — fixed 위치를 `#menuToggle` 대신 부모 `#topActions`
+하나에만 줬습니다(버튼 두 개가 따로 fixed면 gap을 맞추기 번거로움). `#loginToggle`은
+`var(--accent-fill)`을 안 씁니다 — 이 변수는 밤 테마에서 `#D1B15A`(톤 다운된 금색)로
+바뀌어서 "낮/밤 둘 다 노란색"이라는 요청과 안 맞습니다. 대신 값을 고정했습니다:
+
+```css
+#loginToggle {
+  background: #FFD24A;   /* 낮 테마의 accent-fill 값을 그대로 고정 */
+  color: #2D2A32;
+  border-radius: 999px;  /* 알약 모양 */
+  ...
+}
+```
+
+모달은 `.reason-modal`(`ui/reason.css`)과 같은 크기 규칙을 그대로 복사했습니다
+(`width: min(460px, 92vw); max-height: 86vh; border-radius: 18px;` 등) — 클래스는
+새로 만들었습니다(`.auth-backdrop`/`.auth-modal`). `reason.css`의 클래스를 직접
+재사용하지 않은 이유는, 그 파일이 "핀 클릭 사유 모달" 전용으로 이미 이름 붙어 있어서
+같이 쓰면 나중에 파일을 찾을 때 헷갈리기 때문입니다(화면 단위로 CSS를 나눈 원칙과도
+맞음 — `CLAUDE.md`의 CSS 분리 규칙 참고).
+
+**`frontend/ui/menu.js`** — `renderMenuItems()`가 더 이상 분기하지 않고 로그인 이후
+항목만 그립니다. 로그인/회원가입 "준비중" 모달을 여닫는 `ensureAuthModal()`/
+`openAuthModal()`/`closeAuthModal()`을 추가하고 `openAuthModal`을 export 했습니다.
+
+**`frontend/ui/search.js`** — 기존에 `#menuToggle` 클릭을 `openMenu`에 연결하던
+자리(`bindEvents()`) 옆에 `#loginToggle` 클릭을 `openAuthModal`에 연결하는 줄을
+추가했습니다. 이 파일이 이미 시작 화면의 모든 버튼 바인딩을 모아두는 곳이라 그대로
+따랐습니다.
+
+## 확인한 것
+
+서버를 띄워 `/`, `/ui/menu.js`, `/ui/menu.css`가 200으로 응답하는 것과, 두 파일의
+JS 문법이 깨지지 않은 것(`node --check`)을 확인했습니다. 브라우저에서 직접 클릭해
+보는 것까지는 이 환경에서 헤드리스 브라우저 도구가 없어 못 했으니, 실제로 열어서
+① 로그인 버튼이 노란 알약 모양으로 뜨는지 ② 눌렀을 때 로그인/회원가입 준비중 모달이
+핀 모달과 같은 크기로 뜨는지 ③ 햄버거 메뉴에 회원가입/로그인 링크 없이 마이페이지
+등 4개 항목만 뜨는지 한 번 확인해 주세요.
+
+---
+
 # 아직 안 만든 것 — 로그인 관련 메뉴 항목 (백엔드 필요, 참고용)
 
 우측 상단 메뉴의 로그인 후 항목(마이페이지·검색 기록·좋아요·관리자 페이지)은
@@ -46,8 +490,8 @@
 
 - **로그인/회원가입**: 회원 DB(이메일·비밀번호 해시·가입일·`role`) + `/api/auth/signup`,
   `/api/auth/login`, `/api/auth/me`. 비밀번호는 반드시 해시(`bcrypt`/`passlib`). 로그인
-  성공 시 토큰을 내려주면 프론트는 그걸 `localStorage`에 저장 — 지금 `isLoggedIn()`이
-  보는 자리가 이미 있음.
+  성공 시 토큰을 내려주면 프론트는 그걸 `localStorage`에 저장 — 헤더의 `#loginToggle`
+  버튼이 이 상태를 표시하는 자리가 된다(지금은 "준비중" 모달만 띄우는 자리표시).
 - **검색·대화 기록 저장**: `main.py`의 `ChatRequest.history`가 지금은 빈 자리로만
   있음(주석에 "로그인·저장 기능을 붙이면 여기로 들어온다"고 미리 적어둠, `main.py:89-91`).
   로그인 상태일 때 `/api/predict`·`/api/chat` 결과를 회원별 DB 테이블에 쌓는 로직 필요.
@@ -58,623 +502,29 @@
 
 ---
 
-# CSS 파일도 `ui/*.js`처럼 화면 단위로 나누기 (완료)
+# CSS 파일도 `ui/*.js`처럼 화면 단위로 나누기 (완료 — 요약만 남김)
 
-`style.css`/`search.css` 두 개뿐이던 CSS를 화면 단위로 나눴습니다
-(`ui/result.css`, `ui/reason.css`, `ui/chat.css`, `ui/menu.css` 신규 생성 +
-`index.html`에 `<link>` 4줄 추가). 서버를 띄워 전부 200 응답 + 화면이 그대로
-보이는 것까지 확인했습니다.
-
-**CSS는 JS의 `import`가 없어서** 나눈 파일 수만큼 `index.html`에
-`<link rel="stylesheet">`를 직접 추가해야 하고, 공용 스타일(`style.css`)을
-화면별 스타일(`ui/*.css`)보다 먼저 적어야 합니다(같은 우선순위 선택자는
-`<link>`를 나중에 적은 파일이 이김).
-
-나중에 비슷하게 더 나누고 싶을 때 참고할 매핑표:
-
-| 파일 | 담긴 내용 |
-|---|---|
-| `style.css` | 테마 변수, 리셋, `.panel` 공통 틀, 좌측 컨트롤 패널(슬라이더 전반 — 여러 화면이 같이 쓰는 폼 스타일), 스크롤바·반응형 |
-| `ui/result.css` | 우측 결과 패널 — 점수 박스, TOP5 목록, 평면도 |
-| `ui/reason.css` | 추천 사유 모달 + 레이더 차트(`.rc-chart`) |
-| `ui/chat.css` | 채팅 패널 |
-| `ui/menu.css` | 메뉴 + 준비중 안내창 |
-| `search.css` | 첫 검색 화면 + 결과 화면 상단 검색바 |
-
-`#map`(`ui/map.js`)과 `.seg`/`.seg-btn`(`ui/deal.js`)은 분량이 작아 일부러
-`style.css`에 남겨 뒀습니다 — `ui/*.js`와 `ui/*.css`를 무조건 1:1로 맞출
-필요는 없고, 파일을 만들 가치가 있는 화면만 나누면 됩니다.
+`style.css`/`search.css` 두 개뿐이던 CSS를 화면 단위(`ui/result.css`,
+`ui/reason.css`, `ui/chat.css`, `ui/menu.css`)로 나누고 200 응답까지 확인했습니다.
+파일별로 뭐가 들어있는지는 `CLAUDE.md`의 프론트엔드 구조 설명에 매핑표로 남아있으니
+여기서는 지웠습니다.
 
 ---
 
-# 시세(집값) 반영 — 엔진 팀 요청 사항 진행 상황
-
-엔진 팀이 보낸 7개 항목을 실제 코드와 대조한 결과, 그중 3개(3·4·5번)는 이미
-되어 있어서 손댈 게 없었고, 1개(1번 — 가격 상관없음 체크박스)는 아래처럼
-직접 고쳐서 끝냈습니다. 2번과 6번은 아직 안 고쳤습니다.
-
-## 1. "가격 상관없음" 체크박스 — 완료. 내가 고친 것
-
-사용자님이 `index.html`에 체크박스, `frontend/ui/deal.js`에 `isPriceAny()`
-함수, `main.py`의 `PredictRequest` 필드를 옵셔널로 바꾸는 것까지는 이미
-해두셨습니다. 제가 이어서 고친 부분은 아래 세 가지입니다.
-
-### 1-1. `main.py`에서 `builtYear` 필드가 통째로 사라져 있었음 (버그)
-
-`PredictRequest`를 옵셔널로 바꾸는 작업을 하다가, 관련 없는 `builtYear` 줄까지
-같이 지워진 것으로 보입니다.
-
-원본(`main.py`, 사용자님이 수정한 상태):
-```python
-    area: int = 59
-    bldgType: str | None = None
-
-    dealType: str | None = None
-    salePrice: int | None = None
-    ...
-```
-
-그런데 아래쪽 `predict()` 함수는 여전히 `body.builtYear`를 읽고 있었습니다
-(126번째 줄):
-```python
-    if body.builtYear >= 2015:
-        base_score += 5
-```
-
-`PredictRequest`에 `builtYear` 필드 자체가 없어졌으니, 요청이 들어올 때마다
-`body.builtYear`에서 `AttributeError`가 나서 **`/api/predict`가 무조건 500
-에러**가 나는 상태였습니다(실제로 서버를 띄워 재현해 확인했습니다). 필드를
-그대로 되살려서 고쳤습니다.
-
-수정:
-```python
-    area: int = 59
-    builtYear: int = 2015
-    bldgType: str | None = None
-
-    dealType: str | None = None
-```
-
-**교훈**: 여러 줄을 한 번에 골라서 지우거나 바꿀 때, 그 범위 안에 손대려던
-것과 무관한 줄이 같이 딸려 들어가지 않았는지 항상 한 번 더 확인하는 게
-좋습니다. 이런 실수는 문법 오류가 아니라서 에디터가 안 잡아주고, 그 필드를
-실제로 쓰는 요청이 와야만(즉 서버를 실행해서 확인해야만) 드러납니다.
-
-### 1-2. `frontend/ui/deal.js` — 체크되면 가격 관련 입력을 잠그기
-
-요청 문서 1번 항목이 "슬라이더는 체크박스가 꺼져 있을 때만 활성화되는 게
-자연스럽다"고 했던 부분입니다. `isPriceAny()`는 이미 있었지만, 그 값을 실제로
-써서 입력을 잠그는 코드가 없었습니다.
-
-`frontend/ui/deal.js`에 추가:
-```js
-/** "가격 상관없음"이 켜지면 가격 관련 입력을 전부 잠가서
- *  건드려도 소용없다는 걸 눈으로 보여준다 */
-function updatePriceAnyState() {
-  const any = isPriceAny();
-  const seg = document.getElementById("dealSeg");
-  const bldg = document.getElementById("bldgType");
-
-  seg?.querySelectorAll(".seg-btn").forEach((b) => { b.disabled = any; });
-  if (bldg) bldg.disabled = any;
-
-  MONEY_SLIDERS.forEach(([id]) => {
-    const s = document.getElementById(id);
-    if (s) s.disabled = any;
-  });
-}
-```
-그리고 `initDealType()` 끝에 체크박스 이벤트 연결 + 첫 화면 상태 맞추기를
-추가했습니다:
-```js
-  document.getElementById("priceAny")?.addEventListener("change", updatePriceAnyState);
-
-  showDealGroup(currentDeal());
-  updatePriceAnyState();         // 첫 화면 상태도 맞춰 준다
-```
-`disabled = true`가 붙은 `<select>`/`<button>`/`<input type="range">`는
-브라우저가 자동으로 흐리게 보여주고 클릭도 안 먹기 때문에, CSS를 따로 안 써도
-"이건 지금 못 건드린다"는 게 눈으로 보입니다.
-
-### 1-3. `frontend/ui/result.js` — 체크됐으면 서버에 `null`로 보내기
-
-체크박스를 잠그기만 하고 서버로 보내는 값은 그대로면 의미가 없습니다.
-`runSimulation()`이 `payload`를 만드는 부분을 고쳤습니다.
-
-원본:
-```js
-import { currentDeal } from "./deal.js";
-...
-  const payload = {
-    bldgType: document.getElementById('bldgType')?.value || "아파트",
-    dealType: currentDeal(),
-    salePrice: Number(document.getElementById('salePrice')?.value || 58000),
-    jeonseDeposit: Number(document.getElementById('jeonseDeposit')?.value || 23000),
-    wolseDeposit: Number(document.getElementById('wolseDeposit')?.value || 3000),
-    wolseRent: Number(document.getElementById('wolseRent')?.value || 60),
-```
-
-수정:
-```js
-import { currentDeal, isPriceAny } from "./deal.js";
-...
-  const priceAny = isPriceAny();
-  const payload = {
-    // "가격 상관없음"이 켜지면 null 로 보낸다.
-    // 슬라이더 값을 그대로 보내면 서버가 "이 가격을 원한다" 로 알아듣기 때문이다
-    bldgType: priceAny ? null : (document.getElementById('bldgType')?.value || "아파트"),
-    dealType: priceAny ? null : currentDeal(),
-    salePrice: priceAny ? null : Number(document.getElementById('salePrice')?.value || 58000),
-    jeonseDeposit: priceAny ? null : Number(document.getElementById('jeonseDeposit')?.value || 23000),
-    wolseDeposit: priceAny ? null : Number(document.getElementById('wolseDeposit')?.value || 3000),
-    wolseRent: priceAny ? null : Number(document.getElementById('wolseRent')?.value || 60),
-```
-
-### 확인한 것
-
-서버를 실제로 띄워 두 가지 요청을 다 보내봤습니다.
-- 평소처럼 가격 값을 보낸 요청 → 정상 200, 로그에 `[예산검토]`가 찍히며 예산
-  초과 지역이 실제로 감점되는 것 확인(builtYear 버그 고친 뒤 정상화됨).
-- `bldgType`/`dealType`/가격 4개를 전부 `null`로 보낸 요청 → 정상 200, 감점
-  없이 원래 점수 그대로 나오는 것 확인("가격 상관없음"이 실제로 가격 필터를
-  건너뛴다는 뜻).
-
-`services/price.py`는 이미 `None`을 잘 처리하도록 짜여 있어서 따로 안
-고쳤습니다(`apply_budget()`의 `prefs.get("bldgType") or "아파트"`, `over_ratio()`의
-`if not 시세 or not 내예산: return 0.0`).
-
-## 2. 가격 슬라이더 라벨 — 아직 안 고침
-
-`index.html`의 라벨 4곳(`매매가`/`전세 보증금`/`보증금`/`월 임대료`)을 "목표가"
-뉘앙스로 바꾸는 문구 작업입니다. 문구는 프론트 판단이라 예시만 남깁니다: `희망
-매매가`/`희망 전세 보증금`/`희망 보증금`/`희망 월세`.
-
-**참고**: `services/price.py`의 `over_ratio()`를 다시 보니 `max(0.0, (시세 -
-내예산) / 내예산)`이라 **시세가 목표가보다 쌀 때는 감점이 0**입니다. 엔진 팀
-요청 문서는 "훨씬 싼 매물도 똑같이 감점"이라고 설명했는데 실제 코드는
-"비쌀 때만 감점"으로 짜여 있어서, 문구를 정하기 전에 엔진 팀에 어느 쪽이
-맞는 설명인지 확인해 보면 좋겠습니다.
-
-## 3~5, 7. 확인만 하고 끝난 것 — 손댈 것 없음
-
-- **월세 보증금+월세 두 입력**: `index.html`에 이미 둘 다 있고 `payload`에도
-  둘 다 실어 보내고 있습니다.
-- **건물유형 드롭다운 값**: `아파트`/`단독다가구`/`연립다세대`/`오피스텔` —
-  엔진이 갖고 있는 값과 정확히 일치해서 매핑표가 필요 없습니다.
-- **면적 슬라이더**: `services/price.py`의 시세 계산 어디에도 `area`를 읽는
-  코드가 없어서, 지금 상태가 이미 "면적은 가격 계산에 반영 안 함"입니다.
-- **자연어 검색**: `frontend/ui/search.js`의 `runSearch()`는 검색어만 보내고
-  있어서 이미 요청 문서 설명대로 동작합니다.
-
-## 6. 주변 시세 탭 — 아직 안 고침 (백엔드부터 손대야 함)
-
-요청 문서에는 없던 내용인데 확인하다가 찾았습니다. `services/price.py`의
-`apply_budget()`은 이미 각 지역에 시세 정보를 담아 둡니다(`r["price"] = info`).
-그런데 `main.py`의 `/api/predict`가 응답을 만드는 부분이 이 값을 빼먹고
-있어서, 프론트로는 아예 안 넘어옵니다:
-```python
-top_regions.append({
-    "rank": idx + 1,
-    "name": f"서울특별시 {r['name']}",
-    "lat": lat,
-    "lng": lng,
-    "score": r["total"],
-    "scores": r["scores"],
-    # ← 여기에 "price": r.get("price") 가 빠져 있음
-})
-```
-
-**해야 할 일**:
-1. `main.py`의 `top_regions.append({...})`에 `"price": r.get("price")` 추가
-   (서울 전체 대비 백분위는 지금 `services/price.py`에 없는 기능이라 별도
-   개발이 더 필요할 수 있음 — 중앙값·25~75% 범위는 바로 가능).
-2. `frontend/ui/reason.js`의 "주변 시세" 탭(`data-tab-panel="price"` 자리,
-   지금은 `<div class="rc-empty">준비 중입니다.</div>`만 있음)을 `item.price`를
-   읽어 채우는 코드로 바꾸기. 매매/전세면 `item.price?.금액`·`금액_25`·`금액_75`,
-   월세면 `item.price?.보증금`·`월임대료`. `item.price`가 `null`이면(그 동네
-   시세 데이터가 없을 때) "준비 중"이 아니라 "이 조건의 시세 정보가 없어요"로
-   문구를 바꾸는 게 더 정확함.
-3. "가격 상관없음"이 켜진 상태에서도 `services/price.py`가 기본값(아파트/전세)
-   시세를 채워 넣긴 하므로, 이 탭을 그때는 숨길지 "조건을 선택하면 시세를 볼
-   수 있어요"로 대체할지 정해야 함.
-
-## 요약
-
-| 번호 | 항목 | 상태 |
-|---|---|---|
-| 1 | 가격 상관없음 체크박스 | ✅ 완료 (오늘 마무리 — builtYear 버그도 같이 고침) |
-| 2 | 가격 슬라이더 문구 | 미착수 — 문구는 자유, 단 엔진 팀에 감점 방식 재확인 권장 |
-| 3 | 월세 보증금+월세 입력 | 확인 완료 — 이미 있음 |
-| 4 | 건물유형 드롭다운 값 | 확인 완료 — 이미 엔진 값 그대로 |
-| 5 | 면적 슬라이더 반영 | 확인 완료 — 지금 상태가 이미 A안(안 보냄) |
-| 6 | 주변 시세 탭 | 미착수 — `main.py` 응답에 `price` 필드 추가부터 필요 |
-| 7 | 자연어 검색 가격 반영 | 확인 완료 — 이미 됨 |
-
----
-
-# (2026-08-31) 왜 엔진에 시세를 추가했는데도 LLM 서술에 반영이 안 되는가
-
-엔진 팀이 `master_dataset_v3`에 시세 24칸을 추가하고, `pipeline/housing.py`·`chat.py`·
-`region_explain.py`·`explain.py`까지 전부 손봐서 "목표가에 얼마나 가까운가"를 계산하고
-설명문에 넣는 파이프라인을 이미 완성해 두었다(자세한 내용은 `Life-Embed-jh/STUDY.md`
-1~10번). 그런데 실제로 화면에서 써보면 여전히 안 맞는 느낌이 든다 — 원인을 찾아보니
-**엔진 문제가 아니라 이 저장소(Life-Web)가 그 새 기능을 아예 호출하지 않고 있었다.**
-
-## 1. 지금 이 저장소엔 시세 시스템이 두 개다
-
-- **엔진의 새 시스템** — `search()`/`recommend_by_weights(weights, housing=...)`. 사용자
-  조건(건물유형·거래유형·예산)에 맞는 동만 먼저 추리고, 그 안에서 순위를 매기고, 그 순위
-  그대로 설명문(`explanation`)을 쓴다. `housing`을 안 주면 이 필터는 그냥 꺼진다.
-- **이 저장소의 옛날 시스템** — `services/price.py`의 `apply_budget()`. 자기 `data/시세_지역별.csv`를
-  따로 읽어서, 엔진이 이미 뽑아준 TOP 5의 점수를 예산 초과분만큼 다시 깎고 재정렬한다.
-
-`services/engine.py`의 `get_regions()`를 보면 이 둘이 어떻게 부딪히는지 보인다.
-
-```python
-# services/engine.py (현재)
-def get_regions(user_prefs):
-    query = (user_prefs.get('query') or '').strip()
-
-    if query:
-        result = search(query, top_k=CANDIDATE_K)                     # housing 인자 없음
-        weights = result["weights"]
-        regions = result["regions"]
-        explanation = result["explanation"]
-    else:
-        weights = to_korean_weights(user_prefs)
-        regions = recommend_by_weights(weights, top_k=CANDIDATE_K)    # 여기도 없음
-        explanation = ""                                              # 슬라이더 경로는 설명문이 아예 없다
-
-    regions = apply_budget(regions, user_prefs, top_k=5)              # 별개의 옛 시스템으로 재정렬
-    return weights, regions, explanation
-```
-
-증상이 세 가지로 나타난다.
-
-1. **슬라이더만 써서 추천받으면(검색어 없이) LLM 서술 자체가 없다.** `explanation = ""`을
-   이 파일이 직접 박아두고 있다 — 화면에 건물유형·거래유형·예산을 다 골라도 그 조건이
-   엔진에 전혀 안 들어가기 때문이다("가격 상관없음" 체크박스와 무관하게, 애초에 검색어
-   경로가 아니면 `explanation`이 항상 빈 문자열이다).
-2. **검색어로 검색해도, 화면 슬라이더 값은 무시된다.** `search(query, ...)`는 오직 검색어
-   "문장"에서 Claude가 뽑아낸 조건만 본다 — "2억 3천짜리 전세 아파트"처럼 검색어에 직접
-   써야만 반영되고, 화면에서 슬라이더로 골라둔 값은 안 본다.
-3. **엔진이 만든 TOP 5·설명문을, `apply_budget()`이 다시 한번 자기 방식대로 재정렬한다.**
-   그래서 최종 화면 순서와 설명문이 말하는 순서가 어긋날 수 있다 — 설명문은
-   `apply_budget()` 재정렬 **이전** 순서를 근거로 쓰였기 때문이다. 또한 `apply_budget()`이
-   보는 시세(`data/시세_지역별.csv`)와 엔진이 참고 시세로 문장에 넣은 시세(`master_dataset_v3`)가
-   같은 동네라도 서로 다른 숫자일 수 있다 — 화면 표시와 설명문이 서로 다른 값을 인용하게 된다.
-
-## 2. 수정 — `services/engine.py`에서 슬라이더 값을 `housing`으로 바꿔 엔진에 넘기기
-
-```python
-# services/engine.py (수정) — housing 딕셔너리를 만드는 함수 추가
-def to_housing(prefs):
-    """화면의 건물유형·거래유형·예산 슬라이더를 엔진의 housing 형태로 바꾼다.
-
-    '가격 상관없음'이면 bldgType/dealType 이 이미 None 으로 온다
-    (frontend/ui/result.js 의 isPriceAny() 처리 — 그대로 유지).
-    """
-    bldg = prefs.get("bldgType")
-    deal = prefs.get("dealType")
-    if not bldg or not deal:
-        return None
-
-    if deal == "매매":
-        예산 = prefs.get("salePrice")
-    elif deal == "전세":
-        예산 = prefs.get("jeonseDeposit")
-    else:  # 월세
-        예산 = prefs.get("wolseRent")
-
-    if not 예산:
-        return None
-
-    targets = {"예산": 예산}
-    if deal == "월세" and prefs.get("wolseDeposit"):
-        targets["보증금"] = prefs["wolseDeposit"]
-
-    return {"건물유형": bldg, "거래유형": deal, "targets": targets}
-```
-
-```python
-# services/engine.py (수정) — get_regions()
-def get_regions(user_prefs):
-    query = (user_prefs.get('query') or '').strip()
-    housing = to_housing(user_prefs)
-
-    if query:
-        result = search(query, top_k=CANDIDATE_K, housing_override=housing)
-        weights = result["weights"]
-        regions = result["regions"]
-        explanation = result["explanation"]
-    else:
-        weights = to_korean_weights(user_prefs)
-        regions = recommend_by_weights(weights, top_k=CANDIDATE_K, housing=housing)
-        explanation = ""   # 슬라이더 경로는 자연어 검색어가 없어 explain() 프롬프트를 못 만든다 — 4번 참고
-
-    return weights, regions[:5]
-```
-
-**주의 — `search()`에 `housing_override` 인자를 추가하는 건 엔진(Life-Embed-jh) 쪽 작업이다.**
-지금 `search()`는 검색어 문장에서 Claude가 뽑은 조건만 쓰기 때문에, 화면 슬라이더 값을
-우선 반영하려면 엔진이 먼저 그 인자를 받아야 한다 — 제안 코드를 `Life-Embed-jh/STUDY.md`
-10번에 적어뒀다. 그전까지는 검색어 경로에서 화면 슬라이더 값이 여전히 무시된다는 걸
-알고 있을 것.
-
-`apply_budget()` 호출을 통째로 뺀 이유 — `housing`을 넘긴 순간부터 "조건에 맞는 동만
-추리고 순위를 매기는" 일을 엔진이 이미 하므로, 그 위에 또 다른 방식으로 재정렬하면
-1번 문제(설명문·화면 순서 불일치)가 그대로 재발한다. 대신 [10]에서 엔진에 요청해 둔
-`attach_price()`가 각 동네에 `r["price"]`(구조화된 시세)를 붙여서 돌려주므로, 화면에
-시세를 보여주는 용도는 그걸로 대체한다 — 3번에서 이어서 다룬다.
-
-## 3. `main.py` — 엔진이 붙여준 `price`를 응답에 그대로 실어 보내기
-
-`services/price.py`의 `apply_budget()`이 없어지면, "주변 시세" 탭(요약 6번, 아직 미착수였던
-바로 그 항목)에 필요한 값은 이제 엔진이 `detailed`에 붙여준 `r["price"]`에서 나온다.
-
-```python
-# main.py (원본) — predict() 안, top_regions.append({...})
-        top_regions.append({
-            "rank": idx + 1,
-            "name": f"서울특별시 {r['name']}",
-            "lat": lat,
-            "lng": lng,
-            "score": r["total"],
-            "scores": r["scores"],
-        })
-```
-
-```python
-# main.py (수정)
-        top_regions.append({
-            "rank": idx + 1,
-            "name": f"서울특별시 {r['name']}",
-            "lat": lat,
-            "lng": lng,
-            "score": r["total"],
-            "scores": r["scores"],
-            "price": r.get("price"),   # housing 조건이 없었으면 None — 프론트에서 탭을 숨기거나 안내문으로 대체
-        })
-```
-
-`frontend/ui/reason.js`의 "주변 시세" 탭(`data-tab-panel="price"`)을 `item.price`를 읽어
-채우는 것은 원래 계획(위쪽 6번 항목)과 같으니 그대로 진행하면 된다. 다만 `item.price`의
-모양이 바뀐다는 점만 주의 — `services/price.py`가 주던 `금액_25`/`금액_75`(분포 범위)나
-`신뢰등급`/`거래건수`/`출처`는 `master_dataset_v3` 기반의 새 `price`엔 없다(중앙값과
-"일치도" 점수만 있음). 분포·신뢰도 정보까지 화면에 꼭 보여줘야 한다면, 그 정보가 남아있는
-`Life-Embed-jh/data/시세_지역별_전처리.csv`를 엔진 쪽에서 별도로 노출해줘야 한다 — 지금
-당장 필요한지는 결정이 필요하다(아래 4번).
-
-## 4. 아직 결정이 안 된 것들
-
-- **슬라이더 경로엔 여전히 LLM 설명문이 없다.** `search()`는 자연어 검색어가 있어야
-  `explain()` 프롬프트(`## 사용자 검색어\n{query}`)를 만들 수 있는 구조라서, 슬라이더만
-  쓴 요청엔 대응하는 "검색어"가 없다. 빈 문자열이나 "건물유형·거래유형·예산 조건으로 찾음"
-  같은 자리표시 문장을 만들어 `explain()`을 그래도 불러줄지, 아니면 슬라이더 경로는 원래
-  설명문이 없는 게 맞는 설계인지는 결정이 필요하다 — 지금 코드를 그대로 살려뒀다.
-- **`신뢰등급`/`거래건수`/`출처`(표본 신뢰도) 정보 손실.** 위 3번 참고. `services/price.py`를
-  완전히 지우면 이 정보를 보여줄 방법이 없어진다.
-- **`services/price.py` 자체를 지울지 여부.** `apply_budget()` 호출을 뺀 순간 이 파일은
-  안 쓰이게 되지만, 3번의 신뢰도 정보 문제가 해결되기 전까지는 남겨두고 참고용으로만 쓸지,
-  바로 지울지는 사용자 판단에 맡긴다 — 지금은 손대지 않았다.
-- **`CANDIDATE_K=25`로 후보를 넉넉히 받던 이유가 `apply_budget()`의 재정렬 때문이었다.**
-  이제 `housing` 필터가 엔진 안에서 먼저 걸러내므로, `top_k=CANDIDATE_K` 대신 처음부터
-  `top_k=5`로 줄여도 되는지 실제로 돌려보고 확인이 필요하다.
-
-## 5. "가격 상관없음" 체크박스 → 건물유형 드롭다운 5번째 옵션으로 통합
-
-지금은 체크박스 하나(`#priceAny`)가 거래유형 버튼 3개(`#dealSeg`), 건물유형 드롭다운
-(`#bldgType`), 금액 슬라이더 4개를 한꺼번에 잠그는 구조다. 컨트롤이 5종류나 서로 다른 위치에
-흩어져 있어서 "체크박스 하나가 저 멀리 있는 것들까지 잠근다"는 게 화면만 보고는 안 와닿는다.
-건물유형 드롭다운 자체에 "건물·거래유형 고려안함" 항목을 5번째로 추가하면, 잠그는 대상이
-드롭다운 하나로 좁혀지고 체크박스도 따로 필요 없어진다.
-
-### 5-1. `index.html` — 체크박스를 없애고 드롭다운에 옵션 추가
-
-```html
-<!-- index.html (원본) -->
-      <select id="bldgType">
-        <option value="아파트" selected>아파트</option>
-        <option value="단독다가구">단독다가구</option>
-        <option value="연립다세대">연립다세대</option>
-        <option value="오피스텔">오피스텔</option>
-      </select>
-    </div>
-
-      <div class="weight-row">
-      <div class="weight-top">
-        <span class="wlabel">거래 유형</span>
-      </div>
-      <div class="seg" id="dealSeg">
-        <button type="button" class="seg-btn" data-deal="매매">매매</button>
-        <button type="button" class="seg-btn is-on" data-deal="전세">전세</button>
-        <button type="button" class="seg-btn" data-deal="월세">월세</button>
-      </div>
-    </div>
-
-    <label class="weight-row">
-      <input type="checkbox" id="priceAny">
-      <span class="wlabel">가격 상관없음</span>
-    </label>
-```
-
-```html
-<!-- index.html (수정) -->
-      <select id="bldgType">
-        <option value="아파트" selected>아파트</option>
-        <option value="단독다가구">단독다가구</option>
-        <option value="연립다세대">연립다세대</option>
-        <option value="오피스텔">오피스텔</option>
-        <option value="ANY">건물·거래유형 고려안함</option>
-      </select>
-    </div>
-
-      <div class="weight-row">
-      <div class="weight-top">
-        <span class="wlabel">거래 유형</span>
-      </div>
-      <div class="seg" id="dealSeg">
-        <button type="button" class="seg-btn" data-deal="매매">매매</button>
-        <button type="button" class="seg-btn is-on" data-deal="전세">전세</button>
-        <button type="button" class="seg-btn" data-deal="월세">월세</button>
-      </div>
-    </div>
-```
-
-체크박스 `<label>` 통째로 삭제. "가격 상관없음"이라는 뜻은 이제 드롭다운 값 하나
-(`"ANY"`)로 표현된다.
-
-### 5-2. `frontend/ui/deal.js` — 체크박스 대신 드롭다운 값을 본다
-
-```js
-// deal.js (원본)
-export function isPriceAny() {
-  return document.getElementById("priceAny")?.checked ?? false;
-}
-
-function updatePriceAnyState() {
-  const any = isPriceAny();
-  const seg = document.getElementById("dealSeg");
-  const bldg = document.getElementById("bldgType");
-
-  seg?.querySelectorAll(".seg-btn").forEach((b) => { b.disabled = any; });
-  if (bldg) bldg.disabled = any;
-
-  MONEY_SLIDERS.forEach(([id]) => {
-    const s = document.getElementById(id);
-    if (s) s.disabled = any;
-  });
-}
-```
-
-```js
-// deal.js (수정)
-export function isPriceAny() {
-  return document.getElementById("bldgType")?.value === "ANY";
-}
-
-/** "건물·거래유형 고려안함"이 선택되면 거래유형·금액 입력을 잠근다.
- *  건물유형 드롭다운 자체는 잠그지 않는다 — 다시 다른 값을 골라서
- *  빠져나올 수 있어야 하기 때문이다 */
-function updatePriceAnyState() {
-  const any = isPriceAny();
-  const seg = document.getElementById("dealSeg");
-
-  seg?.querySelectorAll(".seg-btn").forEach((b) => { b.disabled = any; });
-
-  MONEY_SLIDERS.forEach(([id]) => {
-    const s = document.getElementById(id);
-    if (s) s.disabled = any;
-  });
-}
-```
-
-`initDealType()` 안에서 이벤트를 붙이는 대상도 바꾼다 — 체크박스의 `change`가 아니라
-드롭다운의 `change`를 듣는다.
-
-```js
-// deal.js (원본) — initDealType() 안
-  document.getElementById("priceAny")?.addEventListener("change", updatePriceAnyState);
-```
-
-```js
-// deal.js (수정)
-  document.getElementById("bldgType")?.addEventListener("change", updatePriceAnyState);
-```
-
-### 5-3. `frontend/ui/result.js`는 고칠 필요가 없다
-
-`result.js`는 체크박스를 직접 안 보고 `isPriceAny()` 함수만 부른다(`priceAny ? null :
-...`). `isPriceAny()`의 내부 구현만 바꿨을 뿐 반환값의 의미(참/거짓)는 그대로라서,
-`result.js`는 한 줄도 안 건드려도 그대로 동작한다 — 애초에 체크박스를 직접 참조하지 않고
-함수로 감싸뒀던 게 여기서 이득을 본 것이다.
-
-### 확인할 것
-
-드롭다운에서 "건물·거래유형 고려안함"을 선택했을 때 거래유형 버튼·금액 슬라이더가
-잠기는지, 다시 "아파트" 같은 값으로 되돌렸을 때 전부 풀리는지 브라우저에서 직접 클릭해
-확인. `<select>`는 체크박스와 달리 클릭 한 번에 값이 바로 안 바뀌고 옵션을 고르고 나서
-바뀌므로, `change` 이벤트가 브라우저마다 다르게 씹히지 않는지도 같이 확인.
-
----
-
-# (2026-08-31) 결정 사항 두 가지 반영 — 시세 8번째 지표 + C안(CSV·price.py 이관)
-
-지난 논의에서 두 가지를 정하기로 했다.
-
-1. "건물·거래유형 고려안함"을 고르면(=`housing`이 `None`) 그냥 가격을 무시하는 게 아니라,
-   **4건물유형×3거래유형 12개 컬럼의 평균 백분위**로 "저렴한 동네를 살짝 우대"한다.
-2. `data/시세_지역별.csv`·`services/price.py`는 **C안** — 신뢰등급·거래건수·분포 정보까지
-   전부 엔진(Life-Embed-jh)으로 이관하고, 이 저장소는 엔진이 돌려주는 `price` 필드 하나만
-   그대로 쓴다.
-
-1번은 엔진 쪽 작업이 대부분이라 코드는 `Life-Embed-jh/STUDY.md` 11번(시세를 8번째 신호로
-켜기)·12번(C안 상세)에 적어뒀다. 여기서는 **이 저장소가 뭘 안 해도 되고 뭘 해야 하는지**만
-정리한다.
-
-## 1. 이 저장소가 따로 할 일은 없다 — `housing=None`만 잘 넘기면 자동으로 켜진다
-
-지난번에 적어둔 `to_housing()`을 다시 보면:
-
-```python
-# services/engine.py (지난 제안, 그대로 유지)
-def to_housing(prefs):
-    bldg = prefs.get("bldgType")
-    deal = prefs.get("dealType")
-    if not bldg or not deal:
-        return None   # "건물·거래유형 고려안함"을 고르면 여기로 온다
-    ...
-```
-
-"건물·거래유형 고려안함"(드롭다운의 `bldgType === "ANY"`)을 고르면 `bldg`가 `"ANY"`가
-되어 `if not bldg`는 거짓이지만, **`recommend_by_weights(weights, housing=...)`에 넘기기
-전에 `"ANY"`를 실제로는 "조건 없음"으로 바꿔줘야 한다** — 엔진의 `DEAL_COLUMNS`엔
-`("ANY", ...)` 같은 키가 없기 때문이다. `to_housing()`에 한 줄만 추가하면 된다.
-
-```python
-# services/engine.py (수정) — to_housing() 맨 앞에 추가
-def to_housing(prefs):
-    bldg = prefs.get("bldgType")
-    deal = prefs.get("dealType")
-    if not bldg or bldg == "ANY" or not deal:
-        return None
-    ...
-```
-
-이렇게 `housing`이 `None`으로 엔진에 전달되면, `Life-Embed-jh/STUDY.md` 11번에서 만드는
-`recommend_by_weights()`의 `else` 분기(시세를 8번째 신호로 얹는 부분)가 자동으로 켜진다.
-**이 저장소는 "저렴한 순 우대"를 흉내 낼 별도 로직을 만들 필요가 없다** — `housing=None`을
-정확히 넘기기만 하면 된다. (참고로 이전 버전 체크박스가 있었을 때도 원리는 같았다 —
-`priceAny`가 켜지면 `bldgType`/`dealType`을 `null`로 보내던 것과 지금 `"ANY"` 옵션이
-`None`으로 정규화되는 것이 같은 역할이다.)
-
-## 2. `price` 필드 — 이제 신뢰등급·분포까지 들어온다
-
-`Life-Embed-jh/STUDY.md` 12번대로 엔진이 `attach_price()`를 확장하면, `main.py`에 이미
-적어둔 `"price": r.get("price")`(요약 6번 항목) 하나로 신뢰등급·거래건수·분포 범위까지
-전부 딸려온다. 이 저장소 쪽에서 추가로 조회할 게 없다 — `frontend/ui/reason.js`의
-"주변 시세" 탭은 `item.price.거래건수`/`item.price.신뢰등급`/`item.price.금액_25`/
-`item.price.금액_75`를 그대로 읽으면 된다(옛 `services/price.py`가 주던 필드 이름과
-최대한 맞춰뒀다 — `Life-Embed-jh/STUDY.md` 12번의 `attach_price()` 참고).
-
-## 3. 지울 것 — 순서
-
-1. `services/engine.py` 맨 위의 `from .price import apply_budget` 삭제, `get_regions()`의
-   `apply_budget(...)` 호출도 삭제(지난 제안대로 `housing`을 넘기는 구조로 이미 바뀌었다면
-   이 줄은 이미 안 쓰이고 있을 것 — 지우기만 하면 됨).
-2. `services/price.py` 파일 삭제.
-3. `data/시세_지역별.csv` 삭제.
-4. 서버 재시작 후 `/api/predict`가 정상 응답하는지, "주변 시세" 탭에 신뢰등급·거래건수가
-   여전히 뜨는지 확인. `services/engine.py`에 `price.py`를 참조하는 줄이 남아있으면
-   임포트 시점에 바로 `ModuleNotFoundError`가 나므로 서버가 뜨는지만 봐도 빠뜨린 곳을
-   바로 알 수 있다.
-
-## 주의할 점
-
-- **삭제는 `Life-Embed-jh` 쪽 12번 작업(`region_price_detail()`, `attach_price()` 확장)이
-  끝난 뒤에 해야 한다.** 순서를 바꿔서 이 저장소의 CSV·`price.py`부터 지우면, 엔진 쪽
-  작업이 끝나기 전까지 신뢰등급·거래건수·분포 정보를 화면 어디서도 못 보여주는 공백
-  기간이 생긴다.
-- **`CANDIDATE_K=25`를 계속 쓸지도 이 김에 다시 볼 것.** 예전엔 `apply_budget()`이 재정렬할
-  후보를 넉넉히 받으려고 25개를 받았는데, 이제 그 재정렬 자체가 없어지므로 `top_k=5`로
-  바로 받아도 되는지 실제로 돌려서 확인.
+# 시세(집값) 반영 — 완료 (요약만 남김)
+
+`data/시세_지역별.csv`·`services/price.py`로 이 저장소가 따로 예산을 계산하던 옛 방식은
+전부 지웠다(둘 다 디스크에서 삭제 확인). 지금은 `services/engine.py`의 `to_housing()`이
+화면의 건물유형·거래유형·예산을 엔진의 `housing` 형태로 바꿔 `search()`/
+`recommend_by_weights()`에 그대로 넘기고, 엔진이 그 조건에 맞는 동만 추려 순위를 매긴다.
+"건물·거래유형 고려안함"을 고르면(`bldgType === "ANY"`) `housing`이 `None`이 되어, 엔진이
+"저렴한 동네를 살짝 우대"하는 기본 동작으로 넘어간다. `main.py`가 엔진의 `attach_price()`
+결과(`r["price"]`)를 `topRegions`에 그대로 실어 보내고, `frontend/ui/reason.js`의
+"주변 시세" 탭(`buildPriceHtml`)이 그 값을 읽어 보여준다 — 전부 확인 완료.
+
+가격 관련 컨트롤도 체크박스(`#priceAny`) 대신 건물유형 드롭다운의 다섯 번째 옵션
+(`"ANY" = "건물·거래유형 고려안함"`)으로 통합됐다. `isPriceAny()`가 드롭다운 값만 보고,
+선택 시 거래유형 버튼·금액 슬라이더를 잠근다(`frontend/ui/deal.js`).
+
+**남은 것**: 가격 슬라이더 라벨(`희망 매매가` 등을 "목표가" 뉘앙스로 다듬는 문구 작업)은
+아직 안 건드렸다 — 급하지 않은 문구 작업이라 미룸.
