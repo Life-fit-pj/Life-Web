@@ -48,9 +48,16 @@
   <script>
     const API_BASE = '/api/admin';
 
+    // 토큰은 한 번 물어보고 localStorage 에 저장해 다음부터는 안 물어본다
+    let TOKEN = localStorage.getItem('adminToken') || prompt('관리자 토큰을 입력하세요') || '';
+    if (TOKEN) localStorage.setItem('adminToken', TOKEN);
+
     // 모든 요청이 이 함수를 지난다. 6단계에서 토큰을 붙일 때도 여기 한 줄만 고치면 된다
     const api = async (path, options = {}) => {
-      const res = await fetch(API_BASE + path, options);
+      const res = await fetch(API_BASE + path, {
+        ...options,
+        headers: { 'Authorization': 'Bearer ' + TOKEN, ...options.headers },
+      });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     };
