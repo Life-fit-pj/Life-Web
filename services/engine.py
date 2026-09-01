@@ -23,7 +23,8 @@ from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
 from app.features.admin import (
     get_member, list_members, get_region, list_regions,
-    update_member, update_region, preview_member, similar_members, InvalidPatch,
+    update_member, update_region, preview_member, similar_members, InvalidPatch, health,
+    clear_caches,
 )
 
 

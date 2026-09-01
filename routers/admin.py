@@ -19,7 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 
 from services.engine import (
     get_member, list_members, get_region, list_regions,
-    update_member, update_region, preview_member, similar_members, InvalidPatch,
+    update_member, update_region, preview_member, similar_members, InvalidPatch, health,
+    clear_caches,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -112,3 +113,21 @@ def admin_similar_members(customer_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="그런 회원이 없다")
     return result
+
+
+@router.get("/health")
+def admin_health():
+    """프로세스가 살아 있나. 토큰도 필요 없다 — 이건 가장 바깥 확인이다."""
+    return {"ok": True}
+
+
+@router.get("/ready", dependencies=[Depends(check_admin)])
+def admin_ready():
+    """일할 준비가 됐나 — DB가 진짜 DB인지, 캐시가 데워져 있는지."""
+    return health()
+
+
+@router.post("/cache/clear", dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_clear_cache():
+    """캐시를 버린다. 다음 요청 때 새로 계산된다."""
+    return clear_caches()

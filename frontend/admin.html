@@ -46,11 +46,17 @@
          border-radius: 99px; overflow: hidden; }
     .meter i { display: block; height: 100%; background: var(--accent); }
     .err { color: #d63b30; font-size: 11.5px; margin-top: 4px; }
+    #status { padding: 6px 12px; font-size: 12px; }
+    #status.ok { color: #2f8f5b; }
+    #status.bad { color: #d63b30; font-weight: bold; }
   </style>
 </head>
 <body>
 
   <div id="toast" hidden></div>
+
+  <div id="status">…</div>
+  <button onclick="clearCache()">캐시 비우기</button>
 
   <!-- 4-3에서 여기에 탭·목록·폼 화면을 채운다 -->
   <div class="tabs">
@@ -132,6 +138,29 @@
       if (name === 'member' && !membersLoaded) loadMembers();
       if (name === 'region' && !regionsLoaded) loadRegions();
     }
+
+
+    async function clearCache() {
+      await api('/cache/clear', { method: 'POST' });
+      await refreshStatus();          // 비운 걸 화면에 바로 반영
+      toast('캐시를 비웠다');
+    }
+
+
+    async function refreshStatus() {
+      const box = document.getElementById('status');
+      try {
+        const s = await api('/ready');
+        box.textContent = s.ok
+          ? `정상 · 행정동 ${s.regions}개 · 회원 ${s.members}명 · 캐시 ${s.cache_warm ? '있음' : '비어 있음'}`
+          : `문제 있음: ${s.error ?? '데이터 없음'}`;
+        box.className = s.ok ? 'ok' : 'bad';
+      } catch (e) {
+        box.textContent = '서버에 연결할 수 없음';
+        box.className = 'bad';
+      }
+    }
+
 
     // 회원목록
     let members = [];
@@ -382,6 +411,7 @@
     }
 
     showTab('member');
+    refreshStatus();
   </script>
 
 </body>
