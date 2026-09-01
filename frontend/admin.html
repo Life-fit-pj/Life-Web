@@ -45,7 +45,7 @@
     .meter { height: 6px; background: rgba(0,0,0,.07);
          border-radius: 99px; overflow: hidden; }
     .meter i { display: block; height: 100%; background: var(--accent); }
-  
+    .err { color: #d63b30; font-size: 11.5px; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -220,13 +220,40 @@
       // ② 저장하기 "전"의 추천을 먼저 받아 둔다 — 순서를 바꾸면 비교 대상이 사라진다
       const before = await api(`/members/${id}/preview`);
 
-      // ③ 저장
-      await api('/members/' + id, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
+      // ③ 저장 — 값이 규칙에 어긋나면 422 가 오고, 칸마다 이유가 붙어 온다
+      clearErrors();
+      try {
+        await api('/members/' + id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+      } catch (e) {
+        return showErrors(e);        // 저장 실패 — 아래 ④⑤ 를 하면 안 된다
+      }
 
+
+    function clearErrors() {
+      document.querySelectorAll('[data-err]').forEach(el => { el.textContent = ''; });
+    }
+
+    function showErrors(e) {
+      let detail;
+      try {
+        detail = JSON.parse(e.message).detail;
+      } catch {
+        return toast('저장 실패: ' + e.message);   // 404 처럼 detail 이 문자열인 경우
+      }
+      if (typeof detail !== 'object') return toast('저장 실패: ' + detail);
+
+      for (const [name, message] of Object.entries(detail)) {
+        const box = document.querySelector(`[data-err="${name}"]`);
+        if (box) box.textContent = message;
+      }
+      toast('값이 올바르지 않다');
+    }
+
+    
       // ④ 저장 "후"의 추천. 캐시는 서버가 이미 비웠으므로 새 값 기준으로 계산된다
       const after = await api(`/members/${id}/preview`);
 

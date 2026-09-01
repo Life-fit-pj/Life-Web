@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 
 from services.engine import (
     get_member, list_members, get_region, list_regions,
-    update_member, update_region, preview_member, similar_members,
+    update_member, update_region, preview_member, similar_members, InvalidPatch,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -75,15 +75,22 @@ def admin_region(gu: str, dong: str):
 # 회원정보/지역 수정 — 토큰 + 쓰기 스위치 둘 다 통과해야 한다
 @router.patch("/members/{customer_id}", dependencies=[Depends(check_admin), Depends(check_writable)])
 def admin_update_member(customer_id: str, patch: dict):
-    updated = update_member(customer_id, patch)
+    try:
+        updated = update_member(customer_id, patch)
+    except InvalidPatch as e:
+        raise HTTPException(status_code=422, detail=e.errors)
     if updated is None:
         raise HTTPException(status_code=404, detail="그런 회원이 없다")
     return updated
 
 
+
 @router.patch("/regions/{gu}/{dong}", dependencies=[Depends(check_admin), Depends(check_writable)])
 def admin_update_region(gu: str, dong: str, patch: dict):
-    updated = update_region(gu, dong, patch)
+    try:
+        updated = update_region(gu, dong, patch)
+    except InvalidPatch as e:
+        raise HTTPException(status_code=422, detail=e.errors)
     if updated is None:
         raise HTTPException(status_code=404, detail="그런 행정동이 없다")
     return updated
