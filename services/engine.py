@@ -17,6 +17,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
+from app.core.db import add_like, remove_like
 from app.core.db import facilities, facility_counts, region_extras
 from app.features.pipeline_api import search, recommend_by_weights
 from app.features.region_explain import region_explain_cached
@@ -118,6 +119,14 @@ def get_chat_answer(question, regions=None, weights=None, history=None):
     """추천 결과에 대한 후속 질문에 답한다."""
     return chat_engine(question, regions=regions, weights=weights, history=history)
 
+
+def like_region(anon_id, gu, dong):
+    """지도 핀에서 좋아요 클릭시 호출한다."""
+    add_like(anon_id, gu, dong)
+
+def unlike_region(anon_id, gu, dong):
+    """좋아요를 취소하면 호출한다."""
+    remove_like(anon_id, gu, dong)
 
 if __name__ == "__main__":
     w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})
