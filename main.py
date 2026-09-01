@@ -38,11 +38,12 @@ app = FastAPI(title="LIFE,FIT")
 # 2. API 라우트: 예측 및 추천 수행
 # ==========================================
 
-from routers import admin, lifetype, recommend
+from routers import admin, lifetype, recommend, likes
 
 app.include_router(recommend.router)
 app.include_router(lifetype.router)
 app.include_router(admin.router)
+app.include_router(likes.router)
 
 
 # ==========================================
