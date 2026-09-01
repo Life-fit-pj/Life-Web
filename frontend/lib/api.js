@@ -78,12 +78,18 @@ export function postRegionExplain(gu, dong, query, weights, scores) {
 }
 
 /** 결과 화면 후속 질문 */
-export function postChat(question, regions, weights) {
+export function postChat(question, regions, weights, anonId) {
   return postJSON("/api/chat", {
     question,
     regions: regions || null,
     weights: weights || null,
+    anonId,
   });
+}
+
+/** 검색·대화 기록 조회 */
+export function getHistory(anonId) {
+  return getJSON(`/api/history?anonId=${encodeURIComponent(anonId)}`);
 }
 
 /** 좋아요 추가 */

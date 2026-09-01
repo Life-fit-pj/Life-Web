@@ -1,0 +1,76 @@
+/*
+검색 및 대화 기록 저장소 모달
+크기·구조는 ui/menu.css 의 .auth-modal 을 그대로 따른다
+*/
+
+.history-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;               /* 메뉴(.menu-backdrop, 9000)보다 위에 뜨도록 */
+  background: rgba(30, 26, 22, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.history-backdrop.is-open { display: flex; }
+
+.history-modal {
+  position: relative;
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.history-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.history-close:hover { color: var(--text); }
+
+.history-title {
+  margin: 0 0 14px;
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
+  font-size: 19px;
+  color: var(--text);
+}
+
+.history-section + .history-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.history-section h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.history-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.history-item:last-child { border-bottom: none; }
+
+.history-q { color: var(--text); font-weight: 600; }
+.history-a { margin-top: 2px; color: var(--muted); }
+
+.history-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 12px 0;
+}

@@ -12,7 +12,7 @@
    ========================================================= */
 
 import { postPredict, postLifeType, getLifeTypeKeywords } from "../lib/api.js";
-import { nextSeq, isLatest } from "../lib/state.js";
+import { nextSeq, isLatest, anonId } from "../lib/state.js";
 import { renderResult } from "./result.js";
 import { openMenu, openAuthModal } from "./menu.js";
 import { showTypeCard, firstPayload } from "./lifetype.js";
@@ -409,7 +409,7 @@ async function runPredict(query, { from = "screen", autoClose = true } = {}) {
   try {
     // firstPayload() 는 1차를 거쳤을 때만 값이 있다.
     // 슬라이더를 직접 만졌으면 서버가 알아서 firstWeights 를 무시한다
-    const data = await postPredict({ query, ...firstPayload() });
+    const data = await postPredict({ query, anonId, ...firstPayload() });
     if (!isLatest(seq)) return false;     // 오래된 응답은 버린다
 
     stopSteps();
