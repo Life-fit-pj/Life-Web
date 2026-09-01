@@ -42,6 +42,10 @@
              background: var(--ink); color: #fff;
              padding: 12px 18px; border-radius: 8px; }
     #toast[hidden] { display: none; }
+    .meter { height: 6px; background: rgba(0,0,0,.07);
+         border-radius: 99px; overflow: hidden; }
+    .meter i { display: block; height: 100%; background: var(--accent); }
+  
   </style>
 </head>
 <body>
@@ -244,9 +248,13 @@
 
     async function openRegion(gu, dong) {
       const data = await api(`/regions/${gu}/${dong}`);
-      const fields = Object.entries(data)
-        .filter(([k]) => k !== '구' && k !== '행정동명')
-        .map(([k, v]) => field(k, k, v, { type: 'number' })).join('');
+
+      const fields = Object.entries(data.values).map(([k, v]) => {
+        const pct = data.percentiles[k];
+        // 백분위 92 = 427개 동 중 위에서 8% 안에 든다는 뜻
+        const label = pct === null ? k : `${k} · 상위 ${100 - pct}%`;
+        return `<div>${field(label, k, v, { type: 'number' })}${meter(pct ?? 0)}</div>`;
+      }).join('');
 
       document.getElementById('region-board').innerHTML = `
         <h3>${esc(data.구)} ${esc(data.행정동명)}</h3>
@@ -254,6 +262,7 @@
         <button onclick="saveRegion('${data.구}', '${data.행정동명}')">저장</button>
       `;
     }
+
 
     async function saveRegion(gu, dong) {
       const inputs = document.querySelectorAll('#region-board input');
@@ -268,6 +277,10 @@
 
       openRegion(gu, dong);
       toast('저장했다');            // 수정
+    }
+
+    function meter(percent) {
+      return `<div class="meter"><i style="width:${percent}%"></i></div>`;
     }
 
     showTab('member');
