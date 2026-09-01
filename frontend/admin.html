@@ -202,6 +202,9 @@
         </div>
 
         <button onclick="saveMember('${customer.customer_id}')">저장</button>
+        <button onclick="previewMember('${customer.customer_id}')">추천 돌려보기</button>
+
+        <div id="preview"></div>
       `;
     }
 
@@ -223,6 +226,22 @@
       openMember(id);                      // 저장된 값으로 폼 다시 채움
       toast('저장했다');            // 수정
     }
+
+
+    async function previewMember(id) {
+      const box = document.getElementById('preview');
+      box.textContent = '계산 중…';        // 몇 초 걸릴 수 있다
+
+      const regions = await api(`/members/${id}/preview`);
+
+      box.innerHTML = `
+        <div class="card">
+          <div class="card-title">이 회원 조건으로 뽑은 TOP 5</div>
+          ${regions.map((r, i) =>
+            `<div>${i + 1}위 ${esc(r.name)} — ${r.total}점</div>`).join('')}
+        </div>`;
+    }
+
 
 
     // 행정동

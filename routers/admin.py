@@ -3,6 +3,7 @@ GET   /api/admin/members                  회원 100명 목록
 GET   /api/admin/members/{customer_id}    회원 한 명 (기본정보+조건+페르소나)
 GET   /api/admin/regions                  행정동 427개 목록
 GET   /api/admin/regions/{gu}/{dong}      행정동 하나의 지표 12개
+GET   /api/admin/members/{customer_id}/preview   이 회원 조건으로 추천 TOP 5
 PATCH /api/admin/members/{customer_id}    회원 수정
 PATCH /api/admin/regions/{gu}/{dong}      행정동 수정
 
@@ -16,7 +17,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Header
 
-from services.engine import get_member, list_members, get_region, list_regions, update_member, update_region
+from services.engine import (
+    get_member, list_members, get_region, list_regions,
+    update_member, update_region, preview_member,
+)
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -83,3 +87,12 @@ def admin_update_region(gu: str, dong: str, patch: dict):
     if updated is None:
         raise HTTPException(status_code=404, detail="그런 행정동이 없다")
     return updated
+
+
+@router.get("/members/{customer_id}/preview", dependencies=[Depends(check_admin)])
+def admin_preview_member(customer_id: str):
+    """이 회원 조건으로 추천을 돌려본다. 아무것도 안 고친다."""
+    result = preview_member(customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    return result
