@@ -20,8 +20,8 @@ Life-fit-main/
 ```
 
 `services/engine.py`는 `../Life-Embed-jh`를 `sys.path`에 추가하고 여기서
-`app.features.pipeline_api.{search, recommend_by_weights}`와
-`app.core.db.{facilities, facility_counts}`를 임포트합니다. `Life-Embed-jh`가 없거나 이름이
+`app.features.pipeline_api`, `app.core.db`, `app.features.region_explain`,
+`app.features.chat`, `app.features.admin`을 임포트합니다. `Life-Embed-jh`가 없거나 이름이
 잘못되면 서버는 임포트 시점에 `ModuleNotFoundError: No module named 'app'` 오류로 실패합니다.
 `Life-Embed-jh`는 자체 `.env`에 `ANTHROPIC_API_KEY`와 `data/life.db`(약 216MB, git에 포함되지
 않음)가 필요합니다 — 해당 저장소의 README를 참고하세요.
@@ -29,7 +29,7 @@ Life-fit-main/
 ## 실행 방법
 
 ```bash
-py -m pip install fastapi uvicorn pydantic pandas numpy
+py -m pip install fastapi uvicorn pydantic pandas numpy python-dotenv
 py -m uvicorn main:app --reload --port 5000
 ```
 
@@ -38,151 +38,180 @@ py -m uvicorn main:app --reload --port 5000
 해당 모듈을 단독으로 점검하려면 직접 실행하면 됩니다(예: `py services/coords.py`,
 `py services/engine.py`, `py services/floorplan.py`).
 
-`services/coords.py`, `services/engine.py`, `services/floorplan.py`는 임포트 시점에 `✅`/`❌`
-이모지를 `print()`합니다. 한국어 Windows 콘솔의 기본 코드페이지(cp949)는 이 문자들을 못
-담아 `UnicodeEncodeError`가 나고, 그 에러를 처리하는 `except` 블록의 `print`도 같은 이유로
-또 실패해 서버가 임포트 단계에서 죽습니다 — `main.py`가 다른 임포트보다 먼저
-`sys.stdout.reconfigure(encoding="utf-8")`로 이를 막아 둡니다. 이 재설정 코드보다 위쪽으로
-새 임포트를 옮기지 마세요.
-
-`Life-Embed-jh/data/life.db`는 Git LFS로 관리됩니다. 그 저장소를 `git lfs pull` 없이 그냥
-클론하면 66MB 실제 DB 대신 133바이트짜리 포인터 텍스트 파일만 받아지고, `/api/predict` 호출
-시 `sqlite3.DatabaseError: file is not a database`로 500 에러가 납니다(이 저장소가 아니라
-`Life-Embed-jh` 쪽 문제입니다).
-
-`FastAPI` 인스턴스에는 `.run()`이 없으므로(Flask와 다름) `py main.py`로 직접 실행하면
-안 되고, 반드시 위의 `uvicorn` 명령으로 실행하세요. (예전에는 Flask 시절 잔재인
-`if __name__ == '__main__': app.run(...)` 블록이 파일 맨 아래 죽은 코드로 남아 있었는데,
-지금은 지워졌습니다.)
-
 Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao Developers 콘솔의 Web
 플랫폼에 `http://127.0.0.1:5000`이 등록되어 있어야 하며, 그렇지 않으면 지도가 아무 오류 없이
 렌더링되지 않습니다.
 
 ## 아키텍처
 
-**요청 흐름:** `frontend/*.js` → FastAPI 앱(`main.py`)의 `POST /api/predict` 또는 `/api/region`
+**요청 흐름:** `frontend/main.js` → `frontend/ui/*.js` → FastAPI 앱의 API 라우트
 (요청 본문은 pydantic 모델로 검증됨) → `services/engine.py`가 형제 패키지인 `Life-Embed-jh`를
 호출 → 응답을 재구성해 JSON으로 반환 → 프론트엔드가 지도 핀/카드를 렌더링.
 
-- `main.py` — FastAPI 앱 설정, 정적 파일 서빙(`StaticFiles` 마운트로 프론트엔드 + `data/LH평면도`
-  이미지), 그리고 네 개의 API 라우트(`/api/predict`, `/api/region`, `/api/region/explain`,
-  `/api/chat`)를 담당합니다. 라우트 핸들러는 입출력 형태만 다듬고, 실제 작업은 모두
-  `services/`에 위임합니다. `/api/predict` 응답에서 지역명 앞에 `서울특별시`를 붙이는 것도
-  이 파일이 합니다(엔진이 주는 `"구 행정동명"`은 접두어가 없음).
+- `main.py` — FastAPI 앱 설정과 정적 파일 서빙(`StaticFiles` 마운트로 프론트엔드 +
+  `data/LH평면도` 이미지)**만** 합니다. 라우트는 전부 `routers/`에 있고 여기서는
+  `include_router`만 합니다.
+- `routers/recommend.py` — `/api/predict`, `/api/region`, `/api/region/explain`, `/api/chat`,
+  `/api/regions/gudong`. `/api/predict` 응답에서 지역명 앞에 `서울특별시`를 붙이는 것도
+  이 파일입니다(엔진이 주는 `"구 행정동명"`은 접두어가 없음).
+- `routers/lifetype.py` — `/api/lifetype`, `/api/lifetype/keywords`. 1차 유형 판정입니다.
+- `routers/admin.py` — `/api/admin/*`. `Authorization: Bearer <ADMIN_TOKEN>` 헤더를 요구하고,
+  수정(PATCH)은 `.env`의 `ADMIN_WRITE_ENABLED=1`까지 있어야 통과합니다.
 - `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. 다른 추천 엔진으로
-  교체하려면 여기 있는 두 개의 import 줄만 바꾸면 됩니다(아래 "교체 가능한 엔진 계약" 참고).
-  또한 7개 라이프스타일 지표에 대한 한국어⇄영어 키 매핑과, 핀 클릭 시 필요한 시설 정보
-  조회(`get_facilities`)도 이 파일이 담당합니다.
+  교체하려면 여기 있는 import 줄만 바꾸면 됩니다(README의 "다른 엔진 붙이기" 참고).
+  7개 라이프스타일 지표의 한국어⇄영어 매핑(`KEY_MAP`)도 여기 하나만 있습니다 — 다른 파일에서
+  다시 적지 말고 import 하세요.
 - `services/coords.py` — `data/동_좌표.csv`(427행)를 임포트 시점에 메모리 내
-  `(구, 동) → (lat, lng)` 딕셔너리로 한 번만 로드합니다. `lookup_coords`가 이를 읽어옵니다.
-  pandas가 아닌 `csv`를 사용합니다.
+  `(구, 동) → (lat, lng)` 딕셔너리(`COORDS`)로 한 번만 로드합니다. `lookup_coords`와
+  `/api/regions/gudong`이 이를 읽어옵니다. pandas가 아닌 `csv`를 사용합니다.
+- `services/lifetype.py` — 1차 유형 판정. 고른 키워드를 축 점수로 바꾸고 유형 이름과 7지표
+  가중치를 만듭니다. **LLM을 쓰지 않습니다** — 의존성이 `random` 뿐입니다.
+- `services/typespot.py` — 1차 유형에 어울리는 동네 2곳. `life.db`(없으면
+  `master_dataset_v3.csv`)를 `_find()`로 형제 폴더에서 찾아 **그 표 하나만** 읽습니다.
+  시세도 그 안에 있습니다(`아파트_전세_보증금`) — 따로 열 파일이 없습니다. 시세는
+  "서울 전세 중앙값의 0.65~1.35배" 밴드로 후보를 거르는 데 씁니다(예산을 아직 안 받은
+  단계라 아무나 못 가는 동네를 보여 주지 않으려는 것).
 - `services/floorplan.py` — LH 평면도 CSV(cp949 인코딩)를 임포트 시점에 pandas로 로드합니다.
   `find_floorplan(area)`는 *실제로 디스크에 이미지 파일이 존재하는* 평면도 중 면적이 가장
-  가까운 것을 선택합니다 — CSV에는 227행이 있지만 그중 66개만 대응하는 이미지 폴더가 있어서,
-  면적 차이순으로 정렬한 후보들을 순회하며 실제로 존재하는 경로가 나올 때까지 탐색합니다.
-- `services/price.py` — `data/시세_지역별.csv`를 임포트 후 첫 호출 시점에 한 번만 로드합니다
-  (지연 로딩). `apply_budget()`이 `services/engine.py`의 추천 결과에 예산 초과분만큼 감점을
-  얹고, 화면에 보여줄 시세를 붙입니다. 엔진이 주는 만족도 순위 자체는 건드리지 않고 그 위에
-  얹는 방식이라, 엔진 교체와 무관하게 독립적으로 동작합니다.
-- `frontend/` — 빌드 단계도, 프레임워크도 없습니다(다만 아래처럼 ES 모듈로 화면 단위·역할
-  단위로 잘게 나뉘어 있어 나중에 Next.js 등으로 옮길 때 파일 단위 이식이 쉽습니다).
-  `index.html`은 `<script type="module" src="main.js">` 하나만 불러오고, 나머지는
-  `import`로 연결됩니다. 예전의 단일 `script.js`는 화면별로 쪼개져 지금은 존재하지
-  않습니다.
-  - `frontend/main.js` — 모듈 진입점. `ui/*.js` 각 파일을 옆으로 불러와 각자 자기
-    `DOMContentLoaded` 리스너로 스스로 초기화하게 하고, `onclick` 속성이 모듈 스코프
-    함수를 못 찾는 문제 때문에 `runBtn` 클릭 이벤트만 여기서 직접 연결합니다.
-  - `frontend/lib/` — 화면 여러 곳이 같이 쓰는 것들. `api.js`는 서버 호출(`fetch`)을
-    모아 둔 곳(`postPredict`/`postRegion`/`postRegionExplain`/`postChat`) — 주소나
-    헤더가 바뀌면 여기만 고치면 됩니다. `state.js`는 화면 간에 공유하는 값(마지막 추천
-    결과 `state.lastResult`, 마지막 검색어 `state.lastQuery`, 중복 요청 방지용
-    `nextSeq`/`isLatest`)을 담는 상자입니다. `format.js`는 DOM을 건드리지 않고 문자열만
-    다듬는 순수 함수(`escapeAndFormat`, `splitRegionName`)를 모아 둡니다. `.gitignore`의
-    Python용 `lib/` 규칙이 한때 이 폴더를 통째로 가려서 git이 추적하지 못했던 적이
-    있으니(`/lib/`로 루트 한정 완료), 새 `.gitignore` 규칙을 추가할 때 `frontend/lib/`을
-    다시 가리지 않도록 주의하세요.
-  - `frontend/ui/` — 화면 단위로 나뉜 코드. `search.js`(초기 검색 화면 — 떠다니는 클릭
-    가능한 키워드, 자연어 질의 입력창), `result.js`(`runSimulation`/`renderResult` —
-    슬라이더·검색 두 경로가 모두 이 결과 렌더러 하나로 수렴), `map.js`(Kakao 지도 초기화·
-    마커), `reason.js`(핀 클릭 시 뜨는 추천 사유 모달, 레이더 차트), `chat.js`(결과 화면
-    채팅 패널), `deal.js`(거래유형 세그먼트·금액 슬라이더), `menu.js`(우측 상단 메뉴
-    패널 — 로그인/로그아웃은 `localStorage`의 `lifefit-token` 유무로만 판별하는 개발용
-    임시 구현이며, 실제 로그인 API가 없습니다)로 나뉩니다.
-  - CSS도 같은 방식으로 화면 단위 분리를 시작했습니다. `frontend/style.css`(테마 변수,
-    리셋, `.panel` 공통 틀, 좌측 컨트롤 패널 전반의 폼 스타일, 스크롤바·반응형처럼 여러
-    화면이 같이 쓰는 것만 남음)와 `frontend/search.css`(첫 진입 검색 화면 + 결과 화면
-    상단 검색바)는 공용, `frontend/ui/result.css`·`ui/reason.css`·`ui/chat.css`·
-    `ui/menu.css`는 같은 이름의 `ui/*.js`와 1:1로 대응하는 화면별 스타일입니다. CSS에는
-    JS의 `import` 같은 연결 수단이 없어서, 나눈 파일 수만큼 `index.html`에
-    `<link rel="stylesheet">`를 직접 추가해야 합니다(순서: 공용 파일 먼저, 화면별 파일
-    나중 — 같은 우선순위 선택자는 나중에 적은 `<link>`가 이기기 때문). `#map`(`ui/map.js`
-    담당)과 `.seg`/`.seg-btn`(`ui/deal.js` 담당)은 분량이 작아 `style.css`에 남겨 뒀습니다
-    — `ui/*.js`와 `ui/*.css`가 무조건 1:1일 필요는 없고, 파일을 만들 가치가 있는 화면만
-    나눴습니다.
+  가까운 것을 선택합니다.
+- `frontend/` — 빌드 단계도, 프레임워크도 없습니다. `index.html`이 `main.js` 하나만 모듈로
+  불러오고 나머지는 `import`가 끌고 옵니다. `lib/`는 공용(서버 호출·공유 상태·문자열 다듬기),
+  `ui/`는 화면 단위입니다.
+- `frontend/signup.html`, `frontend/admin.html` — **일체형 단일 페이지**입니다(HTML+CSS+JS가
+  한 파일). 첫 화면과 공유하는 코드가 없어서 나누면 파일만 늘어납니다. 서버에 저장하는 기능이
+  붙어 `lib/api.js`를 쓰게 되면 그때 `<script type="module">`로 바꾸면 됩니다.
+
+### 화면 흐름 — 1차와 2차
+
+첫 화면은 두 단계입니다. 이 구분을 모르고 고치면 엉뚱한 곳을 건드리게 됩니다.
+
+| | 부르는 API | LLM | 담당 파일 |
+|---|---|---|---|
+| **1차** 유형 판정 | `/api/lifetype` | ✗ (즉시) | `ui/search.js` → `ui/lifetype.js` |
+| **2차** 추천 | `/api/predict` | ✓ (3~6초) | `ui/search.js` `runPredict()` |
+
+1차가 LLM을 안 쓰는 이유는 "즉시 나오는 맛보기"여야 키워드를 바꿔 가며 여러 번 눌러 보기
+때문입니다. 지역 선정은 검색이 아니라 채점이라(427개 동이 전부 지표 점수를 가짐) 가중치만
+있으면 순위가 나오며 매칭 실패가 없습니다.
+
+`ui/search.js`와 `ui/lifetype.js`는 **서로 import 하지 않습니다.** `showTypeCard`가
+`onContinue`/`onSkip` 콜백을 받는 구조라 순환 import가 생기지 않습니다 — 이 구조를 유지하세요.
 
 ### API 계약
 
 - `POST /api/predict` — 요청 본문은 `{ query: "..." }`(LLM이 텍스트를 7개 지표 가중치로 변환)
   또는 영어 키 `greenery, safety, transport, commercial, medical, education, culture` 아래의
-  슬라이더 값(가중치로 그대로 사용됨) 중 하나입니다. `area`/`bldgType`도 함께 받으며, `area`가
-  59㎡ 이상이면 종합 점수(`score`)에 소폭 가산점이 붙습니다. `dealType`(`매매`/`전세`/`월세`)과
-  그에 맞는 예산 필드(`salePrice`/`jeonseDeposit`/`wolseDeposit`+`wolseRent`, 전부 만원 단위)는
-  `services/engine.py`의 `to_housing()`이 엔진의 `housing` 형태로 바꿔 `search`/
-  `recommend_by_weights`에 그대로 넘기고, 엔진이 그 조건에 맞는 동만 추려 순위를 매깁니다
-  (예전에는 이 저장소의 `services/price.py`가 따로 예산 초과분을 감점했으나 지금은 삭제되어
-  없음 — 엔진이 필터링까지 전담). 두 경로 모두 `services.engine.get_regions`로 수렴하며,
-  동일한 형태를 반환합니다: `score`, `topRegions`(좌표 포함, `name`에 `서울특별시` 접두어가
-  붙음), `floorplanPath`, `fallback`(현재 항상 `False`, 실제 폴백 감지는 미구현), `explanation`,
-  `weights`(프론트엔드가 슬라이더를 다시 동기화할 수 있도록), `housing`(검색어 경로에서 LLM이
-  읽어낸 건물유형·거래유형·예산 조건 — `{건물유형, 거래유형, targets:{예산, 보증금?}}` 또는
-  가격 언급이 없었으면 `null`. `frontend/ui/search.js`의 `applyHousing()`이 이 값으로 "건축"
-  패널을 동기화한다. 슬라이더 경로에서는 화면 값과 이미 같으므로 항상 `null`).
-- `POST /api/region` — 요청 본문 `{ gu, dong }`, 지도 핀 클릭 시 표시되는 모달용으로 인근 시설
-  개수/항목(`services.engine.get_facilities`가 주는 `counts`/`items`)을 반환합니다. 핀 클릭 시
+  슬라이더 값 중 하나입니다. `area`/`bldgType`/`dealType`과 금액 필드도 함께 받습니다.
+  1차에서 넘어왔다면 `firstWeights`/`firstSpots`/`typeName`이 함께 옵니다 —
+  `firstWeights`는 **슬라이더를 안 만졌을 때만**(전부 기본값 3) 적용됩니다.
+  응답: `score`, `topRegions`(좌표 포함, `name`에 `서울특별시` 접두어, 각 항목에 `fromFirst`),
+  `firstTypeName`, `droppedFromFirst`, `floorplanPath`, `fallback`, `explanation`,
+  `weights`, `housing`.
+- `POST /api/lifetype` — 요청 `{ query }`. 응답은 유형 판정 결과 전체 + `spots`(동네 2곳) +
+  `dataStatus`. `GET /api/lifetype/keywords`는 첫 화면에 뿌릴 키워드를 줍니다 —
+  프론트에 하드코딩하면 `services/lifetype.py`와 어긋나므로 반드시 서버에서 받으세요.
+- `POST /api/region` — 요청 `{ gu, dong }`, 지도 핀 클릭 시 인근 시설 개수/항목을 반환합니다.
   427개 동 전체 점수를 다시 계산하지 않도록 `/api/predict`와 의도적으로 분리되어 있습니다.
-- `frontend/ui/reason.js`는 `POST /api/region/explain`(동네별 개별 LLM 설명)을,
-  `frontend/ui/chat.js`는 `POST /api/chat`(결과 화면에서의 추가 질문)을 호출하며,
-  `main.py`에 이미 구현되어 있습니다(각각 151번째 줄, 169번째 줄 부근).
+- `POST /api/region/explain` — 동네별 개별 LLM 설명. 시설 정보는 즉시 나오지만 설명은 3~5초
+  걸려서 `/api/region`과 나눴습니다.
+- `GET /api/regions/gudong` — `{구: [동...]}`. 25개 구 / 427개 동. 회원가입 2단 드롭다운용.
 
-### 교체 가능한 엔진 계약
+## 회원 데이터 3계층 (설문·회원가입을 건드릴 때 필수)
 
-어떤 엔진이든 아래 두 함수를 정확히 이 반환 형태로 노출하기만 하면 `Life-Embed-jh`를 대체할
-수 있습니다(자세한 내용과 셀프 체크 스니펫은 README.md 참고):
+설문과 회원가입 폼은 **이미 존재하는 스키마에 맞춰 만들어져 있습니다.** 키 이름을 바꾸면
+나중에 DB 적재를 붙일 때 변환 코드를 새로 써야 하므로 함부로 고치지 마세요.
 
-- `search(query, top_k=5)` → `{"weights": {<7개 한국어 지표명>: 1-5 float}, "regions": [{"name": "구 행정동명", "total": float, "scores": {<7개 지표>: 0-100}}], "explanation": str}`
-- `recommend_by_weights(weights, top_k=5)` → 위와 같은 `regions` 목록 형태만 반환
+| 계층 | 저장 위치 | 무엇이 채우는가 |
+|---|---|---|
+| customer | `Life-Embed-jh/data/customers_v2.csv` | 회원가입 기본정보 폼(아직 없음) |
+| preferences | `Life-Embed-jh/data/user_preferences.csv` | 슬라이더·거래유형 화면 + persona에서 도출한 7지표 |
+| persona | `CHUNK_COLUMNS` 9칸 (`app/core/config.py:49`) | `frontend/signup.html`의 15문항 설문 |
 
-위반 시 프론트엔드가 아무 오류 없이 조용히 망가지는 강제 제약 조건:
-- 7개 지표명은 고정된 한국어 문자열입니다: `녹지 안전 교통 상권 의료 교육 문화`.
-- `name`은 정확히 `"구 행정동명"` 형태여야 합니다 — 공백 하나, `서울특별시` 접두어 없음.
-  백엔드가 `name.split(" ", 1)`로 좌표를 조회하므로, 이 형식을 벗어나면 좌표 조회가 실패합니다.
-- `scores` 값은 0-100 범위이며 높을수록 좋은 값이어야 합니다(정확한 백분위일 필요는 없음).
-- `weights` 값은 숫자형이어야 하며(`"4.6"`이 아닌 `4.6`), 범위는 1-5입니다.
-- `explanation`은 값이 없을 때 `None`이 아닌 `""`이어야 합니다.
+**설문 문항 → persona 칸** (`signup.html`의 `PERSONA_MAP`):
 
-엔진을 교체하려면 `services/engine.py` 상단의 import 두 줄(형제 폴더 경로 + 그 안의 모듈
-경로)만 수정하면 됩니다.
+| 문항 | 칸 |
+|---|---|
+| P1 P2 | `professional_persona` |
+| S1 S2 | `sports_persona` |
+| A1 A2 H1 | `arts_persona` |
+| T1 T2 | `travel_persona` |
+| C1 C2 | `culinary_persona` |
+| F1 F2 | `family_persona` |
+| G1 G2 | `cultural_background` |
+| — | `persona`, `career_goals_and_ambitions` — **비워 둠** |
+
+`persona`는 "전기태 씨는 …한 인물입니다" 같은 **총괄 요약**이라 문항 하나로 대신할 수 없고,
+`career_goals_and_ambitions`는 대응 문항이 아직 없습니다. 빈 칸은 청크가 안 만들어질 뿐
+나머지 칸으로 추천이 돌아갑니다.
+
+**저장용 persona에는 질문 라벨을 붙이지 마세요.** 붙이면 모든 회원이 동일한 라벨 문장을
+갖게 되어 서로 비슷해 보이고, `find_similar_members()`의 이웃 찾기가 무의미해집니다.
+(검색어로 보낼 때는 머리말을 붙여도 됩니다 — Claude가 읽는 용도라 다릅니다.)
+
+## 알려진 함정
+
+**`services/price.py`를 되살리지 마세요.** 예산 감점은 엔진이 `search(housing_override=…)`
+안에서 처리합니다. 웹에도 `apply_budget()` 같은 것을 두면 **예산이 두 번 적용되어 오류 없이
+결과가 틀어집니다.** `front-ds-v2` 브랜치에는 아직 `price.py`와 `data/시세_*.csv`가 남아
+있으니 거기서 파일을 가져올 때 주의하세요.
+
+**데이터 파일을 `Life-Web/data/`에 복사해 두지 마세요.** `Life-Embed-jh/data/`에 원본이
+있고 `typespot.py`의 `_find()`가 형제 폴더를 찾습니다. 사본을 만들면 두 벌이 되어 언젠가
+어긋납니다. 이 저장소의 `data/`에는 웹 전용 자료(동 좌표, LH 평면도)만 둡니다.
+
+**시세를 별도 CSV에서 읽지 마세요.** `master_dataset_v3` 안에 이미 동마다 들어 있습니다.
+예전에 `Life-Web/data/시세_지역별.csv`를 따로 읽던 코드가 있었는데 두 가지가 잘못돼
+있었습니다. ① 원본이 엔진 쪽에 있는데 사본을 만들어 5천 줄이 두 벌이 됨.
+② CSV의 `(자치구명, 지역명)`과 DB의 `(구, 행정동명)` 이름이 안 맞아 **427개 중 180개가
+시세 없음으로 빠짐**. 같은 표에서 꺼내면 둘 다 사라집니다(지금은 427/427).
+
+**`status()`의 `*Found`는 파일 존재 여부일 뿐입니다.** 예전에 `priceFound: True`인데도
+`_load_price()`가 빈 딕셔너리인 적이 있었습니다 — 없는 칸(`기준금액`)을 읽어 매 줄이
+`except KeyError`로 걸러졌고, 그 탓에 시세 밴드가 한 번도 안 돌았는데 아무도 몰랐습니다.
+그래서 값이 실제로 실렸는지 보는 `priceLoaded`를 뒀습니다.
+**데이터가 붙었는지 확인할 때는 파일 존재가 아니라 실린 개수를 보세요.**
+
+**`MIN_LENGTH = 20`(`app/core/config.py`)을 낮추지 마세요.** `make_chunks()`는 회원
+임베딩과 지식베이스 청킹이 **함께 쓰는** 함수라, 설문 하나 때문에 427개 동 청킹까지 바뀝니다.
+게다가 기존 회원 900개 청크의 실측 분포가 최소 55자 / 중앙 138자라 이 값은 지금 아무것도
+거르지 않습니다 — 낮추면 새로 들어올 짧은 답변만 통과시킵니다. 짧은 persona가 통과하면
+엉뚱한 이웃이 뽑히고 그들의 7지표를 신규 회원이 물려받습니다(오류 없이 조용히 틀림).
+자세한 내용과 권장 대안은 README의 "그 전에 확인해야 할 것" 참고.
+
+**`frontend/index.html`의 `<script>`는 `main.js` 하나뿐이어야 합니다.** `front-ds-v2`
+브랜치는 `script.js`/`search.js`/`menu.js`를 각각 불러오는 옛 구조입니다. 그쪽에서 마크업을
+가져올 때 script 줄까지 따라오면 모듈과 옛 monolith가 동시에 돌아 조용히 깨집니다.
+
+**`onclick` 속성으로 모듈 함수를 부를 수 없습니다.** ES 모듈 스코프라 전역에서 안 보입니다.
+이벤트는 JS에서 `addEventListener`로 연결하세요(`main.js` 아래쪽 주석 참고).
+
+**모달 여는 클래스는 `.is-open`입니다.** 메뉴·로그인·추천 사유·1차 유형 카드가 전부 이
+관례를 씁니다. `front-ds-v2`는 `.show`를 쓰므로 코드를 옮길 때 바꿔야 합니다.
 
 ## 보안 주의사항
 
 API 키, 토큰, 기타 비밀 정보는 반드시 `.env`(gitignore 처리됨)에 두고 절대 커밋하지 마세요.
 추천 엔진이 사용하는 Anthropic 키는 이 저장소의 `.env`가 아닌 `Life-Embed-jh/.env`에
-있습니다.
+있습니다. 관리자 토큰(`ADMIN_TOKEN`)은 이 저장소의 `.env`입니다.
 
 ## 진단·수정 기록은 study.md에 남깁니다
 
 버그 진단, 수정 전/후 코드 비교, 초보자용 설명처럼 과정을 자세히 풀어 쓰는 기록은
 `study.md`에 적습니다. 여기 CLAUDE.md에는 저장소의 현재 사실 관계만 간결하게 유지합니다.
 
-## 검토 결과 (2026-08-31) — JS·CSS 화면 단위 분리 완료 이후 점검
+## 다음에 할 일
 
-프론트가 단일 `script.js`/`style.css`에서 `main.js`(진입점) + `lib/{api,state,format}.js`
-(공용) + `ui/{deal,map,reason,chat,result,menu,search}.js`(화면 단위 JS) +
-`ui/{result,reason,chat,menu}.css`(화면 단위 CSS)로 나뉘는 작업이 끝났습니다. 서버를 띄워
-`/`, `/main.js`, `/ui/*.js`, `/ui/*.css`, `/lib/*.js`가 전부 200으로 응답하는 것, 실제
-`/api/predict` 호출이 진짜 추천 결과를 돌려주는 것까지 확인했고, 정상 동작합니다.
-
-2026-08-30 검토에서 지적됐던 두 가지(`ui/result.js`의 중복 `updateTopRegionsList()`,
-`ui/reason.js`의 `state` 이름 충돌)는 모두 고쳐졌습니다 — `grep`으로 재확인함. CSS 분리도
-선택자가 파일 경계를 넘어 중복 정의되지 않은 것을 확인했습니다.
+1. **회원가입 백엔드** — `POST /api/signup` + 엔진 쪽 적재(`resync_member` → 벡터,
+   `find_similar_members` + `blend` → 7지표). 회원가입 폼(목업 또는 카카오 API) 확정 후 착수.
+   설문 답변은 지금 추천에만 쓰이고 저장되지 않습니다.
+2. **설문 최소 길이 실험** — 기존 회원 100명을 정답지로 삼아 5/10/15자 역테스트.
+   최소 길이를 추측이 아니라 숫자로 정할 수 있습니다(README 참고).
+3. **LLM persona 정제** — 목적은 "짧은 답 늘리기"가 아니라 "기존 데이터와 문체 맞추기".
+   새 사실 추가·근거 없는 추론은 금지 — 환각이 그대로 DB에 남습니다.
+4. **`career_goals_and_ambitions` 문항 추가** 또는 정제 단계에서 생성.
+5. **`fallback` 실제 감지** — 지금은 항상 `False`로 고정되어 있습니다.
+6. **시세 밴드의 하한을 열지 결정** — `typespot.py`의 밴드는 양방향이라 비싼 동네뿐 아니라
+   **싼 동네도 뺍니다**(중계2.3동 2.9억, 공릉1동 3.3억 등이 걸립니다). 예산이 적은 사용자에게
+   저렴한 동네를 감추는 게 맞는지 따져볼 필요가 있습니다. `BAND_LOW = 0.65`를 0으로 두면
+   상한만 걸립니다. 또 427개 중 **180개는 시세 데이터가 없어 그대로 통과**하므로 필터가
+   절반만 걸린다는 점도 감안하세요.

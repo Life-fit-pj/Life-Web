@@ -11,6 +11,10 @@
 export const state = {
   lastResult: null,   // 마지막 추천 응답 전체. 채팅이 질문과 함께 보낸다
   lastQuery: "",      // 마지막 검색어. 핀 클릭 설명에 같이 보낸다
+
+  // 1차 유형 판정 결과(/api/lifetype). 2차 요청에 함께 보내 뿌리를 잇는다 —
+  // 이게 없으면 1차에서 본 동네가 2차에서 아무 설명 없이 사라진다
+  lastType: null,
 };
 
 

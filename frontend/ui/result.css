@@ -83,6 +83,26 @@
   gap: 10px;
 }
 
+/* 1차 유형 카드에도 나왔던 동네임을 알리는 표시 */
+.li-from-first {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* 1차에는 있었는데 예산 때문에 빠진 동네 안내 */
+.li-dropped {
+  margin: 10px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .rank {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;

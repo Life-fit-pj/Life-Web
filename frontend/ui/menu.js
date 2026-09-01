@@ -60,7 +60,8 @@ function closeMenu() {
 }
 
 // 헤더 "로그인" 버튼을 누르면 뜨는 안내 모달.
-// 로그인/회원가입 둘 다 실제 기능이 없어서 "준비중" 문구만 보여준다.
+// 로그인은 아직 기능이 없어 "준비중" 문구만 보여주고,
+// 회원가입은 라이프스타일 설문(signup.html)으로 보낸다.
 // 크기는 맵 핀 클릭 시 뜨는 .reason-modal(ui/reason.css)과 동일하게 맞췄다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
@@ -77,7 +78,8 @@ function ensureAuthModal() {
             <div class="auth-divider"></div>
             <div class="auth-section">
                 <h3 class="auth-title">회원가입</h3>
-                <p class="auth-notice">✍️ 회원가입 기능은 아직 준비 중입니다.</p>
+                <p class="auth-notice">라이프스타일 설문을 먼저 받습니다. 계정 발급은 준비 중입니다.</p>
+                <a class="auth-cta" href="signup.html">설문 시작하기</a>
             </div>
         </div>
     `;

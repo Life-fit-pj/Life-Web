@@ -9,6 +9,7 @@ import "./ui/reason.js";
 import "./ui/chat.js";
 import "./ui/result.js";
 import "./ui/menu.js";
+import "./ui/lifetype.js";
 import "./ui/search.js";
 
 import { runSimulation } from "./ui/result.js";

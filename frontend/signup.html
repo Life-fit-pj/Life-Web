@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LIFE,FIT 회원가입 — 라이프스타일 설문</title>
+
+  <!-- 테마를 CSS 보다 먼저 정한다. index.html 과 같은 키를 읽어
+       두 화면의 낮/밤이 어긋나지 않게 한다 -->
+  <script>
+    (function () {
+      const saved = localStorage.getItem("lifefit-theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme =
+        saved || (prefersDark ? "dark" : "light");
+    })();
+  </script>
+
+  <!--
+    admin.html 과 같은 일체형 페이지다. 첫 화면(index.html)과 공유하는
+    코드가 없어서 나누면 파일만 늘어난다. 서버에 답을 저장하게 되면
+    그때 lib/api.js 를 쓰도록 <script type="module"> 로 바꾸면 된다.
+
+    색은 style.css 의 :root 와 같은 값을 여기 다시 적었다.
+    style.css 를 통째로 불러오면 지도·패널 레이아웃까지 따라온다
+  -->
+  <style>
+    :root {
+      --bg:          #F8F1D8;
+      --surface:     #FFFFFF;
+      --surface-2:   #F1E9CE;
+      --line:        #DAD7CD;
+      --text:        #2D2A32;
+      --text-muted:  #7B7A6B;
+      --primary:     #344E41;
+      --accent:      #8A6D1F;
+      --danger:      #C0563F;
+    }
+
+    [data-theme="dark"] {
+      --bg:          #1B1A17;
+      --surface:     #262420;
+      --surface-2:   #2F2C26;
+      --line:        #45413A;
+      --text:        #EDE8DA;
+      --text-muted:  #A09A88;
+      --primary:     #A3B18A;
+      --accent:      #E3C36B;
+      --danger:      #E08A72;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+      padding: 36px 20px 80px;
+    }
+
+    .wrap { max-width: 560px; margin: 0 auto; }
+
+    .brand {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+    }
+    .brand i { color: var(--accent); font-style: normal; }
+
+    h1 { font-size: 24px; font-weight: 700; margin: 18px 0 6px; letter-spacing: -0.5px; }
+    .lead { color: var(--text-muted); font-size: 14px; margin-bottom: 26px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .sec {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      margin-bottom: 14px;
+    }
+
+    .sq-item { margin-bottom: 16px; }
+    .sq-item:last-child { margin-bottom: 0; }
+
+    .sq-item label {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      line-height: 1.45;
+    }
+
+    .sq-item input {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .sq-item input:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    /* 5글자를 못 채운 칸. 다시 쓰기 시작하면 JS 가 뗀다 */
+    .sq-item input.error { border-color: var(--danger); }
+
+    .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+
+    .btn-submit {
+      padding: 14px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--bg);
+      background: var(--primary);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover { background: var(--accent); }
+
+    .btn-skip {
+      padding: 10px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .note {
+      margin-top: 18px;
+      padding: 12px 16px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+    }
+
+    /* ### 건너뛰기 재확인 ### */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9500;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .overlay.is-open { display: flex; }
+
+    .confirm-card {
+      width: 340px;
+      max-width: 100%;
+      padding: 24px;
+      text-align: center;
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    }
+
+    .confirm-card p {
+      margin-bottom: 22px;
+      font-size: 14.5px;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .confirm-actions { display: flex; gap: 12px; }
+
+    .confirm-actions button {
+      flex: 1;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-yes { background: var(--primary); color: var(--bg); }
+    .btn-no  { background: var(--surface-2); color: var(--text); }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="brand">LIFE<i>,</i>FIT</div>
+  <h1>나만의 맞춤 동네 찾기 🏡</h1>
+  <p class="lead">상세한 라이프스타일 분석을 위해 아래 질문들에 답해 주세요. (건너뛰기 가능)</p>
+
+  <form id="surveyForm">
+
+    <div class="card">
+      <div class="sec">💼 일·커리어</div>
+      <div class="sq-item">
+        <label for="p1">무슨 일을 하시나요? 일터까지는 어떻게 다니시는지도 알려주세요.</label>
+        <input id="p1" name="p1" type="text" placeholder="예) 강남에서 디자인 일을 해요. 지하철로 40분쯤 걸려요">
+      </div>
+      <div class="sq-item">
+        <label for="p2">일과가 끝나면 보통 어떻게 하시나요?</label>
+        <input id="p2" name="p2" type="text" placeholder="예) 야근이 잦아서 집에 오면 바로 뻗어요">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">⚽ 운동·활동</div>
+      <div class="sq-item">
+        <label for="s1">몸을 움직이는 활동을 하신다면 주로 어디서 하시나요?</label>
+        <input id="s1" name="s1" type="text" placeholder="예) 집 앞 하천 따라 러닝해요. 주 3회쯤">
+      </div>
+      <div class="sq-item">
+        <label for="s2">야외 활동과 실내 활동 중 어느 쪽이 더 편하세요? 이유도 적어주세요.</label>
+        <input id="s2" name="s2" type="text" placeholder="예) 무릎이 안 좋아서 밖에 오래 있는 건 힘들어요">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">🎨 문화생활·취미</div>
+      <div class="sq-item">
+        <label for="a1">쉴 때 뭘 보고 듣고 하시나요?</label>
+        <input id="a1" name="a1" type="text" placeholder="예) 집에서 넷플릭스 보거나 가끔 전시 보러 가요">
+      </div>
+      <div class="sq-item">
+        <label for="a2">문화생활을 하러 간다면 어떤 분위기의 장소가 좋으세요?</label>
+        <input id="a2" name="a2" type="text" placeholder="예) 사람 많은 곳은 부담스러워서 조용한 데가 좋아요">
+      </div>
+      <div class="sq-item">
+        <label for="h1">요즘 빠져 있는 것이나 즐겨 하는 일이 있나요? 자유롭게 적어주세요.</label>
+        <input id="h1" name="h1" type="text" placeholder="예) 주말마다 등산 가고, 요즘은 필름 카메라에 빠졌어요">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">✈️ 여행 성향</div>
+      <div class="sq-item">
+        <label for="t1">여행을 간다면 어떤 곳으로 가시나요?</label>
+        <input id="t1" name="t1" type="text" placeholder="예) 관광지보다 한적한 시골 마을이 좋아요">
+      </div>
+      <div class="sq-item">
+        <label for="t2">여행지에서는 주로 어떻게 다니세요?</label>
+        <input id="t2" name="t2" type="text" placeholder="예) 렌터카 빌려서 다녀요. 짐이 많아서요">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">🍲 음식·식생활</div>
+      <div class="sq-item">
+        <label for="c1">평소 끼니는 어떻게 해결하세요?</label>
+        <input id="c1" name="c1" type="text" placeholder="예) 주로 배달 시키고 주말엔 동네 식당에 가요">
+      </div>
+      <div class="sq-item">
+        <label for="c2">자주 가는 가게가 있나요? 어떤 곳인지 알려주세요.</label>
+        <input id="c2" name="c2" type="text" placeholder="예) 동네 국숫집 한 곳은 사장님이 제 얼굴을 아세요">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">👨‍👩‍👧‍👦 가족 구성</div>
+      <div class="sq-item">
+        <label for="f1">누구와 함께 사시나요? 앞으로 2년 안에 달라질 예정이 있다면 함께 적어주세요.</label>
+        <input id="f1" name="f1" type="text" placeholder="예) 아내와 둘이 살고, 내년에 아이가 태어나요">
+      </div>
+      <div class="sq-item">
+        <label for="f2">지금 집에서 아쉬운 점이 있다면 무엇인가요?</label>
+        <input id="f2" name="f2" type="text" placeholder="예) 짐 둘 데가 없어요. 방이 하나 더 있으면 좋겠어요">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec">🏡 주거 환경 배경</div>
+      <div class="sq-item">
+        <label for="g1">어떤 동네에서 자라셨나요? 그때 동네 분위기는 어땠는지도 알려주세요.</label>
+        <input id="g1" name="g1" type="text" placeholder="예) 시골이라 이웃끼리 다 알고 지냈어요">
+      </div>
+      <div class="sq-item">
+        <label for="g2">지금까지 살아본 동네 중 가장 편했던 곳은 어디였나요? 왜 편했는지도 알려주세요.</label>
+        <input id="g2" name="g2" type="text" placeholder="예) 골목 안쪽이라 차 소리가 없어서 좋았어요">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn-submit">완료하고 동네 추천받기</button>
+      <button type="button" id="surveySkip" class="btn-skip">건너뛰기</button>
+    </div>
+  </form>
+
+  <p class="note">
+    적어주신 내용은 추천에만 쓰입니다. 답이 길고 구체적일수록
+    비슷한 생활을 하는 회원들과 정확히 견줄 수 있어 추천이 좋아집니다.
+  </p>
+
+</div>
+
+<!-- 건너뛰기 재확인 -->
+<div id="skipConfirm" class="overlay">
+  <div class="confirm-card">
+    <p>라이프스타일 맞춤형 동네 추천이 어렵습니다.<br>넘어가시겠습니까?</p>
+    <div class="confirm-actions">
+      <button type="button" id="btnSkipNo" class="btn-no">아니요</button>
+      <button type="button" id="btnSkipYes" class="btn-yes">예</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* =========================================================
+   설문 답변 → persona 칸
+
+   칸 이름은 추천 엔진의 CHUNK_COLUMNS(Life-Embed-jh/app/core/config.py)와
+   글자 하나까지 같아야 한다. 나중에 회원가입 정보를 DB 에 적재할 때
+   이 객체를 그대로 넘기기 위해서다 — 여기서 이름을 바꾸면 그때 변환
+   코드를 새로 써야 한다.
+
+   비워 두는 칸이 둘 있다.
+     persona                    — 이름·나이·성격을 아우르는 총괄 요약이라
+                                  설문 답 하나로 대신할 수 없다
+     career_goals_and_ambitions — 대응하는 문항이 아직 없다
+   빈 칸은 청크가 안 만들어질 뿐 나머지 칸으로 추천이 돌아간다
+   ========================================================= */
+const PERSONA_MAP = {
+  professional_persona: ["p1", "p2"],
+  sports_persona:       ["s1", "s2"],
+  arts_persona:         ["a1", "a2", "h1"],
+  travel_persona:       ["t1", "t2"],
+  culinary_persona:     ["c1", "c2"],
+  family_persona:       ["f1", "f2"],
+  cultural_background:  ["g1", "g2"],
+};
+
+const STORAGE_KEY = "lifefit-survey";
+const MIN_CHARS = 5;
+
+const form = document.getElementById("surveyForm");
+const skipConfirm = document.getElementById("skipConfirm");
+
+
+/** 특수문자를 뺀 실제 글자 수. "ㅋㅋㅋ..." 같은 입력을 걸러내려는 것 */
+function meaningfulLength(value) {
+  return value.replace(/[^가-힣a-zA-Z0-9]/g, "").length;
+}
+
+
+/** 답변을 persona 칸으로 묶는다.
+ *
+ *  질문 라벨은 붙이지 않는다. 붙이면 모든 회원이 똑같은 라벨 문장을
+ *  갖게 되어 서로 비슷해 보이고, 비슷한 회원 찾기가 무의미해진다
+ */
+function toPersona() {
+  const persona = {};
+
+  for (const [column, ids] of Object.entries(PERSONA_MAP)) {
+    const text = ids
+      .map((id) => (document.getElementById(id).value || "").trim())
+      .filter(Boolean)
+      .join(" ");
+
+    if (text) persona[column] = text;
+  }
+
+  return persona;
+}
+
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  // ① 모든 칸이 최소 글자 수를 넘겼는지
+  let firstBad = null;
+
+  form.querySelectorAll(".sq-item input").forEach((input) => {
+    const ok = meaningfulLength(input.value) >= MIN_CHARS;
+    input.classList.toggle("error", !ok);
+    if (!ok && !firstBad) firstBad = input;
+  });
+
+  if (firstBad) {
+    alert(`정확한 분석을 위해 각 항목을 ${MIN_CHARS}글자 이상 적어주세요. (특수문자 제외)`);
+    firstBad.focus();
+    return;
+  }
+
+  // ② 첫 화면이 꺼내 갈 수 있도록 넘겨 두고 돌아간다.
+  //    아직 서버에 저장하지 않는다 — 회원가입 백엔드가 생기면 그때 붙인다
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toPersona()));
+  location.href = "/";
+});
+
+
+// 빨간 테두리는 다시 쓰기 시작하면 바로 뗀다
+form.addEventListener("input", (e) => {
+  if (e.target.matches(".sq-item input")) e.target.classList.remove("error");
+});
+
+
+// ### 건너뛰기 ###
+document.getElementById("surveySkip").addEventListener("click", () => {
+  skipConfirm.classList.add("is-open");
+});
+
+document.getElementById("btnSkipNo").addEventListener("click", () => {
+  skipConfirm.classList.remove("is-open");
+});
+
+document.getElementById("btnSkipYes").addEventListener("click", () => {
+  sessionStorage.removeItem(STORAGE_KEY);   // 이전에 쓰다 만 답이 남아 있을 수 있다
+  location.href = "/";
+});
+
+// 바깥을 눌러도 닫힌다
+skipConfirm.addEventListener("click", (e) => {
+  if (e.target === skipConfirm) skipConfirm.classList.remove("is-open");
+});
+</script>
+
+</body>
+</html>

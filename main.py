@@ -23,7 +23,6 @@ import os
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 # ==========================================
 # 1. 폴더 절대 경로 설정
@@ -39,9 +38,10 @@ app = FastAPI(title="LIFE,FIT")
 # 2. API 라우트: 예측 및 추천 수행
 # ==========================================
 
-from routers import admin, recommend
+from routers import admin, lifetype, recommend
 
 app.include_router(recommend.router)
+app.include_router(lifetype.router)
 app.include_router(admin.router)
 
 

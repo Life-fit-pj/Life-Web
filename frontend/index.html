@@ -58,18 +58,27 @@
 
     <div class="search-inner">
       <h1 class="search-title"> 당신에게 딱 맞는<em>동네</em>를 찾아드려요</h1>
-      <p class="search-sub">어떤 곳에서 살고 싶은지 편하게 적어보세요</p>
+      <p class="search-sub">단어를 고르거나 직접 적어도 좋아요</p>
 
-      <div class="search-box">
+      <!-- 고른 키워드가 태그로 쌓인다. 상자 아무 데나 눌러도 입력칸에 focus 가 간다
+           (연결은 ui/search.js — onclick 속성은 모듈 함수를 못 찾으므로 쓰지 않는다) -->
+      <div class="search-box" id="searchBox">
+        <div id="tagContainer" class="tag-container"></div>
         <input id="searchInput" type="text"
               placeholder="예 : 애들 학원 보내기 좋은 조용한 동네"
               autocomplete="off">
-        <button id="searchBtn">찾기</button>
+        <button id="searchBtn" type="button">찾기</button>
       </div>
+
+      <!-- 고른 키워드 개수. 3개 미만이면 더 고르라고 알려 준다 -->
+      <p id="pickCount" class="pick-count"></p>
 
       <p id="searchStatus" class="search-status"></p>
       <button id="skipSearch" class="search-skip">직접 설정할게요</button>
     </div>
+
+    <!-- 1차 유형 결과. 검색하면 화면을 뿌옇게 덮으며 올라온다 -->
+    <div id="typeResult"></div>
   </div>
 
   <!-- 결과 화면 우측 상단 로그인 + 메뉴 버튼 -->
@@ -113,7 +122,7 @@
     <div class="top-search">
       <span class="ts-icon">🔍</span>
       <input id="topSearchInput" type="text"
-             placeholder="어떤 동네를 찾으세요?" autocomplete="off">
+             placeholder="단어를 누르거나, 원하는 동네를 직접 적어보세요" autocomplete="off">
       <button id="topSearchBtn">검색</button>
     </div>
     <p id="topSearchStatus" class="ts-status"></p>

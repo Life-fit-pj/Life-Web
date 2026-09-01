@@ -3,13 +3,16 @@ POST /api/predict          검색어/슬라이더 → 추천 TOP 5
 POST /api/region           행정동 하나의 시설 정보
 POST /api/region/explain   행정동 하나의 LLM 설명
 POST /api/chat             추천 결과 후속 질문
+GET  /api/regions/gudong   구 → 동 목록 (회원가입 2단 드롭다운용)
 """
+
+from collections import defaultdict
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from services.coords import lookup_coords
-from services.engine import get_regions, get_facilities, get_region_explain, get_chat_answer
+from services.coords import COORDS, lookup_coords
+from services.engine import KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer
 from services.floorplan import find_floorplan
 
 router = APIRouter(prefix="/api", tags=["추천"])
@@ -39,6 +42,13 @@ class PredictRequest(BaseModel):
     jeonseDeposit: int | None = None
     wolseDeposit: int | None = None
     wolseRent: int | None = None
+
+    # --- 1차 유형 카드에서 넘어온 값 ---
+    # 1차와 2차가 완전히 다른 동네를 보여 주면
+    # "아까 그 동네는 어디 갔지" 가 된다. 뿌리를 이어 준다
+    firstWeights: dict | None = None   # 1차 유형이 만든 7개 가중치
+    firstSpots: list | None = None     # 1차에서 보여 준 동네 이름들
+    typeName: str | None = None        # "골목 마당발형"
 
 
 class RegionRequest(BaseModel):
@@ -75,6 +85,16 @@ def predict(body: PredictRequest):
     # services 는 사전을 기대하므로 모델을 사전으로 바꿔 넘긴다
     prefs = body.model_dump()
 
+    # 1차 가중치가 있으면 슬라이더 기본값 대신 그걸 쓴다.
+    # 사용자가 슬라이더를 직접 만졌다면(=기본값 3이 아니면) 그쪽을 존중한다.
+    # 영문↔한국어 대응은 services/engine.py 의 KEY_MAP 하나만 쓴다 — 여기서 다시 적으면 언젠가 어긋난다
+    if body.firstWeights:
+        touched = any(prefs.get(eng, 3) != 3 for eng in KEY_MAP)
+        if not touched:
+            for eng, kor in KEY_MAP.items():
+                if kor in body.firstWeights:
+                    prefs[eng] = int(body.firstWeights[kor])
+
     weights, regions, explanation, extracted_housing = get_regions(prefs)
     
     top_regions = []
@@ -97,10 +117,21 @@ def predict(body: PredictRequest):
     if body.area >= 59:
         base_score += 5
 
+    # 1차에서 보여 준 동네가 2차 목록에 있으면 표시해 준다.
+    # 예산 때문에 빠졌다면 그것도 알려 준다 — 사라진 이유를 알아야 납득한다.
+    # name 은 "서울특별시 구 동" 이므로 마지막 조각이 동 이름이다
+    first_names = {s.get("dong") for s in (body.firstSpots or [])
+                   if isinstance(s, dict) and s.get("dong")}
+    for r in top_regions:
+        r["fromFirst"] = r["name"].split(" ")[-1] in first_names
+    dropped = sorted(first_names - {r["name"].split(" ")[-1] for r in top_regions})
+
     return {
         "score": round(min(98.5, max(30.0, base_score)), 1),
         "query": body.query or "",
         "topRegions": top_regions,
+        "firstTypeName": body.typeName or "",
+        "droppedFromFirst": dropped,
         "floorplanPath": find_floorplan(body.area),
         "fallback": False,
         "explanation": explanation,
@@ -117,6 +148,21 @@ def region_detail(body: RegionRequest):
         "dong": body.dong,
         **get_facilities(body.gu, body.dong, limit=5),
     }
+
+
+@router.get("/regions/gudong")
+def region_gudong():
+    """구 → 그 구에 속한 동 목록. 회원가입 화면의 2단 드롭다운이 쓴다.
+
+    427개를 한 번에 늘어놓으면 고르기 어려우니 구(25개)를 먼저 고르게 한다.
+    프론트에 목록을 하드코딩하면 data/동_좌표.csv 와 두 벌이 되어 언젠가
+    어긋나므로, 이미 메모리에 올라와 있는 COORDS 를 그대로 재사용한다
+    """
+    gudong = defaultdict(list)
+    for gu, dong in COORDS:
+        gudong[gu].append(dong)
+
+    return {gu: sorted(dongs) for gu, dongs in sorted(gudong.items())}
 
 
 @router.post("/region/explain")

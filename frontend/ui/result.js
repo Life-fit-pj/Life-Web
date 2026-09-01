@@ -70,7 +70,7 @@ export function renderResult(data) {
   }
 
   // ② 추천 TOP 5 리스트
-  updateTopRegionsList(data.topRegions);
+  updateTopRegionsList(data.topRegions, data.droppedFromFirst);
 
   // ③ 지도 마커
   renderKakaoMapMarkers(data.topRegions, data.weights);
@@ -80,8 +80,14 @@ export function renderResult(data) {
 }
 
 
-// ② 추천 TOP 5 리스트 : 우측 TOP 5 리스트 UI 갱신 함수
-function updateTopRegionsList(regions) {
+/**
+ * ② 추천 TOP 5 리스트 : 우측 TOP 5 리스트 UI 갱신 함수
+ *
+ * dropped 는 1차 유형 카드에서 봤는데 2차 목록에서 빠진 동네들이다.
+ * 아무 말 없이 사라지면 "아까 그 동네는 어디 갔지" 가 되므로 알려 준다.
+ * 1차를 안 거쳤으면 빈 배열이라 아무것도 안 뜬다
+ */
+function updateTopRegionsList(regions, dropped) {
   const container = document.getElementById('resTopRegions');
   if (!container || !regions) return;
 
@@ -92,10 +98,16 @@ function updateTopRegionsList(regions) {
     div.className = 'list-item';
     div.style.cursor = 'pointer';
 
+    // 1차에서도 나왔던 동네에 표시를 달아 준다
+    const mark = item.fromFirst
+      ? '<span class="li-from-first" title="1차 유형에서도 추천된 동네">처음부터</span>'
+      : '';
+
     div.innerHTML = `
       <div class="li-main">
         <span class="rank">${item.rank}</span>
         <div class="list-name">${item.name}</div>
+        ${mark}
       </div>
     `;
 
@@ -104,6 +116,14 @@ function updateTopRegionsList(regions) {
 
     container.appendChild(div);
   });
+
+  if (dropped?.length) {
+    const note = document.createElement('p');
+    note.className = 'li-dropped';
+    note.textContent =
+      `${dropped.join(' · ')} 은(는) 예산·면적 조건에서 밀려 목록에 없어요`;
+    container.appendChild(note);
+  }
 }
 
 

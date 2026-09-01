@@ -1,33 +1,52 @@
 /* =========================================================
    search.js — 1차 검색 화면
-   검색어를 서버(/api/predict)로 보내면 LLM 이 7개 지표 가중치를
-   만들어 준다. 그 값을 슬라이더에 반영하고 결과 화면으로 넘어간다.
+
+   흐름은 두 단계다.
+     1차  떠다니는 단어를 골라 /api/lifetype 으로 보낸다.
+          LLM 을 안 타서 즉시 유형 카드가 뜬다 (ui/lifetype.js)
+     2차  카드에서 '5곳 보기' 를 누르면 /api/predict 로 간다.
+          LLM 이 7개 지표 가중치를 만들고 결과 화면으로 넘어간다
+
+   상단 검색창(결과 화면)은 1차를 건너뛰고 곧바로 2차로 간다 —
+   이미 결과를 보고 있는 사람에게 유형 카드를 다시 띄울 이유가 없다
    ========================================================= */
 
-import { postPredict } from "../lib/api.js";
+import { postPredict, postLifeType, getLifeTypeKeywords } from "../lib/api.js";
 import { nextSeq, isLatest } from "../lib/state.js";
 import { renderResult } from "./result.js";
 import { openMenu, openAuthModal } from "./menu.js";
+import { showTypeCard, firstPayload } from "./lifetype.js";
 
 
-// 배경에 떠다닐 단어들. 클릭하면 검색창에 들어간다.
-// 우리 7개 지표로 답할 수 있는 것만 넣는다 —
-// 답 못 하는 걸 예시로 주면 첫인상을 망친다
-const FLOAT_WORDS = [
-  "조용한 골목", "역세권", "공세권", "산책로", "학군", "치안",
-  "한강뷰", "카페거리", "도서관", "녹지", "신축", "전세",
-  "반려동물", "재택근무", "출퇴근 30분", "병원 가까운",
-  "문화공간", "원룸", "숲세권", "대형마트",
-  "학원가", "전통시장", "아이 키우기 좋은", "부모님과 함께",
-  "밤에도 밝은", "혼자 살기 좋은", "공원 산책", "동네 병원",
-  "전시 보러 가기", "장 보기 편한",
+// 배경에 떠다닐 단어들.
+// 진짜 목록은 서버(services/lifetype.py)가 쥐고 있고, 시작할 때 받아 온다.
+// 여기 적힌 것은 서버를 못 부를 때 쓰는 예비다 —
+// 유형 판정의 축(axis)에 맞춰 고른 말들이라 아무 단어나 넣으면 안 된다
+let FLOAT_WORDS = [
+  "주말엔 무조건 외출", "약속으로 꽉 찬 주말", "핫플 카페 도장 깨기",
+  "완벽한 집순이 집돌이", "퇴근하면 바로 귀가", "내 방이 최고의 힐링",
+  "슬리퍼 신고 쇼핑몰", "맛집 탐방이 일상", "24시간 밝은 거리",
+  "지하철역이 코앞", "소음 없는 한적한 곳", "흙길 따라 걷는 산책",
+  "창문 열면 녹지", "공원이 앞마당인 집", "단골집 사장님과 수다",
+  "오가며 인사하는 이웃", "동네 모임이 활발한", "혼자만의 고요한 시간",
+  "마주칠 일 없는 동네", "조용히 지내고 싶은", "모든 걸 걸어서 해결",
+  "1분 컷 편의점 필수", "장 보러 걸어가는 길", "주차 걱정 없는 동네",
+  "친구 만나러 드라이브", "대형마트는 차로 한 번", "면적은 작아도 분리된",
+  "새 집이면 좋겠는", "방이 많은", "넓은 게 최고인",
 ];
 
-const VISIBLE_COUNT = 14;   // 한 번에 화면에 띄울 개수. 나머지는 교체용 예비
+// 이보다 적게 고르면 축이 대부분 비어 유형이 아무 데나 떨어진다.
+// 서버가 알려 주는 값으로 덮어쓴다
+let MIN_PICK = 3;
+
+const VISIBLE_COUNT = 20;   // 한 번에 화면에 띄울 개수. 나머지는 교체용 예비
 const PULL_RADIUS = 140;    // 마우스가 이 거리(px) 안에 오면 반응
 const PULL_MAX = 18;        // 최대로 끌려오는 거리(px)
 
-// 서버가 준 한국어 지표명 → 슬라이더 id (기존에 이미 있음, 참고용)
+// signup.html 이 설문 답을 넣어 두는 자리. 키 이름을 바꾸면 양쪽 다 고쳐야 한다
+const SURVEY_KEY = "lifefit-survey";
+
+// 서버가 준 한국어 지표명 → 슬라이더 id
 const SLIDER_ID = {
   "녹지": "greenery", "안전": "safety", "교통": "transport",
   "상권": "commercial", "의료": "medical", "교육": "education",
@@ -36,6 +55,93 @@ const SLIDER_ID = {
 
 // 거래유형 → 그 유형이 쓰는 예산 슬라이더 id
 const PRICE_SLIDER_ID = { "매매": "salePrice", "전세": "jeonseDeposit", "월세": "wolseRent" };
+
+
+/* =========================================================
+   고른 키워드
+   ========================================================= */
+
+let selectedKeywords = [];
+
+function toggleKeyword(keyword) {
+  const i = selectedKeywords.indexOf(keyword);
+  if (i > -1) selectedKeywords.splice(i, 1);
+  else selectedKeywords.push(keyword);
+  renderTags();
+}
+
+function removeKeyword(keyword) {
+  selectedKeywords = selectedKeywords.filter((k) => k !== keyword);
+  renderTags();
+}
+
+/** 고른 키워드를 검색창 안에 태그로 그린다 */
+function renderTags() {
+  const container = document.getElementById("tagContainer");
+  const input = document.getElementById("searchInput");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  selectedKeywords.forEach((keyword) => {
+    const tag = document.createElement("div");
+    tag.className = "keyword-tag";
+    tag.textContent = keyword;
+    tag.title = "누르면 지워집니다";
+
+    tag.addEventListener("click", (e) => {
+      // 검색 상자 전체에 걸린 "누르면 입력칸으로" 와 겹치지 않게 막는다
+      e.stopPropagation();
+      removeKeyword(keyword);
+      input?.focus();
+    });
+
+    container.appendChild(tag);
+  });
+
+  // 태그가 있으면 안내 문구가 같이 보여 지저분하므로 잠시 숨긴다
+  if (input) {
+    input.placeholder = selectedKeywords.length
+      ? ""
+      : "예 : 애들 학원 보내기 좋은 조용한 동네";
+  }
+
+  updatePickCount();
+}
+
+/**
+ * 몇 개 골랐는지 알려 준다.
+ *
+ * 고른 키워드는 태그(selectedKeywords)에 있고 입력칸에는 없다.
+ * 직접 쓴 문장도 인정해 준다 — 안 그러면 길게 써 놓고도
+ * "키워드를 고르세요" 를 계속 보게 된다
+ */
+function updatePickCount() {
+  const input = document.getElementById("searchInput");
+  const el = document.getElementById("pickCount");
+  if (!input || !el) return;
+
+  const n = selectedKeywords.length;
+  const typed = input.value.trim().replace(/\s+/g, "").length >= 4;
+
+  if (!n && !typed) {
+    el.textContent = "";
+    el.className = "pick-count";
+  } else if (n && typed) {
+    el.textContent = `키워드 ${n}개 + 직접 입력`;
+    el.className = "pick-count ok";
+  } else if (typed) {
+    el.textContent = "직접 입력한 내용으로 찾아볼게요";
+    el.className = "pick-count ok";
+  } else if (n < MIN_PICK) {
+    el.textContent = `${MIN_PICK}개 이상 고르면 더 정확해요 (지금 ${n}개)`;
+    el.className = "pick-count";
+  } else {
+    el.textContent = `${n}개 선택됨`;
+    el.className = "pick-count ok";
+  }
+}
+
 
 /** 검색어에서 LLM이 읽어낸 건물유형·거래유형·예산을 "건축" 패널에 반영한다.
  *  가격 언급이 없었던 검색이면 housing이 null이라 아무것도 안 건드린다 */
@@ -134,11 +240,8 @@ function makeWord(word, x, y) {
     // 여기서 word 를 쓰면 안 된다.
     // startRotation 이 글씨를 바꿔도 이 함수는 옛날 값을 기억하고 있다.
     // 눌리는 순간 화면에 적힌 글씨를 읽어야 항상 맞는다
-    const current = inner.textContent.trim();
-
-    const input = document.getElementById("searchInput");
-    input.value = input.value ? input.value + " " + current : current;
-    input.focus();
+    toggleKeyword(inner.textContent.trim());
+    document.getElementById("searchInput")?.focus();
   });
 
   return outer;
@@ -167,8 +270,8 @@ function startMagnetic() {
 }
 
 function updateMagnetic(mx, my) {
-    // 검색 화면이 걷힌 뒤에는 계산할 이유가 없다.
-  // 그대로 두면 mousemove 마다 getBoundingClientRect 를 14번씩 부르느라
+  // 검색 화면이 걷힌 뒤에는 계산할 이유가 없다.
+  // 그대로 두면 mousemove 마다 getBoundingClientRect 를 20번씩 부르느라
   // 슬라이더 드래그 같은 다른 조작이 버벅인다
   const screen = document.getElementById("searchScreen");
   if (!screen || screen.classList.contains("out")) return;
@@ -199,16 +302,19 @@ function startRotation() {
   setInterval(() => {
     const screen = document.getElementById("searchScreen");
     if (screen && screen.classList.contains("out")) return;   // 안 보이면 건너뛴다
-    
+
     const words = document.querySelectorAll(".ss-word");
     if (!words.length) return;
 
     const target = words[Math.floor(Math.random() * words.length)];
     const inner = target.firstElementChild;
 
-    // 지금 화면에 없는 단어 중에서 고른다
+    // 지금 화면에 없는 단어 중에서 고른다.
+    // 이미 고른 키워드도 빼야 태그와 배경에 같은 말이 두 번 보이지 않는다
     const showing = new Set([...words].map((w) => w.textContent.trim()));
-    const pool = FLOAT_WORDS.filter((w) => !showing.has(w));
+    const pool = FLOAT_WORDS.filter(
+      (w) => !showing.has(w) && !selectedKeywords.includes(w)
+    );
     if (!pool.length) return;
 
     const next = pool[Math.floor(Math.random() * pool.length)];
@@ -231,16 +337,67 @@ function startRotation() {
 }
 
 
+/* =========================================================
+   1차 — 유형 판정
+   ========================================================= */
+
+/**
+ * 고른 키워드로 유형을 판정하고 카드를 띄운다.
+ * LLM 을 안 타므로 거의 즉시 돌아온다
+ */
+async function runLifeType(query) {
+  const btn = document.getElementById("searchBtn");
+  const status = document.getElementById("searchStatus");
+
+  const seq = nextSeq();
+  btn.disabled = true;
+  status.textContent = "라이프스타일을 살펴보는 중...";
+
+  try {
+    const t = await postLifeType(query);
+    if (!isLatest(seq)) return;      // 오래된 응답은 버린다
+
+    status.textContent = "";
+
+    showTypeCard(t, {
+      // 카드가 이 두 개를 눌렀을 때 부른다.
+      // 2차 결과는 성공 여부(true/false)로 돌려줘야 카드가 닫을지 정한다
+      onContinue: async () => {
+        const ok = await runPredict(query, { autoClose: false });
+        if (ok) closeSearch();
+        return ok;
+      },
+      onSkip: () => runPredict(query),
+    });
+
+  } catch (err) {
+    if (!isLatest(seq)) return;
+    // 1차가 실패해도 2차로는 보내 준다. 검색 화면에 갇히는 것보다 낫다.
+    // await 를 빼면 아래 finally 가 먼저 돌아 2차가 도는 동안 버튼이 다시 눌린다
+    console.error(err);
+    status.textContent = "유형 분석에 실패했어요. 바로 추천해 드릴게요.";
+    await runPredict(query);
+
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+
+/* =========================================================
+   2차 — 추천
+   ========================================================= */
+
 /**
  * 검색어를 서버로 보내 가중치를 받고, 슬라이더에 반영한 뒤
  * 결과 화면으로 넘어간다.
  *
- * 기존 데모는 키워드 규칙(parseQuery)으로 즉시 처리했지만,
- * 지금은 LLM 을 태우므로 3~6초가 걸린다.
- * 그동안 아무 반응이 없으면 고장난 줄 알기 때문에
- * 진행 문구를 단계별로 바꿔 준다
+ * LLM 을 태우므로 3~6초가 걸린다. 그동안 아무 반응이 없으면
+ * 고장난 줄 알기 때문에 진행 문구를 단계별로 바꿔 준다.
+ *
+ * 성공하면 true 를 돌려준다 — 유형 카드가 이 값을 보고 닫을지 정한다
  */
-async function runSearch(query, from = "screen") {
+async function runPredict(query, { from = "screen", autoClose = true } = {}) {
   const isTop = from === "top";
   const btn = document.getElementById(isTop ? "topSearchBtn" : "searchBtn");
   const status = document.getElementById(isTop ? "topSearchStatus" : "searchStatus");
@@ -250,27 +407,32 @@ async function runSearch(query, from = "screen") {
   const stopSteps = showSteps(status);    // 진행 문구 시작
 
   try {
-    const data = await postPredict({ query: query });
-    if (!isLatest(seq)) return;   // 오래된 응답은 버린다
+    // firstPayload() 는 1차를 거쳤을 때만 값이 있다.
+    // 슬라이더를 직접 만졌으면 서버가 알아서 firstWeights 를 무시한다
+    const data = await postPredict({ query, ...firstPayload() });
+    if (!isLatest(seq)) return false;     // 오래된 응답은 버린다
 
     stopSteps();
     applyWeights(data.weights);            // 슬라이더에 반영
     applyHousing(data.housing);            // "건축" 패널에 반영 — 가격 언급 없었으면 아무 일도 안 함
     renderResult(data);                    // 같은 응답으로 결과 화면 채우기
+    fillTopSearch(query);                  // 결과 화면 상단 검색창에도 검색어를 남긴다
 
     // 무엇을 읽었는지 알려 준다
     status.textContent = topLabel(data.weights) + " 조건으로 찾았어요";
 
-    setTimeout(closeSearch, 800);
+    if (autoClose) setTimeout(closeSearch, 800);
+    return true;
 
   } catch (err) {
-    if (!isLatest(seq)) return;
+    if (!isLatest(seq)) return false;
     // LLM 이 실패해도 슬라이더 화면으로는 보내 준다.
     // 검색 화면에 갇히는 것보다 낫다
     console.error(err);
     stopSteps();
     status.textContent = "검색어 분석에 실패했어요. 슬라이더로 조절해 주세요.";
-    setTimeout(closeSearch, 1600);
+    if (autoClose) setTimeout(closeSearch, 1600);
+    return false;
 
   } finally {
     btn.disabled = false;
@@ -329,38 +491,109 @@ function closeSearch() {
 }
 
 
-/** 버튼과 키 입력을 연결한다 */
+/* =========================================================
+   설문(signup.html)에서 돌아왔을 때
+   ========================================================= */
+
+/**
+ * 회원가입 설문을 마치고 돌아왔으면 그 답으로 바로 추천한다.
+ *
+ * 답은 persona 칸 이름(추천 엔진의 CHUNK_COLUMNS)으로 담겨 온다.
+ * 여기서는 문장을 이어 붙여 검색어처럼 보낼 뿐이고,
+ * 서버에 저장하는 것은 회원가입 백엔드가 생기면 붙인다
+ *
+ * @returns 설문으로 시작했으면 true — 그러면 유형 카드는 건너뛴다
+ */
+function runSurveyIfPending() {
+  let raw;
+  try {
+    raw = sessionStorage.getItem(SURVEY_KEY);
+  } catch {
+    return false;                 // 사생활 보호 모드 등으로 막혀 있으면 그냥 넘어간다
+  }
+  if (!raw) return false;
+
+  // 한 번 쓰고 지운다. 새로고침할 때마다 다시 돌면 곤란하다
+  try { sessionStorage.removeItem(SURVEY_KEY); } catch { /* 무시 */ }
+
+  let persona;
+  try {
+    persona = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+
+  const answers = Object.values(persona).filter(Boolean).join(" ");
+  if (!answers) return false;
+
+  // 15개 답이 통째로 오므로 무엇인지 알려 주고 보낸다.
+  // (저장용 persona 에는 이런 머리말을 붙이지 않는다 — signup.html 주석 참고)
+  runPredict("다음은 사용자의 라이프스타일 설문 답변입니다. " + answers);
+  return true;
+}
+
+
+/* =========================================================
+   연결
+   ========================================================= */
+
 function bindEvents() {
   const input = document.getElementById("searchInput");
+
   const submit = () => {
-    const q = input.value.trim();
-    if (!q) { input.focus(); return; }
-    runSearch(q);
+    // 태그로 고른 단어와 직접 쓴 글자를 하나로 묶는다
+    const combined = [...selectedKeywords, input.value.trim()]
+      .filter(Boolean)
+      .join(" ");
+
+    if (!combined) { input.focus(); return; }
+    runLifeType(combined);
   };
 
   document.getElementById("searchBtn").addEventListener("click", submit);
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") submit();
   });
+
+  // 직접 쓰는 동안에도 안내 문구를 갱신한다
+  input.addEventListener("input", updatePickCount);
+
+  // 상자 아무 데나 눌러도 입력칸으로 간다. 태그는 stopPropagation 으로 막아 뒀다
+  document.getElementById("searchBox")?.addEventListener("click", () => input.focus());
 
   document.getElementById("skipSearch").addEventListener("click", closeSearch);
   document.getElementById("menuToggle").addEventListener("click", openMenu);
   document.getElementById("loginToggle").addEventListener("click", openAuthModal);
 }
 
+
 // 페이지가 다 읽히면 시작한다
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // 키워드 목록은 서버가 쥔다. 프론트에 박아 두면 lifetype.py 와 어긋난다
+  try {
+    const d = await getLifeTypeKeywords();
+    if (d.all?.length) FLOAT_WORDS = d.all;
+    if (d.minPick) MIN_PICK = d.minPick;
+  } catch (err) {
+    console.warn("[search] 키워드를 못 받아 예비 목록을 씁니다", err);
+  }
+
   placeWords();
   startMagnetic();
   startRotation();
   bindEvents();
-  setTimeout(() => document.getElementById("searchInput").focus(), 400);
+
+  // 설문을 마치고 돌아온 길이면 검색 화면을 띄우지 않고 바로 추천한다
+  if (!runSurveyIfPending()) {
+    setTimeout(() => document.getElementById("searchInput").focus(), 400);
+  }
 });
 
 
 // ===== 상단 검색창 =====
 // 결과 화면에서도 검색어를 보고 다시 검색할 수 있게 한다.
-// 검색 로직은 runSearch 가 이미 갖고 있으므로 여기서는 부르기만 한다
+// 이미 결과를 보고 있으므로 1차 유형 카드는 건너뛰고 곧바로 2차로 간다
 
 /** 검색이 끝나면 상단 검색창에 그 검색어를 채운다 */
 function fillTopSearch(query) {
@@ -377,7 +610,7 @@ function bindTopSearch() {
   const submit = () => {
     const q = input.value.trim();
     if (!q) { input.focus(); return; }
-    runSearch(q, "top");        // "top" 은 어느 창에서 왔는지 알리는 표시
+    runPredict(q, { from: "top" });        // "top" 은 어느 창에서 왔는지 알리는 표시
   };
 
   btn.addEventListener("click", submit);
