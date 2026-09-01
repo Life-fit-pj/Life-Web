@@ -28,6 +28,19 @@ async function getJSON(url) {
   return res.json();
 }
 
+/** DELETE + JSON 을 보내고 JSON 을 받는 공통 부분 */
+async function deleteJSON(url, body) {
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) throw new Error(`${url} 응답 오류 ${res.status}`);
+
+  return res.json();
+}
+
 
 /** 추천 요청. 검색어만 보내도 되고, 슬라이더 값을 다 보내도 된다 */
 export function postPredict(payload) {
@@ -71,4 +84,14 @@ export function postChat(question, regions, weights) {
     regions: regions || null,
     weights: weights || null,
   });
+}
+
+/** 좋아요 추가 */
+export function postLike(anonId, gu, dong) {
+  return postJSON("/api/likes", { anonId, gu, dong });
+}
+
+/** 좋아요 취소 */
+export function deleteLike(anonId, gu, dong) {
+  return deleteJSON("/api/likes", { anonId, gu, dong });
 }
