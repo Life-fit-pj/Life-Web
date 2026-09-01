@@ -63,6 +63,7 @@ class RegionRequest(BaseModel):
     # 가격 조건이 없었으면 None (엔진이 시세 이야기를 안 꺼낸다)
     housing: dict | None = None
 
+
 class ChatRequest(BaseModel):
     question: str
     # 지금 화면에 떠 있는 추천 결과를 같이 받는다.
@@ -88,17 +89,20 @@ def predict(body: PredictRequest):
     # services 는 사전을 기대하므로 모델을 사전으로 바꿔 넘긴다
     prefs = body.model_dump()
 
-    # 1차 가중치가 있으면 슬라이더 기본값 대신 그걸 쓴다.
-    # 사용자가 슬라이더를 직접 만졌다면(=기본값 3이 아니면) 그쪽을 존중한다.
-    # 영문↔한국어 대응은 services/engine.py 의 KEY_MAP 하나만 쓴다 — 여기서 다시 적으면 언젠가 어긋난다
+    # 1차 유형 카드에서 넘어왔고 슬라이더를 직접 만지지 않았으면,
+    # 1차 가중치를 "확정값"으로 엔진에 넘긴다. 이게 없으면 1차에서 본 동네가
+    # 2차에서 전부 사라진다(실측: fromFirst 전부 False).
+    # 영문↔한국어 대응은 services/engine.py 의 KEY_MAP 하나만 쓴다 —
+    # 여기서 다시 적으면 언젠가 어긋난다
+    fixed_weights = None
     if body.firstWeights:
         touched = any(prefs.get(eng, 3) != 3 for eng in KEY_MAP)
         if not touched:
-            for eng, kor in KEY_MAP.items():
-                if kor in body.firstWeights:
-                    prefs[eng] = float(body.firstWeights[kor])   # int() → float()
+            fixed_weights = {kor: float(body.firstWeights[kor])
+                             for kor in KEY_MAP.values() if kor in body.firstWeights}
 
-    weights, regions, explanation, extracted_housing = get_regions(prefs)
+    weights, regions, explanation, used_housing = get_regions(
+        prefs, weights_override=fixed_weights)
     
     top_regions = []
     for idx, r in enumerate(regions):
@@ -139,7 +143,7 @@ def predict(body: PredictRequest):
         "fallback": False,
         "explanation": explanation,
         "weights": weights,
-        "housing": extracted_housing,   # {"건물유형":"아파트","거래유형":"매매","targets":{"예산":40000}} 또는 null
+        "housing": used_housing,   # {"건물유형":"아파트","거래유형":"매매","targets":{"예산":40000}} 또는 null
     }
 
 
@@ -185,6 +189,7 @@ def region_explain_api(body: RegionRequest):
             housing=body.housing,
         )
     }
+
 
 @router.post("/chat")
 def chat_api(body: ChatRequest):

@@ -79,7 +79,15 @@ def to_housing(prefs):
     return {"건물유형": bldg, "거래유형": deal, "targets": targets}
 
 
-def get_regions(user_prefs):
+def get_regions(user_prefs, weights_override=None):
+    """추천 TOP 5 를 만든다.
+
+    weights_override 는 "화면이 이미 확정한 가중치"다 —
+    1차 유형 카드가 키워드로 만든 7개 값. 이게 있으면 엔진이 검색어를 다시
+    읽어 만든 가중치 대신 이걸 쓴다. 반드시 search() 안으로 넘겨야 한다 —
+    반환값의 weights 만 바꾸면 regions·explanation 은 옛 가중치로 만들어진
+    상태로 남아 응답이 서로 다른 기준을 가리키게 된다
+    """
     query = (user_prefs.get('query') or '').strip()
     housing = to_housing(user_prefs)
 
@@ -93,7 +101,8 @@ def get_regions(user_prefs):
     used_housing = None
 
     if query:
-        result = search(query, top_k=5, housing_override=housing)
+        result = search(query, top_k=5, housing_override=housing,
+                        weights_override=weights_override)
         weights = result["weights"]
         regions = result["regions"]
         explanation = result["explanation"]
@@ -101,7 +110,8 @@ def get_regions(user_prefs):
         # 없으면 검색어에서 뽑아낸 조건을 돌려준다 — 어느 쪽이든 "실제로 쓰인" 값
         used_housing = result.get("housing")
     else:
-        weights = to_korean_weights(user_prefs)
+        # 슬라이더 경로에도 같은 규칙을 적용한다 — 화면이 확정한 값이 우선
+        weights = weights_override or to_korean_weights(user_prefs)
         regions = recommend_by_weights(weights, top_k=5, housing=housing)
         explanation = ""
         used_housing = housing        # ← 이 한 줄이 빠져 있었다

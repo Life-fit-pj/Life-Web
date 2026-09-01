@@ -48,12 +48,12 @@
 |---|---|---|
 | A-3 `to_weights()` 반올림 제거 | ✅ 적용·검증 완료 | 가중치가 실수로 살아남음 |
 | A-4 `typespot` 채점 방식 교체 | ✅ 적용·검증 완료 | 명동·역삼1동 사라짐 |
-| A-5 `firstWeights` 가 무시되는 문제 | ⚠️ **미해결** | `int()`→`float()` 만 적용됨. 근본 원인 그대로 |
+| A-5 `firstWeights` 가 무시되는 문제 | ✅ **해결·검증 완료** | 엔진 `weights_override` + 웹 배선. 7절 참고 |
 | B `/api/region` 500 | ✅ 재발 없음 | 427개 동 전부 200 |
-| C 실패를 조용히 삼키는 문제 | ⬜ **미적용** | `reason.js` 의 `catch` 두 곳 그대로 |
+| C 실패를 조용히 삼키는 문제 | ⚠️ **중괄호 누락** | 코드는 들어갔으나 `}` 2개가 지워짐. 6-2 참고 |
 | D `housing` 배선 5곳 | ✅ 적용·검증 완료 | 설명문에 가격 문장이 실제로 나옴 |
-| **F1 (신규)** 설명문의 금액이 10배 틀림 | 🔴 **엔진 쪽 수정 필요** | 사용자에게 틀린 숫자가 보임 |
-| **F2 (신규)** `region_explain` 프롬프트 자기모순 | 🟠 엔진 쪽 수정 필요 | F1 의 원인 중 하나 |
+| **F1 (신규)** 설명문의 금액이 10배 틀림 | ✅ **해결·검증 완료** | 엔진 `format_won()`. 7절 참고 |
+| **F2 (신규)** `region_explain` 프롬프트 자기모순 | ✅ 해결 | 3단 규칙으로 정리됨 |
 
 ---
 
@@ -225,6 +225,39 @@ app/engine/explain.py 에는 있고 region_explain.py 에는 없다.
 ## 검증
 같은 동네를 목표가만 바꿔 여러 번 부르고, 설명문의 금액이
 "주변 시세" 탭(Life-Web 이 fmtWon 으로 찍는 값)과 자릿수가 같은지 대조.
+
+## 요청 4 (별건) — search() 에 weights_override 를 추가해 달라
+app/features/pipeline_api.py:100
+  현재  def search(query, top_k=5, housing_override=None):
+  요청  def search(query, top_k=5, housing_override=None, weights_override=None):
+
+113행 `weights = blend(draft, member_weights(ids))` 바로 아래에 두 줄:
+
+    if weights_override:
+        weights = dict(weights_override)
+
+[이유]
+Life-Web 의 1차 유형 카드가 키워드로 7개 가중치를 이미 확정해 놓는데, 2차로
+넘어가면 엔진이 같은 키워드 문장을 다시 읽어 **다른** 가중치를 만든다. 그래서
+1차에서 보여 준 동네가 2차에서 100% 사라진다(실측: fromFirst 전부 False,
+droppedFromFirst 에 두 곳 다 들어감).
+
+[왜 웹에서 못 고치나]
+search() 안에서 weights 는 순위(recommend_by_weights)와 설명문(explain) 양쪽에
+쓰인다. 웹이 반환값의 weights 만 바꿔치기하면 regions·explanation 은 옛 가중치로
+만들어진 상태라, 응답의 세 값이 서로 다른 기준을 가리키게 된다 —
+오류 없이 조용히 틀린다. 그래서 반드시 search() 안에서 바뀌어야 한다.
+
+[설계 의도]
+housing_override 와 같은 자리다 — "화면에서 사용자가 명시적으로 고른 값이
+검색어에서 추정한 값보다 신뢰도가 높다". 이름과 동작을 맞춰 주면 좋겠다.
+draft 의 가격 조건 추출, persona_query, find_similar_members, find_cases,
+explain() 은 지금 그대로 두면 된다.
+
+[검증]
+Life-Web 에서 1차 유형 카드 → "동네 5곳 보기" 를 눌렀을 때
+응답의 weights 가 1차 가중치와 같고, topRegions 의 fromFirst 에 true 가
+하나라도 나오는지.
 ```
 
 ---
@@ -254,8 +287,138 @@ droppedFromFirst ['목3동', '신정4동']
 장치가 애초에 막으려던 바로 그 상황입니다.
 
 A-3/A-4 로 1차가 좋아진 만큼 이 단절이 더 눈에 띄게 됐습니다 — 어제는 1차도 2차도
-엉뚱해서 티가 덜 났습니다. 어제 적은 선택지(1: 지금 동작 인정하고 죽은 코드 삭제 /
-2: 1차를 존중 / 3: 섞기) 중 하나를 정하고 진행하세요. **저는 여전히 2번을 권합니다.**
+엉뚱해서 티가 덜 났습니다.
+
+### ▶ 결정 (2026-09-02): **2번 "1차를 존중"** + **엔진에 한 줄 요청**
+
+그런데 이건 한 줄로 안 끝납니다. 함정이 하나 있습니다.
+
+**함정 — 가중치만 바꿔치기하면 응답이 거짓말을 합니다.**
+
+`search()` 안에서는 이미 이 순서로 일이 끝나 있습니다.
+
+```python
+weights  = blend(draft, member_weights(ids))       # LLM 초안 + 회원 보정
+detailed = recommend_by_weights(weights, ...)      # ← 이 weights 로 순위를 매김
+text     = explain(query, weights, detailed, ...)  # ← 이 weights 로 설명문을 씀
+```
+
+그래서 웹이 반환값의 `weights` 만 1차 값으로 덮어쓰면 응답 세 값이 서로 다른
+기준을 가리키게 됩니다.
+
+| 응답 필드 | 근거가 된 가중치 |
+|---|---|
+| `weights` (레이더 점선) | 1차 값 |
+| `topRegions` (순위) | LLM 값 |
+| `explanation` (채팅 요약) | LLM 값 |
+
+화면은 "녹지를 3.46으로 봤어요"라고 말하는데 순위는 5.0으로 매긴 상태입니다.
+**오류 없이 조용히 틀리는** 종류라 제일 나쁩니다.
+
+**그래서 `search()` 안에서 바뀌어야 합니다** → 위 3절 요청서의 **요청 4**.
+
+### 작업 순서 (반드시 이 순서로)
+
+**엔진이 먼저입니다.** 엔진 반영 전에 웹을 먼저 고치면 서버가
+`TypeError: search() got an unexpected keyword argument 'weights_override'`
+로 즉시 죽습니다.
+
+1. 요청서(3절)를 엔진 쪽에 전달 → `weights_override` 반영 확인
+2. 그 다음에 아래 웹 코드 2곳 수정
+
+### 웹 코드 — 엔진 반영 후에 적용할 것
+
+```python
+# services/engine.py — 원본 (82~83번째 줄)
+def get_regions(user_prefs):
+    query = (user_prefs.get('query') or '').strip()
+```
+
+```python
+# services/engine.py — 수정
+def get_regions(user_prefs, weights_override=None):
+    """추천 TOP 5 를 만든다.
+
+    weights_override 는 "화면이 이미 확정한 가중치"다 —
+    1차 유형 카드가 키워드로 만든 7개 값. 이게 있으면 엔진이 검색어를 다시
+    읽어 만든 가중치 대신 이걸 쓴다. 반드시 search() 안으로 넘겨야 한다 —
+    반환값의 weights 만 바꾸면 regions·explanation 은 옛 가중치로 만들어진
+    상태로 남아 응답이 서로 다른 기준을 가리키게 된다
+    """
+    query = (user_prefs.get('query') or '').strip()
+```
+
+```python
+# services/engine.py — 원본 (검색어 분기 / 슬라이더 분기)
+    if query:
+        result = search(query, top_k=5, housing_override=housing)
+        ...
+    else:
+        weights = to_korean_weights(user_prefs)
+```
+
+```python
+# services/engine.py — 수정
+    if query:
+        result = search(query, top_k=5, housing_override=housing,
+                        weights_override=weights_override)
+        ...
+    else:
+        # 슬라이더 경로에도 같은 규칙을 적용한다 — 화면이 확정한 값이 우선
+        weights = weights_override or to_korean_weights(user_prefs)
+```
+
+```python
+# routers/recommend.py — 원본 (91~98번째 줄)
+    if body.firstWeights:
+        touched = any(prefs.get(eng, 3) != 3 for eng in KEY_MAP)
+        if not touched:
+            for eng, kor in KEY_MAP.items():
+                if kor in body.firstWeights:
+                    prefs[eng] = float(body.firstWeights[kor])
+
+    weights, regions, explanation, extracted_housing = get_regions(prefs)
+```
+
+```python
+# routers/recommend.py — 수정
+    # 1차 유형 카드에서 넘어왔고 슬라이더를 직접 만지지 않았으면,
+    # 1차 가중치를 "확정값"으로 엔진에 넘긴다. 이게 없으면 1차에서 본 동네가
+    # 2차에서 전부 사라진다(실측: fromFirst 전부 False).
+    # 영문↔한국어 대응은 services/engine.py 의 KEY_MAP 하나만 쓴다 —
+    # 여기서 다시 적으면 언젠가 어긋난다
+    fixed_weights = None
+    if body.firstWeights:
+        touched = any(prefs.get(eng, 3) != 3 for eng in KEY_MAP)
+        if not touched:
+            fixed_weights = {kor: float(body.firstWeights[kor])
+                             for kor in KEY_MAP.values() if kor in body.firstWeights}
+
+    weights, regions, explanation, used_housing = get_regions(
+        prefs, weights_override=fixed_weights)
+```
+
+`prefs[eng]` 에 써 넣던 방식을 버리고 **한국어 키 딕셔너리를 만들어 통째로 넘기는**
+방식으로 바꿨습니다. 이유는 두 가지입니다.
+
+- 엔진과 `to_korean_weights()` 가 쓰는 형태가 한국어 키라, 어차피 한 번은 변환해야
+  합니다. 경계에서 한 번만 바꾸는 게 이 저장소의 규칙입니다.
+- `prefs[eng]` 에 써 넣으면 "1차에서 온 값"과 "사용자가 슬라이더로 3을 고른 값"이
+  구분되지 않습니다. 별도 인자로 넘기면 의도가 코드에 드러납니다.
+
+139번째 줄의 `"housing": extracted_housing` 도 `used_housing` 으로 같이 바꾸세요
+(아래 5절 참고).
+
+### 확인할 것
+
+1. 1차 카드 → "동네 5곳 보기" → 응답의 `weights` 가 1차 가중치(예: 녹지 3.46)와
+   **같은지**. LLM 값(예: 녹지 5.0)이면 배선이 안 된 것.
+2. `topRegions` 의 `fromFirst` 에 `true` 가 하나라도 있는지.
+   `droppedFromFirst` 가 비거나 짧아져야 정상.
+3. 상단 검색창으로 새 검색("애들 학원 보내기 좋은 곳") → 이때는 LLM 가중치가
+   그대로 쓰여야 정상입니다. 결과 화면에서는 슬라이더가 이미 이전 값으로 채워져
+   있어 `touched` 가 True 가 되므로 `fixed_weights` 는 None 이 됩니다.
+4. 슬라이더만 조작하는 기존 경로(검색어 없음)가 그대로 도는지 회귀 확인.
 
 ### C — `reason.js` 의 `catch` 두 곳은 아직 그대로입니다
 
@@ -281,6 +444,231 @@ C 절 코드를 그대로 쓰시면 됩니다.
 - 문법 검사: `py_compile` 5개 파일, `node --check` 4개 파일 전부 통과.
 - 엔진 저장소에 커밋 안 된 변경(`app/features/admin.py` 의 `preview_member`)이
   있습니다. 이번 작업과 무관한 관리자 페이지 작업으로 보여 건드리지 않았습니다.
+
+---
+
+## 6. (09-02 오후) 엔진 수정 검토 + 막힌 것 2개
+
+### 6-1. ⚠️ 정정 — `node --check` 는 우리 프론트엔드 파일을 **검사하지 않습니다**
+
+제가 어제·오늘 "고친 뒤 `node --check` 로 확인하세요"라고 안내했는데, **그 명령이
+거짓 통과를 냅니다.** 실제로 `reason.js` 가 문법이 깨진 상태인데도 통과했습니다.
+
+원인은 Node 가 `.js` 파일을 기본적으로 CommonJS 로 읽는데, 파일에 `import` 문이
+있으면 검사를 사실상 건너뛰기 때문입니다(Node v24 에서 확인).
+
+```bash
+# 증거 — 둘 다 명백한 문법 오류인데
+printf 'function a() {\n'                     > a.js   # 닫는 괄호 없음
+printf 'import x from "y";\nfunction a() {\n' > b.js   # 같은 오류 + import
+
+node --check a.js   # exit 1  ← 잡는다
+node --check b.js   # exit 0  ← 못 잡는다 (import 때문)
+```
+
+`frontend/lib/*.js`, `frontend/ui/*.js`, `frontend/main.js` 는 **전부 `import` 로
+시작하는 ES 모듈**이라 이 명령이 아무것도 검사하지 않습니다.
+
+**올바른 검사법 — 확장자를 `.mjs` 로 바꿔서 검사합니다.** `.mjs` 는 Node 가 무조건
+ES 모듈로 읽는 확장자라 제대로 파싱합니다.
+
+```bash
+# 파일 하나
+cp frontend/ui/reason.js /tmp/chk.mjs && node --check /tmp/chk.mjs
+
+# 프론트 전체 (Git Bash 에서)
+for f in frontend/lib/*.js frontend/ui/*.js frontend/main.js; do
+  cp "$f" /tmp/chk.mjs
+  node --check /tmp/chk.mjs 2>/dev/null && echo "OK   $f" || echo "FAIL $f"
+done
+```
+
+> 더 확실한 방법은 **브라우저 콘솔**입니다. 문법이 깨지면 페이지를 열자마자
+> `Uncaught SyntaxError: ...reason.js:NN` 이 뜨고 화면이 아무것도 안 움직입니다.
+> 문법 오류는 파일 하나만 죽는 게 아니라 **`main.js` 가 끌어오는 모듈 전체가
+> 안 뜹니다** — "갑자기 아무 버튼도 안 먹는다" 면 제일 먼저 여길 보세요.
+
+### 6-2. 🔴 `reason.js` 의 함수 닫는 중괄호 2개가 지워졌습니다
+
+`catch` 블록을 갈아 끼우면서 **함수를 닫는 `}` 까지 같이 지워졌습니다.**
+79행과 103행 다음에 각각 `}` 가 하나씩 더 있어야 합니다.
+
+결과: `loadRegionExplain` 아래의 함수 12개가 전부 `loadFacilities` **안쪽으로**
+끌려들어갔습니다.
+
+```
+깊이 | 줄   | 함수
+  0  |   65 | loadFacilities
+  1  |   83 | loadRegionExplain     ← 원래 0이어야 함
+  2  |  106 | closeReasonModal      ← 원래 0
+  2  |  115 | bindReasonTabs
+  ...  (이하 buildReasonCard, drawRadar, buildFacilityHtml 등 전부 깊이 2)
+```
+
+**왜 위험한가** — 중첩된 함수는 바깥에서 안 보입니다. `openReasonModal()`(45행)이
+`loadRegionExplain(...)` 을 부르면 `ReferenceError` 가 납니다. 즉 문법을 고쳐도
+**핀 모달 자체가 안 열립니다.**
+
+고치는 법 — 79행 `}` 다음 줄과 103행 `}` 다음 줄에 각각 `}` 를 한 줄씩 추가합니다.
+
+```javascript
+// 79~82행 (수정 후)
+    box.innerHTML = `<div class="rc-empty">이 동네 정보를 불러오지 못했어요.</div>`;
+  }          // ← try/catch 를 닫는 괄호
+}            // ← loadFacilities 함수를 닫는 괄호 (이게 지워졌다)
+```
+
+```javascript
+// 103~106행 (수정 후)
+    box.innerHTML = `<div class="rc-empty">추천 사유를 불러오지 못했어요.</div>`;
+  }          // ← try/catch 를 닫는 괄호
+}            // ← loadRegionExplain 함수를 닫는 괄호 (이게 지워졌다)
+```
+
+**교훈**: `catch` 블록은 함수의 **맨 마지막**에 있어서, 아래쪽 `}` 두 개가
+`}` (catch 닫기) + `}` (함수 닫기) 로 연달아 나옵니다. 블록을 통째로 바꿀 때
+아래쪽 `}` 를 하나만 남기기 쉽습니다. **바꾸기 전에 그 함수의 마지막 `}` 가
+어디까지인지 먼저 세어 두세요.**
+
+### 6-3. 🔴 `Life-Embed-jh/data/life.db` 가 Git LFS 포인터로 돌아갔습니다
+
+```
+-rw-r--r-- 1 lecra 197609 133 Sep  2 00:37 data/life.db
+                            ↑ 216MB 여야 하는데 133바이트
+
+$ head -c 60 data/life.db
+version https://git-lfs.github.com/spec/v1
+oid sha256:f785ca7e...
+```
+
+이 상태면 DB 를 여는 모든 요청이 `sqlite3.DatabaseError: file is not a database`
+로 죽습니다. 엔진을 고치면서 `git` 작업(checkout·stash·merge 등)을 한 뒤 LFS 실체
+파일이 안 받아진 것으로 보입니다. 루트 `CLAUDE.md` 가 경고한 바로 그 함정입니다.
+
+```bash
+cd ../Life-Embed-jh
+git lfs pull
+ls -la data/life.db      # 216MB 대로 돌아왔는지 확인
+```
+
+> 어제 겪은 `/api/region` 500 도 이 계열이었을 가능성이 있습니다 —
+> DB 가 깨져도 브라우저에는 똑같이 "500" 으로만 보입니다.
+
+### 6-4. 엔진 수정 검토 — 잘 됐습니다
+
+**`format_won()`** — 단위 테스트 통과. 경계값까지 정확합니다.
+
+```
+65000 → 6억 5,000만원      80000 → 8억원        52000 → 5억 2,000만원
+100000 → 10억원            10000 → 1억원        10500 → 1억 500만원
+9999 → 9,999만원           70 → 70만원          None → None
+```
+
+**프롬프트 정리** — `explain.py` / `region_explain.py` / `chat.py` 세 곳 모두
+"## 사용자가 원한 가격 절이 있는지"로 분기하는 3단 규칙으로 바뀌었고, 모순이던
+옛 문장("사용자가 가격을 말하지 않은 검색이므로 구체적인 금액은 쓰지 말고")도
+제거됐습니다. 요청 1·2·3 이 의도대로 반영됐습니다.
+
+**`weights_override`** — 요청한 것보다 나은 구현입니다. 제가 요청서에 적은
+`weights = dict(weights_override)` 는 **통째로 대입**이라, 넘긴 딕셔너리에 지표가
+하나라도 빠져 있으면 그 지표가 사라져 `recommend()` 에서 문제가 됩니다.
+실제 구현은 그걸 막았습니다.
+
+```python
+if weights_override:
+    weights = {**weights,
+               **{k: float(v) for k, v in weights_override.items() if k in INDICATORS}}
+```
+
+- `{**weights, **{...}}` — 기존 값 위에 덮어쓰기라 **빠진 지표는 원래 값이 남습니다.**
+- `if k in INDICATORS` — 7개 지표 밖의 키(오타·`"시세"` 등)를 걸러 냅니다.
+- `float(v)` — 문자열로 와도 숫자로 맞춥니다.
+
+**남은 사소한 것 2개** (동작에는 영향 없음)
+
+- `app/engine/explain.py:39` — 괄호가 하나 빠졌습니다.
+  `분포(예: "2억 8,000만원~ 4억 2,000만원"는` → `... 4억 2,000만원")는`
+- `app/features/region_explain.py:41` — 들여쓰기가 6칸입니다(다른 줄은 3칸).
+  프롬프트 문자열이라 동작엔 영향 없지만 읽기 나쁩니다.
+
+### 6-5. 아직 검증 못 한 것
+
+`life.db` 가 깨져 있어 **엔진 수정의 실제 동작(F1 금액 표기, weights_override)은
+아직 확인하지 못했습니다.** 위 6-2·6-3 을 고친 뒤에 검증합니다.
+→ **6-3 은 복구 완료, 검증은 7절에서 전부 통과했습니다. 6-2 만 남았습니다.**
+
+---
+
+## 7. (09-02 저녁) 최종 검증 — F1·A-5 둘 다 통과
+
+`life.db` 복구 후(73MB, 22개 테이블, `master_dataset_v3` 427행 확인) 실제로
+돌려본 결과입니다.
+
+### 7-1. F1 금액 표기 — 고쳐졌습니다
+
+같은 조건(아파트 전세 목표 6억 5,000만원)으로 어제 틀렸던 동네 3곳을 다시 불렀습니다.
+
+| 동네 | 실제 중앙값 | **어제** | **지금** |
+|---|---|---|---|
+| 마포구 아현동 | 8억원 | "8,000만원" ❌ | "8억원" ✅ |
+| 강서구 화곡제3동 | 5억 2,000만원 | "5,200만 원" ❌ | "5억 2,000만원" ✅ |
+| 용산구 효창동 | 8억 4,000만원 | "84,000만원대" ⚠️ | "8억 4,000만원" ✅ |
+
+분포도 `"4억~7억원대"` 로 제대로 나옵니다. 요청 3의 문구도 반영됐습니다 —
+퍼센트를 날것으로 쓰지 않고 `"조금 높은 편"`, `"저렴한 편"` 으로 씁니다.
+
+```
+아현동   ... 원하시는 전세 가격대(6억 5,000만원)보다 현재 시세(중앙값 8억원)가
+             조금 높은 편이라는 점은 참고하세요.
+화곡3동  ... 참고 시세는 5억 2,000만원(중앙값)으로 원하시는 6억 5,000만원보다
+             저렴한 편이지만, 실제 매물은 4억~7억원대로 다양하게 분포하고 있습니다.
+```
+
+`housing=None` 으로 부르면 금액이 **한 번도 안 나옵니다** — 3단 규칙이 의도대로
+동작합니다.
+
+### 7-2. A-5 `weights_override` — 1차와 2차가 이어졌습니다
+
+프론트가 실제로 보내는 형태 그대로 재현했습니다.
+
+```
+1차 가중치  녹지 3.46  안전 3.26  교통 2.46  상권 3.05  의료 3.49  교육 3.35  문화 2.59
+1차 동네    강서구 화곡제3동 · 성북구 길음제1동
+                     ↓  "내게 맞는 동네 5곳 보기"
+2차 가중치  녹지 3.46  안전 3.26  교통 2.46  상권 3.05  의료 3.49  교육 3.35  문화 2.59
+                                                              ↑ 1차와 완전히 동일
+2차 동네    강서구 화곡제3동 · 양천구 목3동 · 노원구 상계6.7동 · 양천구 신정4동 · 노원구 중계1동
+
+fromFirst   [True, False, False, False, False]     ← 어제는 전부 False
+dropped     ['길음제1동']                            ← 어제는 두 곳 다 사라짐
+```
+
+**회귀도 확인했습니다.** 상단 검색창으로 새 검색을 하면(슬라이더가 이미 이전
+결과로 채워져 있어 `touched` 가 True) 1차 가중치가 무시되고 LLM 값이 그대로 쓰입니다.
+
+```
+"애들 학원 보내기 좋은 곳"  →  교육 5.0  (나머지 2.6~3.3)   ← 의도대로
+```
+
+`/api/region` 427개 동 회귀 스윕도 실패 0건입니다.
+
+### 7-3. 코드 검토 — 웹 쪽 배선 정확합니다
+
+`routers/recommend.py` 와 `services/engine.py` 모두 교안대로 들어갔고,
+`used_housing` 이름 통일과 PEP 8 빈 줄까지 정리됐습니다.
+
+> 한 가지 알아만 두세요(지금은 문제 없음) — 슬라이더 분기의
+> `weights = weights_override or to_korean_weights(user_prefs)` 는 넘어온 딕셔너리를
+> **그대로** 씁니다. 지표가 빠진 딕셔너리가 오면 그 지표는 채점에서 통째로
+> 빠집니다. 검색어 분기는 엔진이 `{**weights, **override}` 로 덮어써서 안전합니다.
+> 실제로는 `lifetype.to_weights()` 가 항상 7개를 다 만들고, 슬라이더 경로에는
+> `firstWeights` 가 아예 안 오므로 도달할 수 없는 경로입니다.
+
+### 7-4. 남은 것
+
+- **`frontend/ui/reason.js` 의 닫는 중괄호 2개** (6-2) — 이것만 고치면 이번
+  작업은 전부 끝납니다.
+- 엔진의 사소한 오타 2개 (6-4 마지막) — 동작 무관.
 
 ---
 
