@@ -17,10 +17,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
-from app.features.pipeline_api import search, recommend_by_weights
 from app.core.db import facilities, facility_counts, region_extras
+from app.features.pipeline_api import search, recommend_by_weights
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
+from app.features.admin import get_member, list_members, get_region, list_regions, update_member, update_region
+
 
 print("✅ LLM 파이프라인 연결 성공!")
 
@@ -49,22 +51,53 @@ def to_korean_weights(user_prefs):
     return weights
 
 
-def get_regions(user_prefs):
-    """요청 하나로 (가중치, 추천 목록, 설명문) 을 만든다.
+def to_housing(prefs):
+    """화면의 건물유형·거래유형·예산 슬라이더를 엔진의 housing 형태로 바꾼다.
 
-    두 입력을 모두 받는다.
-      · query 가 있으면  → LLM 이 검색어를 가중치로 바꾼다
-      · 없으면           → 슬라이더 값을 그대로 쓴다
-    어느 쪽이든 뒤 처리는 같으므로 분기를 여기서 끝낸다
+    '가격 상관없음'이면 bldgType/dealType 이 이미 None 으로 온다
+    (frontend/ui/result.js 의 isPriceAny() 처리 — 그대로 유지).
     """
+    bldg = prefs.get("bldgType")
+    deal = prefs.get("dealType")
+    if not bldg or bldg == "ANY" or not deal:
+        return None
+
+    if deal == "매매":
+        예산 = prefs.get("salePrice")
+    elif deal == "전세":
+        예산 = prefs.get("jeonseDeposit")
+    else:  # 월세
+        예산 = prefs.get("wolseRent")
+
+    if not 예산:
+        return None
+
+    targets = {"예산": 예산}
+    if deal == "월세" and prefs.get("wolseDeposit"):
+        targets["보증금"] = prefs["wolseDeposit"]
+
+    return {"건물유형": bldg, "거래유형": deal, "targets": targets}
+
+
+def get_regions(user_prefs):
     query = (user_prefs.get('query') or '').strip()
+    housing = to_housing(user_prefs)
+    extracted_housing = None   # 검색어 경로에서만 채워진다
 
     if query:
-        result = search(query, top_k=5)
-        return result["weights"], result["regions"], result["explanation"]
+        result = search(query, top_k=5, housing_override=housing)
+        weights = result["weights"]
+        regions = result["regions"]
+        explanation = result["explanation"]
+        extracted_housing = result.get("housing")
+    else:
+        # 슬라이더 경로는 애초에 화면 값 그대로 housing을 만들었으니
+        # 다시 화면에 되돌려줄 필요가 없다 (이미 일치함)
+        weights = to_korean_weights(user_prefs)
+        regions = recommend_by_weights(weights, top_k=5, housing=housing)
+        explanation = ""
 
-    weights = to_korean_weights(user_prefs)
-    return weights, recommend_by_weights(weights, top_k=5), ""
+    return weights, regions, explanation, extracted_housing
 
 
 def get_facilities(gu, dong, limit=5):
@@ -87,10 +120,11 @@ def get_chat_answer(question, regions=None, weights=None, history=None):
 
 
 if __name__ == "__main__":
-    w, r, e = get_regions({"query": "애들 학원 보내기 좋은 곳"})
+    w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})
     print(w)
     for x in r:
         print(f"   {x['name']} {x['total']}")
     print(e[:120])
+    print("housing:", h)
     print()
     print(get_facilities("노원구", "중계1동")["counts"])

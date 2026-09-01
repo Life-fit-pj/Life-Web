@@ -1,0 +1,215 @@
+/*
+메뉴 + 준비중 안내창
+*/
+
+/* 메뉴창 */
+
+/* 로그인 버튼 + 메뉴 버튼을 같이 묶는 상자.
+   두 버튼이 우측 상단에 나란히 붙어야 해서 fixed 위치는 여기 하나만 잡는다 */
+#topActions {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#menuToggle {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+#menuToggle:hover { background: var(--accent-soft); }
+
+/* 로그인 버튼. 낮/밤 테마 변수(--accent-fill)를 쓰면 밤에는 톤 다운된
+   금색(#D1B15A)으로 바뀌어버리므로, 테마와 무관하게 값을 고정해 둔다 */
+#loginToggle {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 999px;
+  background: #FFD24A;
+  color: #2D2A32;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.15s, transform 0.15s;
+}
+
+#loginToggle:hover {
+  background: #FFC72C;
+  transform: translateY(-1px);
+}
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 9000;
+  display: none;
+}
+.menu-backdrop.is-open { display: block; }
+
+.coming-soon-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 9500;               /* 메뉴(.menu-backdrop, 9000)보다 위에 뜨도록 */
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.coming-soon-backdrop.is-open { display: flex; }
+
+.coming-soon-panel {
+  position: relative;
+  width: min(320px, 90vw);
+  background: var(--surface-2);
+  border-radius: 16px;
+  padding: 28px 24px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.coming-soon-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.menu-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 260px;
+  background: var(--surface-2);
+  padding: 24px 16px;
+  box-shadow: var(--shadow);
+}
+
+.menu-item {
+  display: block;
+  padding: 12px 8px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.menu-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.menu-admin-link {
+  display: block;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  text-decoration: none;
+}
+.menu-admin-link:hover { color: var(--text); }
+
+
+/* ===== 로그인/회원가입 준비중 모달 =====
+   맵 핀 클릭 시 뜨는 .reason-modal(ui/reason.css)과 같은 크기로 맞춘다 */
+
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;               /* 메뉴(.menu-backdrop, 9000)보다 위에 뜨도록 */
+  background: rgba(30, 26, 22, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.auth-backdrop.is-open { display: flex; }
+
+.auth-modal {
+  position: relative;
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.auth-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.auth-close:hover { color: var(--text); }
+
+.auth-section {
+  padding: 6px 0;
+  text-align: center;
+}
+
+.auth-title {
+  margin: 0 0 8px;
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
+  font-size: 19px;
+  color: var(--text);
+}
+
+.auth-notice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 회원가입 → 라이프스타일 설문(signup.html) 으로 보내는 버튼.
+   실제 페이지가 있으므로 <a> 그대로 두고 준비중 안내를 쓰지 않는다 */
+.auth-cta {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--bg);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.auth-cta:hover { background: var(--accent); }
+
+.auth-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 18px 0;
+}

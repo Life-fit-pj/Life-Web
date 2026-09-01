@@ -1,0 +1,291 @@
+/*
+추천 사유 모달 전체
+*/
+
+/* ===== 추천 사유 패널 ===== */
+
+.reason-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;                 /* 검색 화면(9000)보다 위 */
+  background: rgba(30, 26, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* 평소엔 숨어 있다가 .is-open 이 붙으면 나타난다 */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s;
+}
+
+.reason-backdrop.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.reason-modal {
+  position: relative;
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+
+  transform: translateY(14px);
+  transition: transform 0.25s ease;
+}
+
+.reason-backdrop.is-open .reason-modal {
+  transform: translateY(0);
+}
+
+.reason-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.reason-close:hover { color: var(--text); }
+
+
+/* ### 카드 머리 ### */
+
+.rc-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+  margin-bottom: 6px;
+}
+
+.rc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rc-name {
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
+  font-size: 24px;
+  color: var(--text);
+}
+
+.rc-score {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+.rc-score span {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-align: right;
+}
+
+
+/* ### 사유 문장 ### */
+
+.rc-reason {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.rc-headline {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.rc-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.rc-sub b { color: var(--amber); }
+
+
+/* ### 지표줄 ###*/
+
+.rc-row {
+  display: grid;
+  /* grid : 네 칸을 정해두면 지표마다 글자 길이가 달라도 세로로 줄이 맞는다. */
+  /* 이름 / 점 / 문구 / 백분위 — 네 칸으로 나눈다 */
+  grid-template-columns: 78px auto 1fr 62px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rc-row:last-child { border-bottom: none; }
+
+.rc-row-name {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* 점 5개 */
+.rc-dots { display: flex; gap: 4px; }
+
+.rc-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);          /* 꺼진 점 */
+}
+
+.rc-dots.over  i.on { background: var(--good); }
+.rc-dots.match i.on { background: var(--amber); }
+.rc-dots.under i.on { background: var(--muted); }
+
+.rc-word { font-size: 12px; }
+.rc-word.over  { color: var(--good); }
+.rc-word.match { color: var(--amber); }
+.rc-word.under { color: var(--muted); }
+
+.rc-pct {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+
+.rc-source {
+  margin-top: 16px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
+
+.rc-loading {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rc-fac-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  margin-bottom: 8px;
+}
+
+.rc-fac-summary {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.rc-fac-names {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.rc-extras {
+  margin-top: 4px;
+}
+
+.rc-extra-row {
+  display: grid;
+  grid-template-columns: 96px 110px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12.5px;
+}
+
+.rc-extra-label { color: var(--text); }
+.rc-extra-value { color: var(--text); font-weight: 600; }
+.rc-extra-note  { color: var(--muted); font-size: 11.5px; }
+
+.rc-llm {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.rc-llm:empty {
+  border-top: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rc-llm-body {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.rc-llm-body b { color: var(--text); }
+
+
+/* ### 탭 (5점 점수표 / 생활 여건 / 주변 시세 / 로드뷰) ### */
+
+.rc-tabs {
+  margin-top: 16px;
+}
+
+.rc-tab-heads {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rc-tab-head {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rc-tab-head.is-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+.rc-tab-panel { display: none; padding-top: 14px; }
+.rc-tab-panel.is-active { display: block; }
+
+.rc-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.rc-roadview {
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.rc-chart {
+  height: 240px;
+  margin: 4px 0 14px;
+}

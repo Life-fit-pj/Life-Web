@@ -1,17 +1,93 @@
+/*
+테마 변수(`:root`, `[data-theme="dark"]`), 
+리셋(`*`, `html,body`, `body`), 
+`.panel` 공통 틀, 
+좌측 컨트롤 패널 전체(슬라이더·select·run-btn·loader — 특정 화면 하나가 아니라 여러 슬라이더가 같이 쓰는 기본 폼 스타일), 
+스크롤바·반응형, 
+placeholder 공통 색상 규칙
+*/
+
+
+/* ===== 색 테마 =====
+   낮은 자연·편안함, 밤은 모던을 목표로 한다.
+   색만 바꾸는 것이 아니라 그림자·발광 같은 질감도 함께 바꾼다.
+
+   변수 이름을 색이 아니라 역할로 지었다.
+   --navy 같은 이름은 밤 모드에서 남색이 아니게 되어 거짓말이 된다 */
+
 :root {
-  --paper: #F7F5EF;
-  --card: rgba(255, 255, 255, 0.95);
-  --card-2: #F1EEE5;
-  --line: #DDD8C9;
-  --line-strong: #C9C2AC;
-  --navy: #14213D;
-  --amber: #C97A2B;
-  --amber-soft: #EFDCC4;
-  --ink: #22252B;
-  --muted: #7A7568;
-  --radius: 18px;
-  --shadow: 0 16px 34px rgba(20, 33, 61, 0.10);
+  /* ── 낮 : 자연, 편안함 ── */
+  --bg:           #F8F1D8;
+  --surface:      rgba(255, 255, 255, 0.92);
+  --surface-2:    #F1E9CE;
+  --line:         #DAD7CD;
+  --line-strong:  #BFBBA9;
+
+  --text:         #2D2A32;
+  --text-muted:   #7B7A6B;
+
+  --primary:      #344E41;   /* 깊은 숲 초록 */
+  --primary-soft: #A3B18A;   /* 이끼 초록 */
+
+  --accent:       #8A6D1F;   /* 포인트 글자. 노랑은 밝아 글자로 안 읽힌다 */
+  --accent-fill:  #FFD24A;   /* 포인트 면 */
+  --accent-soft:  #FBEFC4;
+
+  --good:         #4A9D6E;
+  --radius:       18px;
+
+  /* ── 질감 ──
+     낮은 종이 위에 놓인 카드처럼. 부드럽고 발광 없음 */
+  --shadow:       0 12px 28px rgba(52, 78, 65, 0.10);
+  --glow:         none;                    /* 발광. 낮에는 쓰지 않는다 */
+  --blur:         blur(8px);
+  --map-filter:   none;                    /* 지도는 원본 그대로 */
+
+  /* ── 옛 이름. CSS 곳곳이 아직 이 이름을 쓰고 있어 당분간 남겨 둔다 ── */
+  --paper:        var(--bg);
+  --card:         var(--surface);
+  --card-2:       var(--surface-2);
+  --navy:         var(--primary);
+  --amber:        var(--accent);
+  --amber-soft:   var(--accent-soft);
+  --ink:          var(--text);
+  --muted:        var(--text-muted);
 }
+
+
+/* ── 밤 : 모던 ──
+   시스템 설정 감지는 JS 가 하고, 여기서는 data-theme 만 본다.
+   CSS 만으로 prefers-color-scheme 과 수동 선택을 함께 다루려면
+   같은 값을 두 벌 써야 해서 관리가 어렵다 */
+[data-theme="dark"] {
+  --bg:           #182A57;
+  --surface:      rgba(45, 79, 143, 0.30);
+  --surface-2:    #21376B;
+  --line:         rgba(255, 255, 255, 0.10);
+  --line-strong:  rgba(255, 255, 255, 0.18);
+
+  --text:         #F8F1D8;
+  --text-muted:   #A9B6D4;
+
+  --primary:      #2D4F8F;
+  --primary-soft: #3D63A8;
+
+  --accent:       #FFD24A;   /* 어두운 바탕에서는 노랑이 글자로도 읽힌다 */
+  --accent-fill:  #D1B15A;
+  --accent-soft:  rgba(255, 210, 74, 0.16);
+
+  --good:         #7ED6A5;
+
+  /* 질감 — 밤은 유리처럼. 발광을 쓴다 */
+  --shadow:       0 16px 40px rgba(0, 0, 0, 0.45);
+  --glow:         0 0 10px var(--accent-soft);
+  --blur:         blur(12px);
+
+  /* 카카오 기본 지도는 흰 배경이라 밤 화면에서 튄다.
+     색을 반전하고 색상환을 180도 돌려 어두운 지도로 만든다 */
+  --map-filter:   invert(95%) hue-rotate(180deg) brightness(115%) contrast(90%);
+}
+
 
 * {
   box-sizing: border-box;
@@ -32,6 +108,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+
 /* ==========================================
    1. 카카오 지도 스타일
    ========================================== */
@@ -42,7 +119,12 @@ body {
   left: 0;
   right: 0;
   z-index: 0;
+  /* 낮에는 none, 밤에는 반전 필터가 들어간다.
+     카카오 기본 지도는 흰 배경이라 어두운 화면에서 혼자 튄다 */
+  filter: var(--map-filter);
+  transition: filter 0.4s ease;
 }
+
 
 /* ==========================================
    2. 상단 헤더
@@ -54,7 +136,7 @@ body {
   right: 0;
   z-index: 5;
   padding: 20px 26px 56px;
-  background: linear-gradient(180deg, rgba(247, 245, 239, 0.97) 0%, rgba(247, 245, 239, 0) 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
   pointer-events: none;
 }
 
@@ -69,17 +151,18 @@ body {
 }
 
 h1 {
-  font-family: 'Fraunces', serif;
-  font-weight: 600;
-  font-size: clamp(19px, 2.8vw, 26px);
-  line-height: 1.25;
+  font-family: 'Cafe24Ssurround', 'Inter', sans-serif;
+  font-weight: normal;        /* 이 폰트는 굵기가 하나뿐이다 */
+  font-size: clamp(20px, 2.9vw, 27px);
+  line-height: 1.3;
   margin: 0;
-  color: var(--navy);
+  color: var(--text);
+  letter-spacing: -0.5px;
 }
 
 h1 em {
-  font-style: italic;
-  color: var(--amber);
+  font-style: normal;         /* 기울임이 없어 어색해진다 */
+  color: var(--accent);
 }
 
 .disclaimer {
@@ -89,7 +172,7 @@ h1 em {
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.93);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 12px;
@@ -98,6 +181,7 @@ h1 em {
 .disclaimer b {
   color: var(--ink);
 }
+
 
 /* ==========================================
    3. 패널 공통
@@ -108,10 +192,11 @@ h1 em {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  -webkit-backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: var(--blur);
   backdrop-filter: blur(8px);
   box-shadow: var(--shadow);
 }
+
 
 /* ==========================================
    4. 좌측 컨트롤 패널
@@ -120,7 +205,7 @@ h1 em {
   top: 150px;
   left: 24px;
   width: 310px;
-  padding: 20px;
+  padding: 24px;
   max-height: calc(100vh - 182px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -131,7 +216,7 @@ h1 em {
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--muted);
-  margin: 0 0 11px;
+  margin: 0 0 14px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -146,18 +231,21 @@ h1 em {
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+  box-shadow: var(--glow);
 }
 
+
 /* 입력 컨트롤 스타일 */
+
 .weight-row {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .weight-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
 }
 
 .wlabel {
@@ -180,13 +268,48 @@ select#bldgType {
   font-weight: 500;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
-  background: #ffffff;
-  color: var(--ink);
+  background: var(--surface-2);
+  color: var(--text);
   outline: none;
   cursor: pointer;
 }
 
+
+/* 거래 유형 선택. 셋 중 하나라 select 보다 버튼이 빠르다 */
+
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+}
+
+.seg-btn {
+  flex: 1;
+  padding: 7px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.seg-btn:hover { color: var(--text); }
+
+.seg-btn.is-on {
+  background: var(--primary);
+  color: var(--bg);
+}
+
+
 /* Range Input Cross-Browser Customization */
+
 input[type=range] {
   -webkit-appearance: none;
   appearance: none;
@@ -221,7 +344,7 @@ input[type=range]::-moz-range-thumb {
   height: 12px;
   border-radius: 50%;
   background: var(--navy);
-  border: 2px solid #ffffff;
+  border: 2px solid var(--bg);
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
 }
@@ -229,8 +352,9 @@ input[type=range]::-moz-range-thumb {
 .divider {
   height: 1px;
   background: var(--line);
-  margin: 16px 0;
+  margin: 20px 0;
 }
+
 
 /* AI 분석 버튼 */
 .run-btn {
@@ -238,7 +362,7 @@ input[type=range]::-moz-range-thumb {
   width: 100%;
   padding: 11px;
   background: var(--navy);
-  color: #ffffff;
+  color: var(--bg);;
   border: none;
   border-radius: 10px;
   font-size: 13px;
@@ -253,6 +377,7 @@ input[type=range]::-moz-range-thumb {
   transform: translateY(-1px);
 }
 
+
 /* 로딩 스피너 */
 .loader {
   width: 24px;
@@ -266,140 +391,6 @@ input[type=range]::-moz-range-thumb {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* ==========================================
-   5. 우측 결과 및 평면도 패널
-   ========================================== */
-.rank-panel {
-  top: 150px;
-  right: 24px;
-  width: 330px;
-  max-height: calc(100vh - 182px);
-  display: flex;
-  flex-direction: column;
-  padding: 18px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* 종합 점수 상자 */
-.main-score-box {
-  background: var(--card-2);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 14px 16px;
-  text-align: center;
-  margin-bottom: 14px;
-}
-
-.main-score-box p {
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.main-score-box h3 {
-  margin: 0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 28px;
-  color: var(--amber);
-  font-weight: 700;
-}
-
-.rank-head {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-
-.rank-scroll {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 220px; /* 5개 항목이 잘 보이도록 스크롤 영역 확보 */
-  overflow-y: auto;
-  margin-bottom: 16px;
-  padding-right: 4px;
-}
-
-.list-item {
-  padding: 10px 12px;
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.list-item:hover, .list-item.active {
-  border-color: var(--amber);
-  background: var(--amber-soft);
-}
-
-.li-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.rank {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--amber);
-  width: 14px;
-}
-
-.list-name {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--navy);
-}
-
-/* 평면도 영역 */
-.floorplan-area {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
-
-.floorplan-area h4 {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--navy);
-  font-weight: 700;
-}
-
-.placeholder {
-  padding: 30px;
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--muted);
-  background: var(--card-2);
-  border-radius: 8px;
-  border: 1px dashed var(--line-strong);
-}
-
-.floorplan-img {
-  width: 100%;
-  height: auto;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #ffffff;
-}
-
-.filename-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
-  color: var(--muted);
-  margin-top: 8px;
-  word-break: break-all;
-  line-height: 1.4;
 }
 
 
@@ -433,435 +424,12 @@ input[type=range]::-moz-range-thumb {
   }
 }
 
-/* ===== 추천 사유 패널 ===== */
 
-.reason-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9500;                 /* 검색 화면(9000)보다 위 */
-  background: rgba(30, 26, 22, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  /* 평소엔 숨어 있다가 .is-open 이 붙으면 나타난다 */
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.25s ease, visibility 0.25s;
-}
-
-.reason-backdrop.is-open {
+/* 입력칸 안내 문구.
+   opacity 를 1 로 두는 이유 — 파이어폭스가 기본으로 흐리게 만든다 */
+#chatInput::placeholder,
+#topSearchInput::placeholder,
+#searchInput::placeholder {
+  color: var(--text-muted);
   opacity: 1;
-  visibility: visible;
-}
-
-.reason-modal {
-  position: relative;
-  width: min(460px, 92vw);
-  max-height: 86vh;
-  overflow-y: auto;
-  background: #fff;
-  border-radius: 18px;
-  padding: 28px 26px 22px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-
-  transform: translateY(14px);
-  transition: transform 0.25s ease;
-}
-
-.reason-backdrop.is-open .reason-modal {
-  transform: translateY(0);
-}
-
-.reason-close {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  border: none;
-  background: none;
-  font-size: 26px;
-  line-height: 1;
-  color: #b0a496;
-  cursor: pointer;
-}
-
-.reason-close:hover { color: #6b5f52; }
-
-
-/* ### 카드 머리 ### */
-
-.rc-eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: #c8763a;
-  margin-bottom: 6px;
-}
-
-.rc-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.rc-name {
-  font-family: "Fraunces", serif;
-  font-size: 24px;
-  font-weight: 600;
-  color: #2b2723;
-}
-
-.rc-score {
-  font-size: 26px;
-  font-weight: 700;
-  color: #c8763a;
-}
-
-.rc-score span {
-  display: block;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: #b0a496;
-  text-align: right;
-}
-
-
-/* ### 사유 문장 ### */
-
-.rc-reason {
-  background: #faf7f2;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 18px;
-}
-
-.rc-headline {
-  font-size: 15px;
-  font-weight: 600;
-  color: #2b2723;
-  line-height: 1.5;
-}
-
-.rc-sub {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #6b5f52;
-  line-height: 1.5;
-}
-
-.rc-sub b { color: #c8763a; }
-
-
-/* ### 지표줄 ###*/
-
-.rc-row {
-  display: grid;
-  /* grid : 네 칸을 정해두면 지표마다 글자 길이가 달라도 세로로 줄이 맞는다. */
-  /* 이름 / 점 / 문구 / 백분위 — 네 칸으로 나눈다 */
-  grid-template-columns: 78px auto 1fr 62px;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  border-bottom: 1px solid #f0ebe4;
-}
-
-.rc-row:last-child { border-bottom: none; }
-
-.rc-row-name {
-  font-size: 13px;
-  color: #4a4038;
-}
-
-/* 점 5개 */
-.rc-dots { display: flex; gap: 4px; }
-
-.rc-dots i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #e3dbd0;          /* 꺼진 점 */
-}
-
-.rc-dots.over  i.on { background: #4a9d6e; }
-.rc-dots.match i.on { background: #c8763a; }
-.rc-dots.under i.on { background: #b0a496; }
-
-.rc-word { font-size: 12px; }
-.rc-word.over  { color: #4a9d6e; }
-.rc-word.match { color: #c8763a; }
-.rc-word.under { color: #a89b8c; }
-
-.rc-pct {
-  font-size: 11px;
-  color: #b0a496;
-  text-align: right;
-}
-
-.rc-source {
-  margin-top: 16px;
-  font-size: 11px;
-  color: #b0a496;
-  text-align: center;
-}
-
-
-/* LLM 설명문 영역*/
-.explain-box {
-  background: #faf7f2;
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin: 14px 0;
-}
-
-.explain-head {
-  font-size: 12px;
-  font-weight: 600;
-  color: #c8763a;
-  margin-bottom: 8px;
-}
-
-.explain-body {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #4a4038;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.explain-body b { color: #2b2723; }
-
-.rc-facility {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid #f0ebe4;
-}
-
-.rc-loading {
-  font-size: 12px;
-  color: #b0a496;
-}
-
-.rc-fac-head {
-  font-size: 12px;
-  font-weight: 600;
-  color: #c8763a;
-  margin-bottom: 8px;
-}
-
-.rc-fac-summary {
-  font-size: 13px;
-  color: #4a4038;
-  line-height: 1.6;
-}
-
-.rc-fac-names {
-  margin-top: 6px;
-  font-size: 11.5px;
-  color: #8b7f72;
-  line-height: 1.5;
-}
-
-.rc-extras {
-  margin-top: 4px;
-}
-
-.rc-extra-row {
-  display: grid;
-  grid-template-columns: 96px 110px 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  font-size: 12.5px;
-}
-
-.rc-extra-label { color: #4a4038; }
-.rc-extra-value { color: #2b2723; font-weight: 600; }
-.rc-extra-note  { color: #a89b8c; font-size: 11.5px; }
-
-.rc-llm {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid #f0ebe4;
-}
-
-.rc-llm:empty {
-  border-top: none;
-  margin: 0;
-  padding: 0;
-}
-
-.rc-llm-body {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #4a4038;
-}
-
-.rc-llm-body b { color: #2b2723; }
-
-
-/* ===== 채팅 패널 ===== */
-
-#chatToggle {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  /* left:50% 는 버튼의 왼쪽 끝을 중앙에 두는 것이라
-     버튼 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
-  transform: translateX(-50%);
-  z-index: 8000;
-  width: 52px;
-  height: 52px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--navy);
-  color: #fff;
-  font-size: 20px;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: background 0.2s, transform 0.15s;
-}
-
-#chatToggle:hover {
-  background: var(--amber);
-  /* hover 에서도 translateX(-50%) 를 다시 써야 한다.
-     transform 은 덮어쓰기라, 빠뜨리면 버튼이 오른쪽으로 튄다 */
-  transform: translateX(-50%) translateY(-2px);
-}
-
-
-/* 패널 본체 */
-#chatPanel {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 8500;
-  width: min(400px, 92vw);
-
-  display: flex;
-  flex-direction: column;     /* 머리 · 본문 · 입력창을 세로로 쌓는다 */
-
-  background: var(--paper);
-  border-left: 1px solid var(--line);
-  box-shadow: -8px 0 30px rgba(20, 33, 61, 0.12);
-
-  /* 평소엔 화면 밖(오른쪽)에 있다가 .open 이 붙으면 미끄러져 들어온다 */
-  transform: translateX(100%);
-  transition: transform 0.3s ease;
-}
-
-#chatPanel.open {
-  transform: translateX(0);
-}
-
-
-/* 머리부분 */
-.chat-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-}
-
-.chat-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--navy);
-}
-
-#chatClose {
-  border: none;
-  background: none;
-  font-size: 24px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-#chatClose:hover { color: var(--ink); }
-
-/* 대화내용 */
-.chat-body {
-  flex: 1;                    /* 남는 공간을 전부 차지 */
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chat-msg {
-  max-width: 85%;
-  padding: 10px 13px;
-  border-radius: 12px;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;      /* 줄바꿈을 그대로 살린다 */
-}
-
-/* 답변은 왼쪽 */
-.chat-msg.bot {
-  align-self: flex-start;
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--ink);
-}
-
-/* 내 질문은 오른쪽 */
-.chat-msg.user {
-  align-self: flex-end;
-  background: var(--navy);
-  color: #fff;
-}
-
-/* 답을 기다리는 중 */
-.chat-msg.loading {
-  align-self: flex-start;
-  color: var(--muted);
-  font-style: italic;
-  background: none;
-  border: none;
-}
-
-/* 입력창 */
-.chat-input {
-  display: flex;
-  gap: 8px;
-  padding: 12px 14px;
-  border-top: 1px solid var(--line);
-  background: #fff;
-}
-
-#chatInput {
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  color: var(--ink);
-}
-
-#chatInput:focus { border-color: var(--amber); }
-
-#chatSend {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--navy);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-#chatSend:hover { background: var(--amber); }
-
-#chatSend:disabled {
-  background: var(--line-strong);
-  cursor: default;
 }

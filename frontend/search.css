@@ -1,6 +1,9 @@
 /* =========================================================
    search.css — 첫 진입 검색 화면
-   ========================================================= */
+   ========================================================= 
+   결과 화면 상단의 "다시 검색" 바
+   그리고 반응형 규칙
+   */
 
 /* ### 전체 화면 ###*/
 
@@ -10,7 +13,7 @@
   inset: 0;                     /* top/right/bottom/left 를 전부 0 으로 */
   z-index: 9000;                /* 지도·패널보다 위에 오게 한다 */
 
-  background: #faf7f2;
+  background: var(--bg);
   display: flex;                /* 안의 내용을 가운데 정렬하기 위한 설정 */
   align-items: center;          /* 세로 가운데 */
   justify-content: center;      /* 가로 가운데 */
@@ -36,16 +39,16 @@
 }
 
 .ss-logo {
-  font-family: "Fraunces", serif;
+  font-family: 'Cafe24Ssurround', 'Inter', sans-serif;
   font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #2b2723;
+  color: var(--text);
 }
 
 .ss-logo i {                    /* LIFE 와 FIT 사이의 쉼표만 색을 다르게 */
   font-style: normal;
-  color: #c8763a;
+  color: var(--accent);
 }
 
 
@@ -75,7 +78,7 @@
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
-  color: #6b5f52;
+  color: var(--text-muted);
   transition: transform 0.25s ease-out, color 0.2s,
               border-color 0.2s, background 0.2s;
 }
@@ -92,14 +95,14 @@
 
 /* 마우스가 가까워지면 "누를 수 있다"는 신호 */
 .ss-word.near .ss-word-in {
-  border-color: rgba(200, 118, 58, 0.45);
-  color: #c8763a;
+  border-color: var(--accent);        /* rgba(200,118,58,0.45) → */
+  color: var(--accent);
 }
 
 .ss-word:hover .ss-word-in {
-  border-color: #c8763a;
-  background: rgba(200, 118, 58, 0.1);
-  color: #a85c26;
+  border-color: var(--accent);
+  background: var(--accent-soft);     /* rgba(200,118,58,0.1) → */
+  color: var(--accent);
 }
 
 
@@ -113,21 +116,21 @@
 }
 
 .search-title {
-  font-family: "Fraunces", serif;
+  font-family: 'Cafe24Ssurround', 'Inter', sans-serif;
   font-size: 34px;
   font-weight: 600;
-  color: #2b2723;
+  color: var(--text);
   margin: 0 0 10px;
 }
 
 .search-title em {
   font-style: normal;
-  color: #c8763a;
+  color: var(--accent);
 }
 
 .search-sub {
   font-size: 15px;
-  color: #8b7f72;
+  color: var(--text-muted);
   margin: 0 0 28px;
 }
 
@@ -136,47 +139,89 @@
 
 .search-box {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;            /* 태그가 늘어나면 다음 줄로 넘어간다 */
   gap: 8px;
-  background: #fff;
-  border: 1px solid #e3dbd0;
+  min-height: 56px;
+  cursor: text;               /* 상자 아무 데나 눌러도 입력칸으로 간다는 신호 */
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 6px 6px 6px 22px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 /* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
 .search-box:focus-within {
-  border-color: #c8763a;
-  box-shadow: 0 4px 24px rgba(200, 118, 58, 0.15);
+  border-color: var(--accent);
+  box-shadow: var(--shadow), var(--glow);
 }
 
 #searchInput {
   flex: 1;                      /* 남는 공간을 다 차지 */
+  min-width: 120px;             /* 태그가 줄을 채워도 입력칸이 짜부라지지 않게 */
   border: none;
   outline: none;                /* 기본 파란 테두리 제거 */
   background: transparent;
   font-size: 16px;
   font-family: inherit;
-  color: #2b2723;
+  color: var(--text);
+}
+
+/* ### 고른 키워드 태그 ### */
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 고른 게 없으면 빈 상자가 자리를 차지하지 않도록 */
+.tag-container:empty {
+  display: none;
+}
+
+.keyword-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.keyword-tag:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 #searchBtn {
+  margin-left: auto;            /* 태그가 늘어나도 버튼은 오른쪽 끝에 */
+  flex-shrink: 0;
   border: none;
   border-radius: 999px;
   padding: 12px 26px;
-  background: #2b2723;
-  color: #fff;
+  background: var(--primary);
+  color: var(--bg);
   font-size: 15px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
-#searchBtn:hover { background: #c8763a; }
+#searchBtn:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
 
 /* 검색 중에는 눌리지 않게 */
 #searchBtn:disabled {
-  background: #b8ada0;
+  background: var(--line-strong);
   cursor: default;
 }
 
@@ -187,37 +232,346 @@
   min-height: 20px;             /* 문구가 없어도 자리를 지켜 화면이 안 흔들리게 */
   margin: 18px 0 0;
   font-size: 14px;
-  color: #8b7f72;
+  color: var(--text-muted);
 }
 
 .search-skip {
   margin-top: 22px;
   border: none;
   background: none;
-  color: #a89b8c;
+  color: var(--text-muted);
   font-size: 13px;
   text-decoration: underline;
   cursor: pointer;
 }
 
-.search-skip:hover { color: #6b5f52; }
+.search-skip:hover { color: var(--text); }
 
 
-/* ### 다시 검색 버튼 ###*/
+/* ===== 상단 검색창 ===== */
 
-#reopenSearch {
+.top-search-wrap {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 8000;                /* 검색 화면(9000)보다는 아래 */
-  width: 44px;
-  height: 44px;
-  border: 1px solid #e3dbd0;
-  border-radius: 50%;
-  background: #fff;
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  top: 22px;
+  left: 50%;
+  /* left:50% 는 왼쪽 끝을 중앙에 두는 것이라
+     자기 너비의 절반만큼 되돌려야 진짜 가운데가 된다 */
+  transform: translateX(-50%);
+  z-index: 20;                /* 헤더(5)보다 위, 검색 화면(9000)보다 아래 */
+  width: min(520px, 42vw);
 }
 
-#reopenSearch:hover { background: #faf7f2; }
+.top-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  pointer-events: auto; 
+}
+
+/* :focus-within 은 "안에 있는 무언가가 선택되면" 이라는 뜻 */
+.top-search:focus-within {
+  border-color: var(--shadow), var(--glow);
+  box-shadow: 0 6px 24px rgba(201, 122, 43, 0.18);
+}
+
+.ts-icon {
+  font-size: 14px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+#topSearchInput {
+  flex: 1;                    /* 남는 공간을 다 차지 */
+  min-width: 0;               /* flex 안의 input 이 넘치지 않게 */
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+#topSearchBtn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--bg);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#topSearchBtn:hover { background: var(--amber); }
+
+#topSearchBtn:disabled {
+  background: var(--line-strong);
+  cursor: default;
+}
+
+.ts-status {
+  margin: 7px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  /* 문구가 없어도 자리를 지켜 화면이 흔들리지 않게 한다 */
+  min-height: 16px;
+}
+
+/* 화면이 좁으면 좌우 패널과 겹치므로 숨긴다.
+   그때는 우상단 🔍 버튼으로 검색 화면에 가면 된다 */
+@media (max-width: 1100px) {
+  .top-search-wrap { display: none; }
+}
+
+
+/* =========================================================
+   1차 유형 판정 — 고른 개수 안내와 결과 카드
+   ========================================================= */
+
+.pick-count {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  /* 문구가 없어도 자리를 지켜 화면이 흔들리지 않게 한다 */
+  min-height: 17px;
+  transition: color 0.2s ease;
+}
+
+/* 최소 개수를 채우면 색이 바뀌어 "이제 눌러도 된다"를 알린다 */
+.pick-count.ok {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 배경은 .coming-soon-backdrop(ui/menu.css)과 같은 검은 스크림을 쓴다.
+   밝은 색 스크림은 밤 모드에서 화면이 하얗게 뜬다 */
+#typeResult {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.45s ease, visibility 0.45s;
+}
+
+/* 여는 클래스 이름은 저장소 관례를 따른다 (.menu/.auth/.reason 전부 .is-open) */
+#typeResult.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tr-card {
+  width: min(560px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 34px 32px 28px;
+  text-align: center;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  transform: translateY(18px);
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+#typeResult.is-open .tr-card {
+  transform: translateY(0);
+}
+
+.tr-eyebrow {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.tr-name {
+  margin: 8px 0 0;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.tr-desc {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tr-lines {
+  margin: 20px auto 0;
+  max-width: 440px;
+}
+
+.tr-line-row {
+  display: flex;
+  margin-top: 9px;
+}
+
+.tr-line {
+  display: inline-block;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+
+/* 키워드를 너무 적게 골라 유형이 안 잡혔을 때 */
+.tr-nodata {
+  margin: 22px 0 0;
+  padding: 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+
+.tr-hint {
+  margin: 14px 0 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-radius: 10px;
+}
+
+/* --- 어울리는 동네 2곳 --- */
+.tr-spots-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 26px 0 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.tr-spots-head span {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tr-spots-head em {
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--text-muted);
+}
+
+.tr-spots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tr-spot {
+  overflow: hidden;
+  text-align: center;
+  background: var(--primary);
+  border: none;
+  border-radius: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tr-spot:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.tr-spot-body {
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.tr-spot-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--bg);
+}
+
+.tr-spot-blurb {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--bg);
+  opacity: 0.8;
+}
+
+/* --- 2차로 넘어가는 버튼 --- */
+.tr-cta {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.tr-cta p {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.tr-btn-main {
+  width: 100%;
+  padding: 13px;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--primary);
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.tr-btn-main:hover {
+  background: var(--accent);
+  transform: translateY(-1px);
+}
+
+.tr-btn-sub {
+  margin-top: 10px;
+  padding: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .tr-card { padding: 26px 20px 22px; }
+  .tr-name { font-size: 25px; }
+  .tr-spots { grid-template-columns: 1fr; }
+}
