@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 이 파일은 이 저장소에서 작업할 때 Claude Code(claude.ai/code)에게 지침을 제공합니다.
 
 ## 이 저장소는 무엇인가
