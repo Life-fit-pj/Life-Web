@@ -203,8 +203,10 @@
 
         <button onclick="saveMember('${customer.customer_id}')">저장</button>
         <button onclick="previewMember('${customer.customer_id}')">추천 돌려보기</button>
+        <button onclick="showSimilar('${customer.customer_id}')">비슷한 회원</button>
 
         <div id="preview"></div>
+        <div id="similar"></div>
       `;
     }
 
@@ -215,17 +217,26 @@
         patch[el.name] = el.type === 'number' ? Number(el.value) : el.value;
       });
 
+      // ② 저장하기 "전"의 추천을 먼저 받아 둔다 — 순서를 바꾸면 비교 대상이 사라진다
+      const before = await api(`/members/${id}/preview`);
+
+      // ③ 저장
       await api('/members/' + id, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
 
-      members = await api('/members');     // 목록도 최신화 (이름 바뀐 걸 반영)
+      // ④ 저장 "후"의 추천. 캐시는 서버가 이미 비웠으므로 새 값 기준으로 계산된다
+      const after = await api(`/members/${id}/preview`);
+
+      members = await api('/members');
       renderMemberRows(members);
-      openMember(id);                      // 저장된 값으로 폼 다시 채움
-      toast('저장했다');            // 수정
+      await openMember(id);           // ★ await — 판을 다 그릴 때까지 기다린다
+      renderDiff(before, after);      // 그 다음에 그려야 안 지워진다
+      toast('저장했다');
     }
+
 
 
     async function previewMember(id) {
@@ -242,6 +253,47 @@
         </div>`;
     }
 
+
+    async function showSimilar(id) {
+      const box = document.getElementById('similar');
+      box.textContent = '벡터에서 찾는 중…';
+
+      const list = await api(`/members/${id}/similar`);
+
+      box.innerHTML = `
+        <div class="card">
+          <div class="card-title">페르소나가 비슷한 회원</div>
+          ${list.map(s => {
+            const found = members.find(m => m.customer_id === s.customer_id);
+            const name = found ? found.name : '';
+            return `<div>
+              <b>${esc(s.customer_id)} ${esc(name)}</b>
+              <span style="color:var(--muted)"> · ${s.score} · ${esc(s.category)}</span>
+              <div style="font-size:12px">${esc(s.text)}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+
+    function renderDiff(before, after) {
+      const beforeNames = before.map(r => r.name);
+
+      const rows = after.map((r, i) => {
+        const was = beforeNames.indexOf(r.name);          // 전에는 몇 위였나 (없으면 -1)
+        const mark = was === -1 ? 'NEW'
+                   : was === i  ? '—'
+                   : was > i    ? `▲${was - i}`
+                                : `▼${i - was}`;
+        return `<div>${i + 1}위 ${esc(r.name)} — ${r.total}점 <b>${mark}</b></div>`;
+      });
+
+      document.getElementById('preview').innerHTML = `
+        <div class="card">
+          <div class="card-title">저장 전 → 후 순위 변화</div>
+          ${rows.join('')}
+        </div>`;
+    }
 
 
     // 행정동

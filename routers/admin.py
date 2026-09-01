@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 
 from services.engine import (
     get_member, list_members, get_region, list_regions,
-    update_member, update_region, preview_member,
+    update_member, update_region, preview_member, similar_members,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -93,6 +93,15 @@ def admin_update_region(gu: str, dong: str, patch: dict):
 def admin_preview_member(customer_id: str):
     """이 회원 조건으로 추천을 돌려본다. 아무것도 안 고친다."""
     result = preview_member(customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    return result
+
+
+@router.get("/members/{customer_id}/similar", dependencies=[Depends(check_admin)])
+def admin_similar_members(customer_id: str):
+    """이 회원과 페르소나가 비슷한 회원들."""
+    result = similar_members(customer_id)
     if result is None:
         raise HTTPException(status_code=404, detail="그런 회원이 없다")
     return result
