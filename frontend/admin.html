@@ -49,6 +49,11 @@
     #status { padding: 6px 12px; font-size: 12px; }
     #status.ok { color: #2f8f5b; }
     #status.bad { color: #d63b30; font-weight: bold; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .two pre { margin: 0; padding: 10px; border-radius: 6px; white-space: pre-wrap;
+               word-break: break-all; font-size: 12px; max-height: 160px; overflow-y: auto; }
+    pre.raw  { background: rgba(214,59,48,.08); }
+    pre.safe { background: rgba(47,143,91,.10); }
   </style>
 </head>
 <body>
@@ -233,9 +238,11 @@
         <button onclick="saveMember('${customer.customer_id}')">저장</button>
         <button onclick="previewMember('${customer.customer_id}')">추천 돌려보기</button>
         <button onclick="showSimilar('${customer.customer_id}')">비슷한 회원</button>
+        <button onclick="showPrivacy('${customer.customer_id}')">개인정보 점검</button>
 
         <div id="preview"></div>
         <div id="similar"></div>
+        <div id="privacy"></div>
       `;
     }
 
@@ -328,6 +335,38 @@
               <div style="font-size:12px">${esc(s.text)}</div>
             </div>`;
           }).join('')}
+        </div>`;
+    }
+
+
+    async function showPrivacy(id) {
+      const box = document.getElementById('privacy');
+      box.textContent = '확인 중…';
+
+      const data = await api(`/members/${id}/privacy`);
+
+      const rows = Object.keys(data.raw).map(name => {
+        const same = data.raw[name] === data.masked[name];
+        return `
+          <div style="margin-bottom:10px">
+            <div class="card-title">${esc(name)} ${same ? '· 안 가려짐' : ''}</div>
+            <div class="two">
+              <pre class="raw">${esc(data.raw[name])}</pre>
+              <pre class="${same ? 'raw' : 'safe'}">${esc(data.masked[name])}</pre>
+            </div>
+          </div>`;
+      }).join('');
+
+      box.innerHTML = `
+        <div class="card">
+          <div class="card-title">
+            개인정보 점검 — 9칸 중 <b>${data.changed}칸</b>이 가려짐
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+            왼쪽이 우리 DB, 오른쪽이 밖으로 나갈 글이다.
+            <b>안 가려진 칸에 개인정보가 남아 있는지</b>를 보는 게 목적이다.
+          </div>
+          ${rows}
         </div>`;
     }
 

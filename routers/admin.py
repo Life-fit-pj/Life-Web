@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches,
+    clear_caches, privacy_preview,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -131,3 +131,12 @@ def admin_ready():
 def admin_clear_cache():
     """캐시를 버린다. 다음 요청 때 새로 계산된다."""
     return clear_caches()
+
+
+@router.get("/members/{customer_id}/privacy", dependencies=[Depends(check_admin)])
+def admin_privacy_preview(customer_id: str):
+    """원본 vs 가린 글. 관리자만 본다."""
+    result = privacy_preview(customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    return result
