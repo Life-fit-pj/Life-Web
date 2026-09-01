@@ -57,6 +57,10 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 - `routers/lifetype.py` — `/api/lifetype`, `/api/lifetype/keywords`. 1차 유형 판정입니다.
 - `routers/admin.py` — `/api/admin/*`. `Authorization: Bearer <ADMIN_TOKEN>` 헤더를 요구하고,
   수정(PATCH)은 `.env`의 `ADMIN_WRITE_ENABLED=1`까지 있어야 통과합니다.
+  `/summary`는 대시보드가 쓰는 집계 한 덩어리(카운트 + 차트 8종 + 최근 수정)이고
+  `/logs`는 `admin_log` 표를 읽습니다. 둘 다 엔진의 `dashboard()`·`recent_logs()`를 부릅니다.
+  쓰기 스위치 상태(`write_enabled`)는 이 저장소의 `.env`가 갖고 있으므로 엔진이 아니라
+  여기서 `/ready`·`/summary` 응답에 붙입니다.
 - `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. 다른 추천 엔진으로
   교체하려면 여기 있는 import 줄만 바꾸면 됩니다(README의 "다른 엔진 붙이기" 참고).
   7개 라이프스타일 지표의 한국어⇄영어 매핑(`KEY_MAP`)도 여기 하나만 있습니다 — 다른 파일에서
@@ -77,8 +81,18 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 - `frontend/` — 빌드 단계도, 프레임워크도 없습니다. `index.html`이 `main.js` 하나만 모듈로
   불러오고 나머지는 `import`가 끌고 옵니다. `lib/`는 공용(서버 호출·공유 상태·문자열 다듬기),
   `ui/`는 화면 단위입니다.
-- `frontend/signup.html`, `frontend/admin.html` — **일체형 단일 페이지**입니다(HTML+CSS+JS가
-  한 파일). 첫 화면과 공유하는 코드가 없어서 나누면 파일만 늘어납니다. 서버에 저장하는 기능이
+- `frontend/admin.html` — **일체형 단일 페이지**입니다(HTML+CSS+JS가 한 파일).
+  왼쪽 내비게이션으로 네 화면을 오갑니다: **대시보드**(집계·차트), **회원**(목록+상세),
+  **행정동**(목록+지표 12개), **시스템**(상태·캐시·수정 이력). 토큰은 `prompt()`가 아니라
+  첫 화면 카드에서 받고, 401이 오면 그 화면으로 되돌아갑니다.
+  차트는 바깥 라이브러리 없이 HTML·SVG로 그립니다(`bars`/`cols`/`donut`/`area` 네 함수).
+  테마는 `:root`에 라이트 값을 두고 다크 값을 **두 벌** 적습니다 —
+  `@media (prefers-color-scheme: dark)`는 크롬·OS 설정용,
+  `:root[data-theme="dark"]`는 화면 토글용이며, 토글이 이기도록 media 쪽에
+  `:not([data-theme="light"])`를 걸어 둡니다. 한쪽만 고치면 둘 중 하나가 어긋납니다.
+  **저장은 처음 값과 달라진 칸만 보냅니다**(`collectPatch`) — 전부 보내면 페르소나를
+  안 고쳤어도 벡터를 다시 만들고, 수정 이력에 "26칸 고침"만 남아 무엇을 바꿨는지 알 수 없습니다.
+- `frontend/signup.html` — 역시 **일체형 단일 페이지**입니다(HTML+CSS+JS가 한 파일). 첫 화면과 공유하는 코드가 없어서 나누면 파일만 늘어납니다. 서버에 저장하는 기능이
   붙어 `lib/api.js`를 쓰게 되면 그때 `<script type="module">`로 바꾸면 됩니다.
 
 ### 화면 흐름 — 1차와 2차

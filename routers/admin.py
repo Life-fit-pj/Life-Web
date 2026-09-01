@@ -1,4 +1,6 @@
 """
+GET   /api/admin/summary                  대시보드 집계 (첫 화면)
+GET   /api/admin/logs                     관리자 수정 이력
 GET   /api/admin/members                  회원 100명 목록
 GET   /api/admin/members/{customer_id}    회원 한 명 (기본정보+조건+페르소나)
 GET   /api/admin/regions                  행정동 427개 목록
@@ -20,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches, privacy_preview,
+    clear_caches, privacy_preview, dashboard, recent_logs,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -123,8 +125,11 @@ def admin_health():
 
 @router.get("/ready", dependencies=[Depends(check_admin)])
 def admin_ready():
-    """일할 준비가 됐나 — DB가 진짜 DB인지, 캐시가 데워져 있는지."""
-    return health()
+    """일할 준비가 됐나 — DB가 진짜 DB인지, 캐시가 데워져 있는지.
+
+    쓰기 스위치는 이 저장소의 .env 가 갖고 있으므로 엔진이 아니라 여기서 붙인다.
+    """
+    return {**health(), "write_enabled": ADMIN_WRITE_ENABLED}
 
 
 @router.post("/cache/clear", dependencies=[Depends(check_admin), Depends(check_writable)])
@@ -140,3 +145,14 @@ def admin_privacy_preview(customer_id: str):
     if result is None:
         raise HTTPException(status_code=404, detail="그런 회원이 없다")
     return result
+
+@router.get("/summary", dependencies=[Depends(check_admin)])
+def admin_summary():
+    """첫 화면(대시보드)이 쓰는 집계 한 덩어리. 아무것도 안 고친다."""
+    return {**dashboard(), "write_enabled": ADMIN_WRITE_ENABLED}
+
+
+@router.get("/logs", dependencies=[Depends(check_admin)])
+def admin_logs(limit: int = 30):
+    """관리자 수정 이력. 최근 것이 위로 온다."""
+    return recent_logs(min(max(limit, 1), 200))
