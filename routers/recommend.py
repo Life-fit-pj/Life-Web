@@ -58,7 +58,10 @@ class RegionRequest(BaseModel):
     query: str | None = None
     weights: dict | None = None
     scores: dict | None = None
-
+    # 순위를 매길 때 실제로 쓰인 가격 조건. /api/predict 응답의 housing 을
+    # 프론트가 그대로 실어 보낸다 — 프론트에서 새로 조립하지 않는다.
+    # 가격 조건이 없었으면 None (엔진이 시세 이야기를 안 꺼낸다)
+    housing: dict | None = None
 
 class ChatRequest(BaseModel):
     question: str
@@ -93,7 +96,7 @@ def predict(body: PredictRequest):
         if not touched:
             for eng, kor in KEY_MAP.items():
                 if kor in body.firstWeights:
-                    prefs[eng] = int(body.firstWeights[kor])
+                    prefs[eng] = float(body.firstWeights[kor])   # int() → float()
 
     weights, regions, explanation, extracted_housing = get_regions(prefs)
     
@@ -179,9 +182,9 @@ def region_explain_api(body: RegionRequest):
             query=body.query or "",
             weights=body.weights,
             scores=body.scores,
+            housing=body.housing,
         )
     }
-
 
 @router.post("/chat")
 def chat_api(body: ChatRequest):

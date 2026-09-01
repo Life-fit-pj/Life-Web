@@ -319,7 +319,21 @@ def recommend(weights: dict, show: int = SHOW, seed=None) -> list:
         mid = vals[len(vals) // 2]
         band = (mid * BAND_LOW, mid * BAND_HIGH)
 
-    total = sum(max(0.0, weights.get(k, 3)) for k in WEIGHT_KEYS) or 1.0
+    # 가중치를 "배점"이 아니라 "차이"로 쓴다.
+    #
+    # 절대점수 가중합만 쓰면 모든 지표가 높은 동네(명동·역삼1동)가 어떤
+    # 가중치에서도 이긴다 — 상권을 1점으로 낮춰도 상권 100점이 100x1 을
+    # 그대로 벌기 때문이다. 그래서 엔진(app/engine/recommend.py)과 같은
+    # 두 장치를 쓴다.
+    #   (1) 특기 점수 : 그 동네 7개 평균보다 얼마나 높은 지표인가
+    #   (2) 증폭      : 가중치가 평균(3)에서 벗어난 만큼을 지수로 키운다
+    # 두 상수는 반드시 엔진과 같아야 한다 — 1차와 2차가 다른 규칙으로
+    # 채점하면 "아까 그 동네는 어디 갔지"가 된다
+    MIX, SHARPEN = 0.5, 6
+
+    mean_w = sum(max(0.0, weights.get(k, 3)) for k in WEIGHT_KEYS) / len(WEIGHT_KEYS)
+    amp = {k: (max(0.0, weights.get(k, 3)) / mean_w) ** SHARPEN for k in WEIGHT_KEYS}
+    total = sum(amp.values()) or 1.0
 
     def rank_all(use_band):
         out = []
@@ -329,9 +343,15 @@ def recommend(weights: dict, show: int = SHOW, seed=None) -> list:
                 # 시세를 모르는 동은 남긴다. 아는데 범위 밖이면 뺀다
                 if pr is not None and not (band[0] <= pr <= band[1]):
                     continue
-            sc = sum(ind.get(k, 50.0) * max(0.0, weights.get(k, 3))
-                     for k in WEIGHT_KEYS) / total
-            out.append((sc, gu, dong))
+
+            # 이 동네 자기 평균. 특기 점수의 기준선이 된다
+            own = sum(ind.get(k, 50.0) for k in WEIGHT_KEYS) / len(WEIGHT_KEYS)
+
+            sc = 0.0
+            for k in WEIGHT_KEYS:
+                p = ind.get(k, 50.0)
+                sc += (p * MIX + (p - own + 50) * (1 - MIX)) * amp[k]
+            out.append((sc / total, gu, dong))
         return out
 
     # 시세 필터로 후보가 다 걸러지면 필터 없이 다시. 빈손보다 낫다

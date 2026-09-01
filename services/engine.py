@@ -82,22 +82,31 @@ def to_housing(prefs):
 def get_regions(user_prefs):
     query = (user_prefs.get('query') or '').strip()
     housing = to_housing(user_prefs)
-    extracted_housing = None   # 검색어 경로에서만 채워진다
+
+    # "순위를 매길 때 실제로 쓰인" housing. 두 경로 모두에서 채운다.
+    #
+    # 예전에는 검색어 경로에서만 채우고 슬라이더 경로는 None 으로 뒀다 —
+    # "화면이 만든 값이니 되돌려줄 필요 없다"는 판단이었는데, 핀 모달의
+    # 동네 설명(/api/region/explain)이 이 값을 다시 받아야 하게 되면서
+    # 슬라이더로만 조건을 준 사용자는 시세 이야기를 못 듣게 됐다.
+    # 순위 기준과 설명 기준이 다르면 앞뒤가 안 맞는 말을 하게 된다
+    used_housing = None
 
     if query:
         result = search(query, top_k=5, housing_override=housing)
         weights = result["weights"]
         regions = result["regions"]
         explanation = result["explanation"]
-        extracted_housing = result.get("housing")
+        # search() 는 housing_override 가 있으면 그걸 그대로,
+        # 없으면 검색어에서 뽑아낸 조건을 돌려준다 — 어느 쪽이든 "실제로 쓰인" 값
+        used_housing = result.get("housing")
     else:
-        # 슬라이더 경로는 애초에 화면 값 그대로 housing을 만들었으니
-        # 다시 화면에 되돌려줄 필요가 없다 (이미 일치함)
         weights = to_korean_weights(user_prefs)
         regions = recommend_by_weights(weights, top_k=5, housing=housing)
         explanation = ""
+        used_housing = housing        # ← 이 한 줄이 빠져 있었다
 
-    return weights, regions, explanation, extracted_housing
+    return weights, regions, explanation, used_housing
 
 
 def get_facilities(gu, dong, limit=5):
@@ -109,9 +118,14 @@ def get_facilities(gu, dong, limit=5):
     }
 
 
-def get_region_explain(gu, dong, query="", weights=None, scores=None):
-    """동네 하나에 대한 LLM 설명을 만든다. 지도 핀을 눌렀을 때 쓴다."""
-    return region_explain_cached(gu, dong, query, weights, scores)
+def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=None):
+    """동네 하나에 대한 LLM 설명을 만든다. 지도 핀을 눌렀을 때 쓴다.
+
+    housing 이 있으면 엔진이 설명문에 "원하시는 가격대보다 조금 높은 편입니다"
+    같은 문장을 넣는다. None 이면 프롬프트에 "가격 이야기를 꺼내지 마라"가
+    들어가므로, 가격 조건이 없을 때 억지로 기본값을 만들어 넣지 말 것
+    """
+    return region_explain_cached(gu, dong, query, weights, scores, housing)
 
 
 def get_chat_answer(question, regions=None, weights=None, history=None):

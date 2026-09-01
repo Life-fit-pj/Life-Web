@@ -90,7 +90,8 @@ async function loadRegionExplain(item, weights) {
   box.innerHTML = `<div class="rc-loading">이 동네가 왜 맞는지 정리하는 중...</div>`;
 
   try {
-    const data = await postRegionExplain(gu, dong, state.lastQuery, weights, item.scores);
+    const data = await postRegionExplain(
+      gu, dong, state.lastQuery, weights, item.scores, state.lastHousing);
     if (!data.explanation) { box.innerHTML = ""; return; }
 
     box.innerHTML = `
