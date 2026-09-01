@@ -81,6 +81,15 @@
   color: var(--text);
 }
 
+.rc-like {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  margin-right: auto;   /* rc-name 바로 옆에 붙이고, rc-score 는 계속 오른쪽 끝에 둔다 */
+}
+
 .rc-score {
   font-size: 26px;
   font-weight: 700;
