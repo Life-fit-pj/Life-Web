@@ -371,7 +371,7 @@ if __name__ == "__main__":
         print("  축   " + "  ".join(f"{a}:{s:+.2f}"
                                    for a, s in p["axisScores"].items()))
         print(f"  유형 {p['typeCode']}  {p['typeName']}"
-              f"{'  (부분)' if p['partial'] else ''}")
+              f"{'  (부분)' if len(p['filledAxes']) < 4 else ''}")
         if p["typeDesc"]:
             print(f"       {p['typeDesc']}")
         for line in p["lines"]:

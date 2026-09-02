@@ -19,7 +19,7 @@ sys.path.insert(0, EMBED_DIR)
 
 from app.core.db import add_like, remove_like
 from app.core.db import facilities, facility_counts, region_extras
-from app.features.pipeline_api import search, recommend_by_weights
+from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
 from app.features.admin import get_member, list_members, get_region, list_regions, update_member, update_region
@@ -99,6 +99,17 @@ def get_regions(user_prefs):
         explanation = ""
 
     return weights, regions, explanation, extracted_housing
+
+
+def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5):
+    """서술형 설문(2차 유형)에서 이미 뽑은 가중치로 추천한다.
+
+    /api/predict 의 검색어 경로와 달리 ask_claude() 의 LLM 가중치 추정을
+    건너뛴다 — 설문은 services/persona_type.py 가 이미 구조화된 축 점수로
+    가중치를 계산해 뒀기 때문이다.
+    """
+    return recommend_by_weights_explained(weights_kor, persona_query,
+                                           top_k=top_k, housing=housing)
 
 
 def get_facilities(gu, dong, limit=5):
