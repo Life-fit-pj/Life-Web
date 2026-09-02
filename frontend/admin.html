@@ -291,11 +291,23 @@ label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom:
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 13px; }
 
 .sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 24px; }
-.slider-row { display: grid; grid-template-columns: 44px 1fr 22px; align-items: center; gap: 10px; }
+.slider-row { display: grid; grid-template-columns: 44px 1fr 62px; align-items: center; gap: 10px; }
 .slider-row .s-lab { font-size: 13px; color: var(--ink-2); }
 .slider-row .s-val { font-size: 13px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--accent); background: none; padding: 0; border: 0; }
-
+.w-item { position: relative; }
+/* 고정 블록 — 흐리게 해서 "못 고치는 값"임을 눈으로 구분한다 */
+.sliders.fixed { opacity: .62; }
+.sliders.fixed input[type=range] { accent-color: var(--ink-2); }
+.sliders.fixed .w-init { font-size: 13px; text-align: right; color: var(--ink-2);
+                         font-variant-numeric: tabular-nums; }
+/* 가입 때와 달라진 지표는 위아래 양쪽에 점을 찍는다 */
+.w-item.moved .s-lab::after { content: "•"; color: var(--accent); margin-left: 3px; }
+.sliders.fixed .w-item.moved { opacity: 1; }
+.slider-row .w-num { width: 100%; padding: 3px 5px; font-size: 13px; text-align: right;
+                     font-variant-numeric: tabular-nums;
+                     border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+                     
 details.persona { border: 1px solid var(--line); border-radius: 11px; margin-bottom: 9px; background: var(--surface-2); }
 details.persona > summary {
   cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 550;
@@ -843,7 +855,9 @@ async function openMember(id) {
   const board = $('#member-detail');
   board.innerHTML = '<div class="empty">불러오는 중…</div>';
 
-  const { customer, preferences, persona } = await api('/members/' + id);
+  const { customer, preferences, preferences_initial, persona } = await api('/members/' + id);
+  /* initial 은 "저장할 때 바뀐 칸 골라내는 기준"이다. preferences_initial(가입 시 값)과
+     이름이 비슷하지만 전혀 다른 것이니 섞지 말 것 */
   initial = { ...customer, ...preferences, ...persona };
 
   const basic = Object.entries(customer).map(([k, v]) => `
@@ -857,13 +871,40 @@ async function openMember(id) {
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
 
-  const sliders = Object.entries(preferences).map(([k, v]) => `
-    <div>
+  /* 가중치 블록을 둘로 나눈다.
+       위 = 가입 때 받은 값(고정, 읽기 전용)   아래 = 지금 값(조정 가능)
+     같은 지표를 위아래 같은 자리에 놓아 눈으로 바로 비교되게 한다 */
+  const movedKeys = new Set(
+    Object.keys(preferences).filter(k => {
+      const init = preferences_initial?.[k];
+      return init != null && Math.abs(Number(preferences[k]) - Number(init)) >= 0.005;
+    }));
+
+  /* 고정 블록 — disabled 이고 name 이 없으므로 저장에 안 잡힌다 */
+  const fixedSliders = Object.entries(preferences_initial || {}).map(([k, v]) => `
+    <div class="w-item${movedKeys.has(k) ? ' moved' : ''}">
       <div class="slider-row">
         <span class="s-lab">${esc(k)}</span>
-        <input type="range" name="${k}" min="1" max="5" step="1" value="${esc(v)}"
-               oninput="this.closest('.slider-row').querySelector('.s-val').textContent = this.value">
-        <span class="s-val">${esc(v)}</span>
+        <input type="range" class="w-bar" min="1" max="5" step="0.01"
+               value="${esc(round4(v))}" disabled>
+        <span class="w-init">${esc(round4(v))}</span>
+      </div>
+    </div>`).join('');
+
+  /* 변동 블록 — 실제로 저장되는 값 */
+  const sliders = Object.entries(preferences).map(([k, v]) => `
+    <div class="w-item${movedKeys.has(k) ? ' moved' : ''}">
+      <div class="slider-row">
+        <span class="s-lab">${esc(k)}</span>
+
+        <!-- 보여주기·대충 조절용. name 이 없으므로 저장 대상이 아니다 -->
+        <input type="range" class="w-bar" min="1" max="5" step="0.01" value="${esc(round4(v))}"
+               oninput="this.nextElementSibling.value = this.value">
+
+        <!-- 진짜 값. name 이 여기에만 있다 -->
+        <input type="number" class="w-num" name="${k}" min="1" max="5" step="any"
+               value="${esc(round4(v))}"
+               oninput="this.previousElementSibling.value = this.value">
       </div>
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
@@ -888,8 +929,12 @@ async function openMember(id) {
     </div>
     <div class="detail-body" id="member-form">
       ${card('기본 정보', `<div class="grid2">${basic}</div>`, '아이디와 가입일은 고칠 수 없다')}
-      ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
-             '추천 점수를 매기는 가중치다')}
+      ${Object.keys(preferences_initial || {}).length ? card(
+          '가입 시 희망 조건 <span class="hint">고정</span>',
+          `<div class="sliders fixed">${fixedSliders}</div>`,
+          '회원가입 때 받은 값이다. 여기서는 못 고친다') : ''}
+      ${card('현재 희망 조건 <span class="hint">1~5 · 조정 가능</span>', `<div class="sliders">${sliders}</div>`,
+             '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다')}
       ${card('페르소나 <span class="hint">9칸</span>', personas,
              '이 글을 고치면 벡터가 다시 만들어진다')}
       <div id="panel-preview"></div>
