@@ -308,13 +308,21 @@ def describe(axis: dict) -> list:
 
 
 def to_weights(axis: dict) -> dict:
-    """축 점수 -> 7개 지표 가중치(1~5). 지역 정렬에 쓴다."""
+    """축 점수 -> 7개 지표 가중치(1.0~5.0). 지역 정렬에 쓴다.
+
+    정수로 반올림하지 않는다 —
+    축 점수가 완만하게 정규화되어 있어(score_axes 참고) 가중치 차이가 보통
+    ±0.5 안쪽인데, round() 로 접으면 그 차이가 통째로 사라져 7개가 전부
+    3(=조건 없음)이 된다. "조용한 곳"을 고른 사용자에게 중구 명동이 추천되던
+    원인이었다. 받는 쪽(typespot.recommend, 엔진의 recommend_by_weights)은
+    둘 다 실수를 그대로 처리하므로 정수로 만들 이유가 없다
+    """
     w = {k: 3.0 for k in WEIGHT_KEYS}
     for a, eff in AXIS_TO_WEIGHT.items():
         s = axis.get(a, 0.0)
         for key, coef in eff.items():
             w[key] += s * coef
-    return {k: max(1, min(5, round(v))) for k, v in w.items()}
+    return {k: round(max(1.0, min(5.0, v)), 2) for k, v in w.items()}
 
 
 def profile(text: str) -> dict:
@@ -371,7 +379,7 @@ if __name__ == "__main__":
         print("  축   " + "  ".join(f"{a}:{s:+.2f}"
                                    for a, s in p["axisScores"].items()))
         print(f"  유형 {p['typeCode']}  {p['typeName']}"
-              f"{'  (부분)' if p['partial'] else ''}")
+              f"{'  (부분)' if len(p['filledAxes']) < 4 else ''}")
         if p["typeDesc"]:
             print(f"       {p['typeDesc']}")
         for line in p["lines"]:

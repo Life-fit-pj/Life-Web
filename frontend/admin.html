@@ -1,277 +1,1269 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>LIFE,FIT 관리자</title>
-  <style>
-    :root {
-      --ink:    #1c1b22;   /* 본문 글자 */
-      --muted:  #7c7a8a;   /* 흐린 글자 — 라벨, 부제 */
-      --line:   #e2e0e8;   /* 테두리 */
-      --bg:     #f6f5f8;   /* 화면 바탕 */
-      --card:   #ffffff;   /* 카드 배경 */
-      --accent: #4a44d6;   /* 강조 — 고른 행, 주요 버튼 */
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIFE,FIT 관리자</title>
+<style>
+/* ══ 테마 토큰 ══════════════════════════════════════════════
+   라이트 값을 :root 에 전부 적고, 다크는 바뀌는 값만 다시 정의한다.
+   똑같은 다크 블록을 두 번 적는 이유 —
+     ① @media (prefers-color-scheme) 는 크롬·윈도우의 설정을 따르고,
+     ② :root[data-theme="dark"] 는 화면 오른쪽 위 토글을 따른다.
+   토글이 항상 이겨야 하므로 ① 에 :not([data-theme="light"]) 를 걸어
+   "OS 는 다크인데 라이트를 골랐다" 는 경우에 토글이 지지 않게 한다.
 
-    body { font-family: sans-serif; margin: 0;
-           color: var(--ink); background: var(--bg); }
+   차트 색(--s1~--s3)은 UI 강조색(--accent)과 일부러 다른 계열이다.
+   강조색은 "누를 수 있는 것", 차트 색은 "무엇을 나타내는가" 라서
+   섞어 쓰면 버튼인지 데이터인지 눈이 헷갈린다.                    */
+:root {
+  color-scheme: light;
+  --bg:         #f5f5f3;
+  --surface:    #ffffff;
+  --surface-2:  #f2f2ef;
+  --ink:        #14141a;
+  --ink-2:      #52515b;
+  --muted:      #8a8892;
+  --line:       #e5e4e9;
+  --accent:     #4a44d6;
+  --accent-ink: #ffffff;
+  --accent-bg:  rgba(74,68,214,.09);
+  --good:       #0ca30c;
+  --warn:       #b07d05;
+  --bad:        #d03b3b;
+  --s1:         #2a78d6;   /* 차트 1번 — 파랑 */
+  --s2:         #eb6834;   /* 차트 2번 — 주황 */
+  --s3:         #1baf7a;   /* 차트 3번 — 청록 */
+  --grid:       #e6e5e0;
+  --axis:       #c9c8c2;
+  --shadow:     0 1px 2px rgba(11,11,11,.05), 0 10px 28px rgba(11,11,11,.045);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:         #0e0e11;
+    --surface:    #17171c;
+    --surface-2:  #1f1f26;
+    --ink:        #f4f4f7;
+    --ink-2:      #c2c1cb;
+    --muted:      #8d8c98;
+    --line:       #2a2a33;
+    --accent:     #8c86f7;
+    --accent-ink: #14141a;
+    --accent-bg:  rgba(140,134,247,.16);
+    --good:       #35c035;
+    --warn:       #fab219;
+    --bad:        #ef6b6b;
+    --s1:         #3987e5;
+    --s2:         #d95926;
+    --s3:         #199e70;
+    --grid:       #2b2b31;
+    --axis:       #3b3b43;
+    --shadow:     0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:         #0e0e11;
+  --surface:    #17171c;
+  --surface-2:  #1f1f26;
+  --ink:        #f4f4f7;
+  --ink-2:      #c2c1cb;
+  --muted:      #8d8c98;
+  --line:       #2a2a33;
+  --accent:     #8c86f7;
+  --accent-ink: #14141a;
+  --accent-bg:  rgba(140,134,247,.16);
+  --good:       #35c035;
+  --warn:       #fab219;
+  --bad:        #ef6b6b;
+  --s1:         #3987e5;
+  --s2:         #d95926;
+  --s3:         #199e70;
+  --grid:       #2b2b31;
+  --axis:       #3b3b43;
+  --shadow:     0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+}
 
-    .tabs { display: flex; gap: 8px; padding: 10px; }
-    .tab.on { font-weight: bold; text-decoration: underline; }
+/* ══ 기본 ══════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+  font-size: 14px; line-height: 1.5;
+  color: var(--ink); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+[hidden] { display: none !important; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
 
-    .shell { display: flex; height: calc(100vh - 50px); }
-    .shell[hidden] { display: none; }
+/* ══ 토큰 입력 화면 ═════════════════════════════════════════ */
+.gate { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+.gate-card {
+  width: min(380px, 100%); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 32px; box-shadow: var(--shadow); text-align: center;
+}
+.gate-card .brand { justify-content: center; margin-bottom: 20px; }
+.gate-card p { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+.gate-card input { text-align: center; margin-bottom: 10px; }
+.gate-card .btn { width: 100%; justify-content: center; }
+.gate-err { color: var(--bad); font-size: 12.5px; min-height: 18px; margin-top: 10px; }
 
-    .side { width: 260px; overflow-y: auto; padding: 8px;
-            border-right: 1px solid var(--line); background: var(--card); }
-    .row { padding: 8px 10px; cursor: pointer; border-radius: 8px; }
-    .row:hover { background: var(--bg); }
-    .row.on { background: var(--accent); color: #fff; font-weight: bold; }
+/* ══ 상단 바 ═══════════════════════════════════════════════ */
+.topbar {
+  height: 56px; display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -.02em; }
+.brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.brand small { font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.topbar .spacer { flex: 1; }
 
-    main { flex: 1; padding: 16px; overflow-y: auto; }
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 550;
+  background: var(--surface-2); color: var(--ink-2); white-space: nowrap;
+}
+.pill .led { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+.pill.ok   .led { background: var(--good); }
+.pill.warn .led { background: var(--warn); }
+.pill.bad  .led { background: var(--bad); }
+.pill.bad { color: var(--bad); }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-    .wide { grid-column: 1 / -1; }
+/* 테마 3단 스위치 — 시스템 / 라이트 / 다크 */
+.theme { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: 999px; }
+.theme button {
+  border: 0; background: none; cursor: pointer; border-radius: 999px;
+  padding: 4px 10px; font-size: 12px; color: var(--muted); line-height: 1.4;
+}
+.theme button[aria-pressed="true"] {
+  background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.14);
+}
 
-    .card { background: var(--card); border: 1px solid var(--line);
-            border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
-    .card-title { font-size: 13px; color: var(--muted);
-                  letter-spacing: .05em; margin-bottom: 12px; }
+/* ══ 버튼 · 폼 ═════════════════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font-size: 13px; font-weight: 550; transition: background .12s, border-color .12s;
+}
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.sm { padding: 5px 10px; font-size: 12.5px; }
 
-    #toast { position: fixed; right: 20px; bottom: 20px;
-             background: var(--ink); color: #fff;
-             padding: 12px 18px; border-radius: 8px; }
-    #toast[hidden] { display: none; }
-  </style>
+input[type=text], input[type=number], input[type=password], select, textarea {
+  width: 100%; padding: 8px 11px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  outline: none; transition: border-color .12s, background .12s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); background: var(--surface); }
+input:read-only { color: var(--muted); cursor: default; }
+textarea { resize: vertical; min-height: 92px; line-height: 1.6; }
+label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.err { color: var(--bad); font-size: 11.5px; margin-top: 4px; }
+
+/* ══ 뼈대 ══════════════════════════════════════════════════ */
+.layout { display: flex; height: calc(100vh - 56px); }
+.nav {
+  width: 210px; flex: none; padding: 14px 10px; background: var(--surface);
+  border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px;
+}
+.nav button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 11px; border: 0; border-radius: 10px; cursor: pointer;
+  background: none; color: var(--ink-2); font-size: 13.5px; font-weight: 550;
+}
+.nav button:hover { background: var(--surface-2); color: var(--ink); }
+.nav button.on { background: var(--accent-bg); color: var(--accent); }
+.nav svg { width: 17px; height: 17px; flex: none; }
+.nav .gap { flex: 1; }
+.nav .note { font-size: 11.5px; color: var(--muted); padding: 10px 11px; line-height: 1.5; }
+
+.view { flex: 1; overflow-y: auto; }
+.pane { padding: 22px 24px 44px; }
+.pane-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.pane-head h2 { font-size: 19px; }
+.pane-head .sub { color: var(--muted); font-size: 13px; }
+
+/* ══ 카드 ══════════════════════════════════════════════════ */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow);
+}
+.card + .card { margin-top: 16px; }
+.card-title {
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+  letter-spacing: .02em; margin-bottom: 14px;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.card-title .hint { font-weight: 400; font-size: 11.5px; }
+
+/* ══ 대시보드 ═══════════════════════════════════════════════ */
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px; box-shadow: var(--shadow); }
+.kpi .k-lab { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.kpi .k-val { font-size: 27px; font-weight: 680; letter-spacing: -.02em; line-height: 1.15; }
+.kpi .k-val small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+.kpi .k-sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+.dash { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dash .wide { grid-column: 1 / -1; }
+@media (min-width: 1500px) { .dash { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 980px)  { .dash { grid-template-columns: 1fr; } }
+
+/* ══ 차트 ══════════════════════════════════════════════════
+   가로 막대는 값을 늘 옆에 적으므로 따로 툴팁이 필요 없다.
+   면적 차트만 점마다 값을 적을 수 없어 십자선 + 툴팁을 붙였다. */
+.bars { display: grid; gap: 9px; }
+.bars { --lab-w: 84px; }
+.bar-row { display: grid; grid-template-columns: var(--lab-w) 1fr auto; align-items: center; gap: 10px; }
+.bar-lab { font-size: 12.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { height: 9px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.bar-track i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--s1); transition: width .35s ease; }
+.bar-val { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+
+.cols { display: flex; align-items: flex-end; gap: 8px; height: 176px; }
+.col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 6px; }
+.col i { display: block; width: 100%; max-width: 46px; background: var(--s1); border-radius: 4px 4px 0 0; transition: height .35s ease; }
+.col .c-val { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.col .c-lab { font-size: 11.5px; color: var(--muted); }
+
+.dash .card { display: flex; flex-direction: column; }
+.dash .card > .donut-wrap { flex: 1; }
+.donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.donut { width: 132px; height: 132px; flex: none; }
+.legend { display: grid; gap: 8px; flex: 1; min-width: 140px; max-width: 260px; }
+.legend div { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.legend .chip { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.legend .lg-lab { color: var(--ink-2); }
+.legend .lg-val { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.legend .lg-pct { color: var(--muted); font-size: 11.5px; width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.area-wrap { position: relative; }
+.area-wrap svg { width: 100%; height: auto; display: block; }
+.area-wrap .tip {
+  position: absolute; pointer-events: none; transform: translate(-50%, -130%);
+  background: var(--ink); color: var(--bg); font-size: 11.5px; font-weight: 550;
+  padding: 5px 9px; border-radius: 7px; white-space: nowrap;
+}
+.g-line { stroke: var(--grid); stroke-width: 1; }
+.g-axis { stroke: var(--axis); stroke-width: 1; }
+.g-txt  { fill: var(--muted); font-size: 11px; }
+
+/* ══ 목록 + 상세 (회원 · 행정동) ════════════════════════════ */
+.split { display: flex; height: 100%; }
+.side {
+  width: 282px; flex: none; display: flex; flex-direction: column;
+  border-right: 1px solid var(--line); background: var(--surface);
+}
+.side-top { padding: 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.side-count { font-size: 11.5px; color: var(--muted); padding: 0 2px; }
+.side-list { flex: 1; overflow-y: auto; padding: 8px; }
+.row {
+  padding: 8px 11px; border-radius: 10px; cursor: pointer; margin-bottom: 2px;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.row:hover { background: var(--surface-2); }
+.row.on { background: var(--accent); color: var(--accent-ink); }
+.row .r-main { font-size: 13.5px; font-weight: 550; }
+.row .r-sub { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+.row.on .r-sub { color: var(--accent-ink); opacity: .82; }
+.detail { flex: 1; overflow-y: auto; }
+
+.empty { display: grid; place-items: center; min-height: 100%; color: var(--muted); font-size: 13.5px; text-align: center; padding: 24px; }
+.empty .big { font-size: 15px; color: var(--ink-2); font-weight: 600; margin-bottom: 6px; }
+
+.detail-head {
+  position: sticky; top: 0; z-index: 10; background: var(--surface);
+  border-bottom: 1px solid var(--line); padding: 14px 22px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.detail-head h3 { font-size: 17px; }
+.detail-head .id { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.detail-head .acts { margin-left: auto; display: flex; gap: 7px; flex-wrap: wrap; }
+.detail-body { padding: 18px 22px 44px; }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 13px; }
+
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 24px; }
+.slider-row { display: grid; grid-template-columns: 44px 1fr 22px; align-items: center; gap: 10px; }
+.slider-row .s-lab { font-size: 13px; color: var(--ink-2); }
+.slider-row .s-val { font-size: 13px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); background: none; padding: 0; border: 0; }
+
+details.persona { border: 1px solid var(--line); border-radius: 11px; margin-bottom: 9px; background: var(--surface-2); }
+details.persona > summary {
+  cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 550;
+  display: flex; align-items: center; gap: 9px; list-style: none;
+}
+details.persona > summary::-webkit-details-marker { display: none; }
+details.persona > summary::before { content: "\25B8"; color: var(--muted); font-size: 11px; }
+details.persona[open] > summary::before { content: "\25BE"; }
+details.persona > summary .len { margin-left: auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+details.persona .body { padding: 0 14px 12px; }
+
+.metric { background: var(--surface-2); border-radius: 11px; padding: 12px 14px; }
+.metric .m-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.metric .m-name { font-size: 12.5px; font-weight: 600; }
+.metric .m-rank { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+.metric .meter { height: 5px; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: 9px; }
+.metric .meter i { display: block; height: 100%; background: var(--s1); border-radius: 0 3px 3px 0; }
+
+.rank { display: grid; gap: 7px; }
+.rank-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 8px 11px; background: var(--surface-2); border-radius: 9px; }
+.rank-row .no { width: 22px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-row .nm { font-weight: 550; }
+.rank-row .sc { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--line); color: var(--ink-2); }
+.tag.up   { background: rgba(12,163,12,.14);  color: var(--good); }
+.tag.down { background: rgba(208,59,59,.14);  color: var(--bad); }
+.tag.new  { background: var(--accent-bg);     color: var(--accent); }
+
+.sim { padding: 11px 13px; background: var(--surface-2); border-radius: 11px; margin-bottom: 8px; }
+.sim .s-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.sim .s-score { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.sim .s-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.two pre {
+  margin: 0; padding: 10px 12px; border-radius: 9px; white-space: pre-wrap;
+  word-break: break-all; font-size: 12px; line-height: 1.55; max-height: 150px;
+  overflow-y: auto; font-family: inherit;
+}
+pre.raw  { background: rgba(208,59,59,.09); }
+pre.safe { background: rgba(12,163,12,.10); }
+@media (max-width: 820px) { .two { grid-template-columns: 1fr; } }
+
+.logs { display: grid; gap: 8px; }
+.log { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 10px; font-size: 12.5px; flex-wrap: wrap; }
+.log .l-fields { color: var(--ink-2); font-size: 11.5px; }
+.log .l-when { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; font-size: 11.5px; }
+
+#toast {
+  position: fixed; right: 22px; bottom: 22px; z-index: 100;
+  background: var(--ink); color: var(--bg);
+  padding: 11px 17px; border-radius: 11px; font-size: 13px; font-weight: 550;
+  box-shadow: var(--shadow); animation: rise .18s ease;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+.skel { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+#system-pane { max-width: 1080px; }
+.log .l-val { margin-left: auto; color: var(--ink-2); }
+
+@media (max-width: 720px) {
+  .nav { width: 60px; }
+  .nav button span, .nav .note { display: none; }
+  .side { width: 200px; }
+}
+</style>
 </head>
 <body>
 
-  <div id="toast" hidden></div>
-
-  <!-- 4-3에서 여기에 탭·목록·폼 화면을 채운다 -->
-  <div class="tabs">
-
-  <!-- 4-3에서 여기에 탭·목록·폼 화면을 채운다 -->
-  <div class="tabs">
-    <button class="tab" data-tab="member" onclick="showTab('member')">회원</button>
-    <button class="tab" data-tab="region" onclick="showTab('region')">행정동</button>
+<!-- ══ 토큰 입력 ══ -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <div class="brand"><span class="dot"></span>LIFE,FIT <small>관리자</small></div>
+    <p>관리자 토큰을 입력하면 시작합니다.</p>
+    <input type="password" id="gate-token" placeholder="ADMIN_TOKEN" autocomplete="off">
+    <button class="btn primary" id="gate-go">들어가기</button>
+    <div class="gate-err" id="gate-err"></div>
   </div>
+</div>
 
-  <div class="shell" id="view-member">
-    <aside class="side">
-      <input id="member-search" placeholder="이름 검색" oninput="filterMembers()">
-      <div id="member-rows"></div>
-    </aside>
-    <main id="member-board">
-      <div class="empty">회원을 선택하세요</div>
-    </main>
+<!-- ══ 본 화면 ══ -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span>LIFE,FIT <small>관리자</small></div>
+    <div class="spacer"></div>
+    <span class="pill" id="status"><span class="led"></span>확인 중…</span>
+    <div class="theme" id="theme" role="group" aria-label="화면 테마">
+      <button data-theme-set="system" aria-pressed="false">시스템</button>
+      <button data-theme-set="light"  aria-pressed="false">라이트</button>
+      <button data-theme-set="dark"   aria-pressed="false">다크</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="nav" id="nav">
+      <button data-view="dash" class="on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>대시보드</span>
+      </button>
+      <button data-view="member">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>
+        <span>회원</span>
+      </button>
+      <button data-view="region">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        <span>행정동</span>
+      </button>
+      <button data-view="system">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+        <span>시스템</span>
+      </button>
+      <div class="gap"></div>
+      <div class="note">수정은 DB · 벡터 · 캐시 세 곳에 한 번에 반영된다.</div>
+    </nav>
+
+    <!-- 대시보드 -->
+    <section class="view" id="view-dash">
+      <div class="pane">
+        <div class="pane-head">
+          <h2>한눈에 보기</h2>
+          <span class="sub" id="dash-sub">불러오는 중…</span>
+          <span style="margin-left:auto"><button class="btn sm" id="dash-reload">새로고침</button></span>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="dash" id="dash"></div>
+      </div>
+    </section>
+
+    <!-- 회원 -->
+    <section class="view" id="view-member" hidden>
+      <div class="split">
+        <aside class="side">
+          <div class="side-top">
+            <input type="text" id="member-search" placeholder="이름 · 아이디 검색">
+            <div class="side-count" id="member-count"></div>
+          </div>
+          <div class="side-list" id="member-rows"></div>
+        </aside>
+        <div class="detail" id="member-detail">
+          <div class="empty"><div>
+            <div class="big">회원을 고르세요</div>
+            기본정보 · 희망조건 · 페르소나를 한 화면에서 고칩니다
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 행정동 -->
+    <section class="view" id="view-region" hidden>
+      <div class="split">
+        <aside class="side">
+          <div class="side-top">
+            <select id="region-gu"><option value="">자치구 전체</option></select>
+            <input type="text" id="region-search" placeholder="동 이름 검색">
+            <div class="side-count" id="region-count"></div>
+          </div>
+          <div class="side-list" id="region-rows"></div>
+        </aside>
+        <div class="detail" id="region-detail"></div>
+      </div>
+    </section>
+
+    <!-- 시스템 -->
+    <section class="view" id="view-system" hidden>
+      <div class="pane" id="system-pane"></div>
+    </section>
   </div>
+</div>
 
-  <div class="shell" id="view-region" hidden>
-    <aside class="side">
-      <input id="region-search" placeholder="동 이름 검색" oninput="filterRegions()">
-      <div id="region-rows"></div>
-    </aside>
-    <main id="region-board">
-      <div class="empty">행정동을 선택하세요</div>
-    </main>
-  </div>
+<div id="toast" hidden></div>
 
-  <script>
-    const API_BASE = '/api/admin';
+<script>
+/* ═══════════════════════════════════════════════════════════
+   0. 공통 — 통신 · 토스트 · 문자열
+   ═══════════════════════════════════════════════════════════ */
+const API = '/api/admin';
+let TOKEN = localStorage.getItem('adminToken') || '';
 
-    // 토큰은 한 번 물어보고 localStorage 에 저장해 다음부터는 안 물어본다
-    let TOKEN = localStorage.getItem('adminToken') || prompt('관리자 토큰을 입력하세요') || '';
-    if (TOKEN) localStorage.setItem('adminToken', TOKEN);
+const $  = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
-    // 모든 요청이 이 함수를 지난다. 6단계에서 토큰을 붙일 때도 여기 한 줄만 고치면 된다
-    const api = async (path, options = {}) => {
-      const res = await fetch(API_BASE + path, {
-        ...options,
-        headers: { 'Authorization': 'Bearer ' + TOKEN, ...options.headers },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    };
+/* HTML 로 해석될 글자를 막는다 — 회원 이름·페르소나가 그대로 화면에 들어간다 */
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+));
 
-    // HTML 로 해석될 글자를 막는다
-    const esc = s => (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+/* 모든 요청이 이 함수를 지난다. 401 이면 토큰이 틀린 것이므로 입력 화면으로 되돌린다 */
+async function api(path, options = {}) {
+  const res = await fetch(API + path, {
+    ...options,
+    headers: { Authorization: 'Bearer ' + TOKEN, ...options.headers },
+  });
+  if (res.status === 401) { lock('토큰이 맞지 않습니다'); throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 
-    function toast(message) {
-      const el = document.getElementById('toast');
-      el.textContent = message;
-      el.hidden = false;
-      setTimeout(() => { el.hidden = true; }, 1800);
-    }
+let toastTimer = null;
+function toast(message) {
+  const el = $('#toast');
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
 
-    function field(label, name, value, {type = 'input', options = null, wide = false} = {}) {
-      const box = options
-        ? `<select name="${name}">${options.map(o =>
-            `<option ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`
-        : type === 'textarea'
-          ? `<textarea name="${name}">${esc(value ?? '')}</textarea>`
-          : `<input name="${name}" value="${esc(String(value ?? ''))}"
-               ${type === 'number' ? 'type="number" min="0"' : ''}>`;
-      return `<div class="${wide ? 'wide' : ''}">
-        <label>${label}</label>${box}<div class="err" data-err="${name}"></div></div>`;
-    }
+const num = n => Number(n ?? 0).toLocaleString('ko-KR');
 
-    let membersLoaded = false;
-    let regionsLoaded = false;
+/* ═══════════════════════════════════════════════════════════
+   1. 테마 — 시스템 / 라이트 / 다크
+   고른 값만 저장한다. 'system' 이면 data-theme 를 아예 지워서
+   CSS 의 @media (prefers-color-scheme) 가 그대로 먹게 둔다.
+   ═══════════════════════════════════════════════════════════ */
+function applyTheme(mode) {
+  if (mode === 'system') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = mode;
+  localStorage.setItem('adminTheme', mode);
+  $$('#theme button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.themeSet === mode)));
+}
+applyTheme(localStorage.getItem('adminTheme') || 'system');
+$('#theme').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (btn) applyTheme(btn.dataset.themeSet);
+});
 
-    function showTab(name) {
-      document.getElementById('view-member').hidden = name !== 'member';
-      document.getElementById('view-region').hidden = name !== 'region';
-      document.querySelectorAll('.tab').forEach(t =>
-        t.classList.toggle('on', t.dataset.tab === name));
+/* ═══════════════════════════════════════════════════════════
+   2. 차트 — 바깥 라이브러리 없이 HTML·SVG 로 그린다
+   전부 [{label, value}] 한 가지 모양만 받는다.
+   ═══════════════════════════════════════════════════════════ */
+const SERIES = ['var(--s1)', 'var(--s2)', 'var(--s3)'];
 
-      if (name === 'member' && !membersLoaded) loadMembers();
-      if (name === 'region' && !regionsLoaded) loadRegions();
-    }
+/* 가로 막대 — 값이 늘 오른쪽에 붙으므로 축이 없어도 읽힌다 */
+function bars(data, { color = 'var(--s1)', fmt = num, max = null, labelWidth = null } = {}) {
+  if (!data.length) return '<div class="skel">자료 없음</div>';
+  const top = max ?? Math.max(...data.map(d => d.value), 1);
+  return `<div class="bars" ${labelWidth ? `style="--lab-w:${labelWidth}"` : ''}>` + data.map(d => `
+    <div class="bar-row">
+      <span class="bar-lab" title="${esc(d.label)}">${esc(d.label)}</span>
+      <span class="bar-track"><i style="width:${(d.value / top * 100).toFixed(1)}%;background:${color}"></i></span>
+      <span class="bar-val">${fmt(d.value)}</span>
+    </div>`).join('') + '</div>';
+}
 
-    // 회원목록
-    let members = [];
-    let currentMember = null;      // 지금 고른 회원의 customer_id. 아직 없으면 null
+/* 세로 막대 — 항목이 적고 순서가 있는 것(연령대)에 쓴다 */
+function cols(data, { color = 'var(--s1)' } = {}) {
+  if (!data.length) return '<div class="skel">자료 없음</div>';
+  const top = Math.max(...data.map(d => d.value), 1);
+  return '<div class="cols">' + data.map(d => `
+    <div class="col">
+      <span class="c-val">${num(d.value)}</span>
+      <i style="height:${Math.max(d.value / top * 100, 2)}%;background:${color}"></i>
+      <span class="c-lab">${esc(d.label)}</span>
+    </div>`).join('') + '</div>';
+}
 
-    async function loadMembers() {
-      members = await api('/members');
-      membersLoaded = true;
-      renderMemberRows(members);
-    }
+/* 도넛 — 조각마다 값과 비율을 범례에 적는다(색만으로 구분하지 않게) */
+function donut(data) {
+  const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const R = 52, C = 2 * Math.PI * R;
+  let at = 0;
+  const arcs = data.map((d, i) => {
+    const len = d.value / total * C;
+    const seg = `<circle cx="66" cy="66" r="${R}" fill="none"
+        stroke="${SERIES[i % SERIES.length]}" stroke-width="17"
+        stroke-dasharray="${Math.max(len - 2, 0.5)} ${C - Math.max(len - 2, 0.5)}"
+        stroke-dashoffset="${-at}" transform="rotate(-90 66 66)"/>`;
+    at += len;
+    return seg;
+  }).join('');
 
-    function renderMemberRows(list) {
-      document.getElementById('member-rows').innerHTML = list.map(m => `
-        <div class="row ${m.customer_id === currentMember ? 'on' : ''}"
-             data-id="${m.customer_id}"
-             onclick="openMember('${m.customer_id}')">
-          ${esc(m.customer_id)} ${esc(m.name)}
-        </div>`).join('');
-    }
+  const legend = data.map((d, i) => `
+    <div>
+      <span class="chip" style="background:${SERIES[i % SERIES.length]}"></span>
+      <span class="lg-lab">${esc(d.label)}</span>
+      <span class="lg-val">${num(d.value)}</span>
+      <span class="lg-pct">${(d.value / total * 100).toFixed(0)}%</span>
+    </div>`).join('');
 
-    // 지금 화면에 떠 있는 행들 중, 고른 것에만 'on' 을 붙이고 나머지는 뗀다.
-    // 목록을 다시 그리지 않으므로 검색으로 걸러 놓은 상태가 유지된다
-    function markCurrentRow() {
-      document.querySelectorAll('#member-rows .row').forEach(el => {
-        el.classList.toggle('on', el.dataset.id === currentMember);
-      });
-    }
+  return `<div class="donut-wrap">
+    <svg class="donut" viewBox="0 0 132 132">${arcs}
+      <text x="66" y="63" text-anchor="middle" fill="var(--ink)" font-size="21" font-weight="680">${num(total)}</text>
+      <text x="66" y="79" text-anchor="middle" fill="var(--muted)" font-size="10.5">합계</text>
+    </svg>
+    <div class="legend">${legend}</div>
+  </div>`;
+}
 
-    function filterMembers() {
-      const q = document.getElementById('member-search').value.trim();
-      renderMemberRows(members.filter(m => (m.name + m.customer_id).includes(q)));
-    }
+/* 면적 차트 — 점마다 값을 적을 수 없으므로 십자선 + 툴팁을 붙인다 */
+function area(data, { color = 'var(--s1)' } = {}) {
+  if (!data.length) return '<div class="skel">자료 없음</div>';
+  const W = 1000, H = 240, L = 36, R = 12, T = 14, B = 26;
+  const top = Math.max(...data.map(d => d.value), 1);
+  const step = (W - L - R) / Math.max(data.length - 1, 1);
+  const x = i => L + i * step;
+  const y = v => T + (H - T - B) * (1 - v / top);
 
-    // 회원 한 명 상세
-    async function openMember(id) {
-      currentMember = id;
-      markCurrentRow();              // ← 다시 그리지 않고 표시만 옮긴다
+  const line = data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`).join(' ');
+  const fill = `${line} L${x(data.length - 1).toFixed(1)},${y(0)} L${x(0)},${y(0)} Z`;
 
-      const data = await api('/members/' + id);
-      const { customer, preferences, persona } = data;
+  /* 가로 눈금 3줄이면 크기를 가늠하기에 충분하다. 더 그으면 데이터가 안 보인다 */
+  const grid = [0, .5, 1].map(f => {
+    const gy = y(top * f).toFixed(1);
+    return `<line class="g-line" x1="${L}" y1="${gy}" x2="${W - R}" y2="${gy}"/>
+            <text class="g-txt" x="${L - 7}" y="${+gy + 3.5}" text-anchor="end">${Math.round(top * f)}</text>`;
+  }).join('');
 
-      const customerFields = Object.entries(customer)
-        .filter(([k]) => k !== 'customer_id')
-        .map(([k, v]) => field(k, k, v)).join('');
+  /* x 라벨은 6개쯤만 — 다 적으면 겹친다 */
+  const every = Math.max(1, Math.ceil(data.length / 6));
+  const ticks = data.map((d, i) => {
+    if (i % every !== 0 && i !== data.length - 1) return '';
+    /* 양 끝은 가운데 정렬하면 그림 밖으로 나가 잘린다 */
+    const anchor = i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle';
+    return `<text class="g-txt" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="${anchor}">${esc(d.label)}</text>`;
+  }).join('');
 
-      const prefFields = Object.entries(preferences)
-        .map(([k, v]) => field(k, k, v, { type: 'number' })).join('');
+  const dots = data.map((d, i) =>
+    `<circle class="hit" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(d.value).toFixed(1)}" r="11" fill="transparent"/>`
+  ).join('');
 
-      const personaFields = Object.entries(persona)
-        .map(([k, v]) => field(k, k, v, { type: 'textarea', wide: true })).join('');
+  return `<div class="area-wrap" data-chart="area">
+    <svg viewBox="0 0 ${W} ${H}">
+      ${grid}
+      <path d="${fill}" fill="${color}" opacity=".13"/>
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <line class="cross" x1="0" y1="${T}" x2="0" y2="${H - B}" stroke="var(--axis)" stroke-width="1" opacity="0"/>
+      <circle class="knob" r="4.5" fill="${color}" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+      <line class="g-axis" x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}"/>
+      ${ticks}
+      ${dots}
+    </svg>
+    <div class="tip" hidden></div>
+  </div>`;
+}
 
-      document.getElementById('member-board').innerHTML = `
-        <h3>${esc(customer.customer_id)} ${esc(customer.name)}</h3>
+/* 면적 차트의 툴팁 배선 — 그린 뒤에 한 번 부른다 */
+function wireArea(root, data, unit = '명') {
+  const wrap = $('[data-chart="area"]', root);
+  if (!wrap) return;
+  const svg = $('svg', wrap), tip = $('.tip', wrap);
+  const cross = $('.cross', svg), knob = $('.knob', svg);
 
-        <div class="card">
-          <div class="card-title">기본 정보</div>
-          <div class="grid">${customerFields}</div>
+  svg.addEventListener('mousemove', e => {
+    const hit = e.target.closest('.hit');
+    if (!hit) return;
+    const i = +hit.dataset.i;
+    const cx = +hit.getAttribute('cx'), cy = +hit.getAttribute('cy');
+    cross.setAttribute('x1', cx); cross.setAttribute('x2', cx);
+    cross.setAttribute('opacity', '.7');
+    knob.setAttribute('cx', cx); knob.setAttribute('cy', cy);
+    knob.setAttribute('opacity', '1');
+
+    /* SVG 좌표를 화면 좌표로 바꾼다 — viewBox 라 배율이 1이 아니다 */
+    const box = svg.getBoundingClientRect();
+    const scale = box.width / svg.viewBox.baseVal.width;
+    tip.hidden = false;
+    tip.style.left = (cx * scale) + 'px';
+    tip.style.top  = (cy * scale) + 'px';
+    tip.textContent = `${data[i].label} · ${num(data[i].value)}${unit}`;
+  });
+  svg.addEventListener('mouseleave', () => {
+    tip.hidden = true;
+    cross.setAttribute('opacity', '0');
+    knob.setAttribute('opacity', '0');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. 화면 전환
+   ═══════════════════════════════════════════════════════════ */
+const VIEWS = ['dash', 'member', 'region', 'system'];
+let loaded = {};
+
+function showView(name) {
+  VIEWS.forEach(v => { $('#view-' + v).hidden = v !== name; });
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === name));
+
+  if (name === 'dash'   && !loaded.dash)   loadDashboard();
+  if (name === 'member' && !loaded.member) loadMembers();
+  if (name === 'region' && !loaded.region) loadRegions();
+  if (name === 'system') loadSystem();     /* 상태·이력은 늘 최신을 본다 */
+}
+$('#nav').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-view]');
+  if (btn) showView(btn.dataset.view);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   4. 상단 상태 알약
+   ═══════════════════════════════════════════════════════════ */
+let WRITE_ENABLED = true;
+
+function paintStatus(s) {
+  const box = $('#status');
+  if (!s || !s.ok) {
+    box.className = 'pill bad';
+    box.innerHTML = '<span class="led"></span>' + esc(s?.error || '서버에 연결할 수 없음');
+    return;
+  }
+  WRITE_ENABLED = s.write_enabled !== false;
+  box.className = WRITE_ENABLED ? 'pill ok' : 'pill warn';
+  box.innerHTML = '<span class="led"></span>' +
+    `회원 ${num(s.members)} · 행정동 ${num(s.regions)} · 캐시 ${s.cache_warm ? '있음' : '비어 있음'}` +
+    (WRITE_ENABLED ? '' : ' · 쓰기 잠김');
+}
+
+async function refreshStatus() {
+  try { paintStatus(await api('/ready')); }
+  catch { paintStatus(null); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. 대시보드
+   ═══════════════════════════════════════════════════════════ */
+async function loadDashboard() {
+  $('#dash').innerHTML = '<div class="skel">불러오는 중…</div>';
+  let d;
+  try { d = await api('/summary'); }
+  catch (e) { $('#dash').innerHTML = '<div class="card">집계를 불러오지 못했습니다.</div>'; return; }
+
+  loaded.dash = true;
+  paintStatus(d);
+  $('#dash-sub').textContent = new Date().toLocaleString('ko-KR') + ' 기준';
+
+  if (!d.ok) {
+    $('#kpis').innerHTML = '';
+    $('#dash').innerHTML = `<div class="card wide">DB 를 읽지 못했습니다 — ${esc(d.error || '원인 불명')}</div>`;
+    return;
+  }
+
+  const c = d.counts, ch = d.charts;
+  const avgWeight = ch.weights.length
+    ? (ch.weights.reduce((s, w) => s + w.value, 0) / ch.weights.length).toFixed(2) : '-';
+
+  $('#kpis').innerHTML = [
+    kpi('회원', c.members, '명', '가입 기록이 있는 계정'),
+    kpi('행정동', c.regions, '개', `서울 ${c.gu}개 자치구`),
+    kpi('페르소나 청크', c.chunks, '개', `회원당 ${(c.chunks / (c.members || 1)).toFixed(1)}칸`),
+    kpi('평균 희망 가중치', avgWeight, '/5', '7개 지표 평균'),
+    kpi('관리자 수정', c.edits, '건', d.recent[0] ? when(d.recent[0].changed_at) + ' 최근' : '아직 없음'),
+  ].join('');
+
+  const top10 = ch.memberGu.slice(0, 10);
+  $('#dash').innerHTML = `
+    ${card('월별 가입 추이', area(ch.joins), '가입일이 있는 회원만 센다', 'wide')}
+    ${card('희망 조건 평균 <span class="hint">1~5</span>', bars(ch.weights, { max: 5, fmt: v => v.toFixed(2) }),
+           '회원들이 무엇을 더 중요하게 꼽았는지')}
+    ${card('연령대', cols(ch.ages), '10살 단위')}
+    ${card('성별', donut(ch.genders))}
+    ${card('희망 거래형태', donut(ch.dealType))}
+    ${card('회원이 사는 자치구 <span class="hint">상위 10</span>', bars(top10, { color: 'var(--s3)' }),
+           `25개 구 중 ${ch.memberGu.length}개 구에 회원이 있다`)}
+    ${card('최근 수정', logList(d.recent), '무엇을 고쳤는지 칸 이름까지 남는다')}
+  `;
+  wireArea($('#dash'), ch.joins);
+}
+
+function kpi(label, value, unit, sub) {
+  return `<div class="kpi">
+    <div class="k-lab">${label}</div>
+    <div class="k-val">${typeof value === 'number' ? num(value) : esc(value)}<small>${unit}</small></div>
+    <div class="k-sub">${esc(sub)}</div>
+  </div>`;
+}
+
+function card(title, body, hint = '', cls = '') {
+  return `<div class="card ${cls}">
+    <div class="card-title">${title}${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</div>
+    ${body}
+  </div>`;
+}
+
+function when(iso) {
+  if (!iso) return '';
+  return String(iso).replace('T', ' ').slice(5, 16);
+}
+
+function logList(list) {
+  if (!list || !list.length) return '<div class="skel">아직 수정 기록이 없습니다</div>';
+  return '<div class="logs">' + list.map(l => `
+    <div class="log">
+      <span class="tag">${l.target === 'member' ? '회원' : '행정동'}</span>
+      <b>${esc(l.target_id)}</b>
+      <span class="l-fields">${esc(l.fields.join(', '))}${l.field_count > l.fields.length ? ` 외 ${l.field_count - l.fields.length}칸` : ''}</span>
+      <span class="l-when">${when(l.changed_at)}</span>
+    </div>`).join('') + '</div>';
+}
+
+$('#dash-reload').addEventListener('click', () => { loaded.dash = false; loadDashboard(); });
+
+/* ═══════════════════════════════════════════════════════════
+   6. 회원
+   ═══════════════════════════════════════════════════════════ */
+const CUSTOMER_LABELS = {
+  customer_id: '아이디', name: '이름', gender: '성별', age: '나이', phone: '전화번호', email: '이메일',
+  city: '거주 자치구', city_dong: '거주 행정동',
+  work_city: '직장 자치구', work_dong: '직장 행정동', joined_at: '가입일',
+};
+const PERSONA_LABELS = {
+  persona: '총괄 요약', professional_persona: '직업', sports_persona: '운동',
+  arts_persona: '예술 · 취미', travel_persona: '여행', culinary_persona: '음식',
+  family_persona: '가족', cultural_background: '문화 배경',
+  career_goals_and_ambitions: '커리어 목표',
+};
+/* 서버의 화이트리스트(CUSTOMER_FIELDS)에 없는 칸은 보내 봐야 조용히 버려진다.
+   읽기 전용으로 그려서 "고칠 수 있는 것처럼" 보이지 않게 한다 */
+const READONLY = ['customer_id', 'joined_at'];
+
+let members = [];
+let currentMember = null;
+let initial = {};          /* 화면에 처음 실린 값 — 저장할 때 바뀐 칸만 골라내는 기준 */
+
+async function loadMembers() {
+  members = await api('/members');
+  loaded.member = true;
+  renderMemberRows(members);
+}
+
+function renderMemberRows(list) {
+  $('#member-count').textContent = `${list.length}명${list.length !== members.length ? ` / 전체 ${members.length}명` : ''}`;
+  $('#member-rows').innerHTML = list.map(m => `
+    <div class="row ${m.customer_id === currentMember ? 'on' : ''}" data-id="${esc(m.customer_id)}">
+      <span class="r-main">${esc(m.name)}</span>
+      <span class="r-sub">${esc(m.customer_id)} · ${esc(m.city || '')}</span>
+    </div>`).join('') || '<div class="skel">찾는 회원이 없습니다</div>';
+}
+
+/* 목록을 다시 그리지 않고 표시만 옮긴다 — 검색으로 걸러 둔 상태가 유지된다 */
+function markMemberRow() {
+  $$('#member-rows .row').forEach(el => el.classList.toggle('on', el.dataset.id === currentMember));
+}
+
+$('#member-search').addEventListener('input', e => {
+  const q = e.target.value.trim();
+  renderMemberRows(members.filter(m => (m.name + m.customer_id).includes(q)));
+});
+$('#member-rows').addEventListener('click', e => {
+  const row = e.target.closest('.row');
+  if (row) openMember(row.dataset.id);
+});
+
+async function openMember(id) {
+  currentMember = id;
+  markMemberRow();
+  const board = $('#member-detail');
+  board.innerHTML = '<div class="empty">불러오는 중…</div>';
+
+  const { customer, preferences, persona } = await api('/members/' + id);
+  initial = { ...customer, ...preferences, ...persona };
+
+  const basic = Object.entries(customer).map(([k, v]) => `
+    <div>
+      <label class="lab" for="f-${k}">${esc(CUSTOMER_LABELS[k] || k)}</label>
+      ${k === 'gender'
+        ? `<select id="f-${k}" name="${k}">${['M', 'F'].map(g =>
+            `<option value="${g}" ${g === v ? 'selected' : ''}>${g === 'M' ? '남성' : '여성'}</option>`).join('')}</select>`
+        : `<input id="f-${k}" name="${k}" type="${k === 'age' ? 'number' : 'text'}"
+             value="${esc(v)}" ${READONLY.includes(k) ? 'readonly' : ''}>`}
+      <div class="err" data-err="${k}"></div>
+    </div>`).join('');
+
+  const sliders = Object.entries(preferences).map(([k, v]) => `
+    <div>
+      <div class="slider-row">
+        <span class="s-lab">${esc(k)}</span>
+        <input type="range" name="${k}" min="1" max="5" step="1" value="${esc(v)}"
+               oninput="this.closest('.slider-row').querySelector('.s-val').textContent = this.value">
+        <span class="s-val">${esc(v)}</span>
+      </div>
+      <div class="err" data-err="${k}"></div>
+    </div>`).join('');
+
+  const personas = Object.entries(persona).map(([k, v]) => `
+    <details class="persona">
+      <summary>${esc(PERSONA_LABELS[k] || k)}<span class="len">${String(v ?? '').length}자</span></summary>
+      <div class="body"><textarea name="${k}">${esc(v)}</textarea>
+        <div class="err" data-err="${k}"></div></div>
+    </details>`).join('');
+
+  board.innerHTML = `
+    <div class="detail-head">
+      <h3>${esc(customer.name)}</h3>
+      <span class="id">${esc(customer.customer_id)}</span>
+      <div class="acts">
+        <button class="btn sm" data-act="preview">추천 돌려보기</button>
+        <button class="btn sm" data-act="similar">비슷한 회원</button>
+        <button class="btn sm" data-act="privacy">개인정보 점검</button>
+        <button class="btn sm primary" data-act="save" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>저장</button>
+      </div>
+    </div>
+    <div class="detail-body" id="member-form">
+      ${card('기본 정보', `<div class="grid2">${basic}</div>`, '아이디와 가입일은 고칠 수 없다')}
+      ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
+             '추천 점수를 매기는 가중치다')}
+      ${card('페르소나 <span class="hint">9칸</span>', personas,
+             '이 글을 고치면 벡터가 다시 만들어진다')}
+      <div id="panel-preview"></div>
+      <div id="panel-similar"></div>
+      <div id="panel-privacy"></div>
+    </div>`;
+
+  $('.acts', board).addEventListener('click', e => {
+    const act = e.target.closest('button')?.dataset.act;
+    if (act === 'save')    saveMember(id);
+    if (act === 'preview') previewMember(id);
+    if (act === 'similar') showSimilar(id);
+    if (act === 'privacy') showPrivacy(id);
+  });
+}
+
+/* 처음 값과 달라진 칸만 모은다.
+   전부 보내면 페르소나를 안 고쳤어도 벡터를 900번 다시 만들고,
+   수정 이력에도 "26칸 고침" 이 남아 무엇을 바꿨는지 알 수 없게 된다 */
+function collectPatch() {
+  const patch = {};
+  $$('#member-form [name]').forEach(el => {
+    if (el.readOnly) return;
+    const value = el.type === 'range' || el.type === 'number' ? Number(el.value) : el.value;
+    if (String(value) !== String(initial[el.name] ?? '')) patch[el.name] = value;
+  });
+  return patch;
+}
+
+const clearErrors = () => $$('[data-err]').forEach(el => { el.textContent = ''; });
+
+function showErrors(e) {
+  let detail;
+  try { detail = JSON.parse(e.message).detail; }
+  catch { return toast('저장 실패: ' + e.message); }        /* detail 이 문자열인 경우 */
+  if (typeof detail !== 'object') return toast('저장 실패: ' + detail);
+  for (const [name, message] of Object.entries(detail)) {
+    const box = $(`[data-err="${name}"]`);
+    if (box) box.textContent = message;
+  }
+  toast('값이 올바르지 않습니다');
+}
+
+const INDICATORS = ['녹지', '안전', '교통', '상권', '의료', '교육', '문화'];
+
+async function saveMember(id) {
+  const patch = collectPatch();
+  const changed = Object.keys(patch);
+  if (!changed.length) return toast('바뀐 값이 없습니다');
+
+  /* 가중치를 건드렸을 때만 순위 비교가 의미 있다 — 아니면 두 번 계산할 이유가 없다 */
+  const weightsTouched = changed.some(k => INDICATORS.includes(k));
+  const before = weightsTouched ? await api(`/members/${id}/preview`) : null;
+
+  clearErrors();
+  try {
+    await api('/members/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+  } catch (e) {
+    return showErrors(e);          /* 저장이 실패했으면 아래를 하면 안 된다 */
+  }
+
+  const after = weightsTouched ? await api(`/members/${id}/preview`) : null;
+
+  members = await api('/members');
+  renderMemberRows(members);
+  await openMember(id);            /* 판을 다 그릴 때까지 기다린 다음에 */
+  if (before) renderDiff(before, after);   /* 결과를 얹어야 안 지워진다 */
+  loaded.dash = false;             /* 대시보드 숫자가 낡았다 */
+  refreshStatus();
+  toast(`저장했습니다 · ${changed.length}칸`);
+}
+
+async function previewMember(id) {
+  const box = $('#panel-preview');
+  box.innerHTML = card('이 회원 조건으로 뽑은 추천', '<div class="skel">계산 중…</div>');
+  const regions = await api(`/members/${id}/preview`);
+  box.innerHTML = card('이 회원 조건으로 뽑은 추천 <span class="hint">TOP 5</span>',
+    '<div class="rank">' + regions.map((r, i) => `
+      <div class="rank-row"><span class="no">${i + 1}</span>
+        <span class="nm">${esc(r.name)}</span>
+        <span class="sc">${r.total}점</span></div>`).join('') + '</div>',
+    '지금 저장된 가중치 기준');
+}
+
+/* 저장 전후 순위를 나란히 놓는다. 화살표가 곧 "내 수정이 무엇을 바꿨나" 다 */
+function renderDiff(before, after) {
+  const names = before.map(r => r.name);
+  const rows = after.map((r, i) => {
+    const was = names.indexOf(r.name);
+    const tag = was === -1 ? '<span class="tag new">NEW</span>'
+      : was === i ? '<span class="tag">—</span>'
+      : was > i ? `<span class="tag up">▲${was - i}</span>`
+      : `<span class="tag down">▼${i - was}</span>`;
+    return `<div class="rank-row"><span class="no">${i + 1}</span>
+      <span class="nm">${esc(r.name)}</span>${tag}
+      <span class="sc">${r.total}점</span></div>`;
+  }).join('');
+  $('#panel-preview').innerHTML =
+    card('저장 전 → 후 순위 변화', `<div class="rank">${rows}</div>`, '가중치를 고쳤을 때만 나온다');
+}
+
+async function showSimilar(id) {
+  const box = $('#panel-similar');
+  box.innerHTML = card('페르소나가 비슷한 회원', '<div class="skel">벡터에서 찾는 중…</div>');
+  const list = await api(`/members/${id}/similar`);
+  box.innerHTML = card('페르소나가 비슷한 회원',
+    list.length ? list.map(s => {
+      const found = members.find(m => m.customer_id === s.customer_id);
+      return `<div class="sim">
+        <div class="s-top">
+          <b>${esc(found ? found.name : s.customer_id)}</b>
+          <span class="id" style="color:var(--muted);font-size:11.5px">${esc(s.customer_id)} · ${esc(s.category)}</span>
+          <span class="s-score">${s.score}</span>
         </div>
+        <div class="s-text">${esc(s.text)}</div>
+      </div>`;
+    }).join('') : '<div class="skel">비슷한 회원을 찾지 못했습니다</div>',
+    '신규 회원의 7지표를 물려받을 이웃들');
+}
 
-        <div class="card">
-          <div class="card-title">희망 조건 (가중치 1~5)</div>
-          <div class="grid">${prefFields}</div>
-        </div>
+async function showPrivacy(id) {
+  const box = $('#panel-privacy');
+  box.innerHTML = card('개인정보 점검', '<div class="skel">확인 중…</div>');
+  const data = await api(`/members/${id}/privacy`);
 
-        <div class="card">
-          <div class="card-title">페르소나 — 이 글을 고치면 벡터가 다시 만들어진다</div>
-          <div class="grid">${personaFields}</div>
-        </div>
+  const rows = Object.keys(data.raw).map(name => {
+    const same = data.raw[name] === data.masked[name];
+    return `<div style="margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:6px">
+        ${esc(PERSONA_LABELS[name] || name)}
+        ${same ? '<span class="hint">안 가려짐</span>' : ''}
+      </div>
+      <div class="two">
+        <pre class="raw">${esc(data.raw[name])}</pre>
+        <pre class="${same ? 'raw' : 'safe'}">${esc(data.masked[name])}</pre>
+      </div>
+    </div>`;
+  }).join('');
 
-        <button onclick="saveMember('${customer.customer_id}')">저장</button>
-      `;
-    }
+  box.innerHTML = card(`개인정보 점검 <span class="hint">9칸 중 ${data.changed}칸이 가려짐</span>`,
+    `<div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+       왼쪽이 우리 DB, 오른쪽이 밖으로 나갈 글입니다.
+       <b>안 가려진 칸에 개인정보가 남아 있는지</b>를 보는 게 목적입니다.
+     </div>${rows}`);
+}
 
-    async function saveMember(id) {
-      const inputs = document.querySelectorAll('#member-board input, #member-board textarea');
-      const patch = {};
-      inputs.forEach(el => {
-        patch[el.name] = el.type === 'number' ? Number(el.value) : el.value;
-      });
+/* ═══════════════════════════════════════════════════════════
+   7. 행정동
+   ═══════════════════════════════════════════════════════════ */
+let regions = [];
+let currentRegion = null;
 
-      await api('/members/' + id, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
+/* 3.5615613876428966 같은 원값을 그대로 보여 주면 읽기도 고치기도 어렵다.
+   소수점 4자리까지만 보여 주고, "바뀌었나" 판정도 이 값으로 한다 —
+   그래야 손대지 않은 칸이 반올림된 값으로 조용히 덮어써지지 않는다 */
+const round4 = v => (v === null || v === undefined || v === '')
+  ? '' : String(Math.round(Number(v) * 1e4) / 1e4);
 
-      members = await api('/members');     // 목록도 최신화 (이름 바뀐 걸 반영)
-      renderMemberRows(members);
-      openMember(id);                      // 저장된 값으로 폼 다시 채움
-      toast('저장했다');            // 수정
-    }
+async function loadRegions() {
+  regions = await api('/regions');
+  loaded.region = true;
 
+  const gus = [...new Set(regions.map(r => r['구']))].sort();
+  $('#region-gu').innerHTML = '<option value="">자치구 전체</option>' +
+    gus.map(g => `<option>${esc(g)}</option>`).join('');
 
-    // 행정동
-    let regions = [];
+  renderRegionRows(regions);
+  showRegionEmpty();
+}
 
-    async function loadRegions() {
-      regions = await api('/regions');
-      regionsLoaded = true;
-      renderRegionRows(regions);
-    }
+function renderRegionRows(list) {
+  $('#region-count').textContent = `${list.length}개${list.length !== regions.length ? ` / 전체 ${regions.length}개` : ''}`;
+  $('#region-rows').innerHTML = list.map(r => `
+    <div class="row ${currentRegion === r['구'] + r['행정동명'] ? 'on' : ''}"
+         data-gu="${esc(r['구'])}" data-dong="${esc(r['행정동명'])}">
+      <span class="r-main">${esc(r['행정동명'])}</span>
+      <span class="r-sub">${esc(r['구'])}</span>
+    </div>`).join('') || '<div class="skel">찾는 행정동이 없습니다</div>';
+}
 
-    function renderRegionRows(list) {
-      document.getElementById('region-rows').innerHTML = list.map(r => `
-        <div class="row" onclick="openRegion('${r.구}', '${r.행정동명}')">
-          ${esc(r.구)} ${esc(r.행정동명)}
-        </div>`).join('');
-    }
+function filterRegions() {
+  const gu = $('#region-gu').value;
+  const q = $('#region-search').value.trim();
+  renderRegionRows(regions.filter(r =>
+    (!gu || r['구'] === gu) && (r['구'] + r['행정동명']).includes(q)));
+}
+$('#region-gu').addEventListener('change', filterRegions);
+$('#region-search').addEventListener('input', filterRegions);
+$('#region-rows').addEventListener('click', e => {
+  const row = e.target.closest('.row');
+  if (row) openRegion(row.dataset.gu, row.dataset.dong);
+});
 
-    function filterRegions() {
-      const q = document.getElementById('region-search').value.trim();
-      renderRegionRows(regions.filter(r => (r.구 + r.행정동명).includes(q)));
-    }
+/* 아무것도 안 골랐을 때 빈 화면 대신 자치구별 행정동 수를 보여 준다 */
+async function showRegionEmpty() {
+  const box = $('#region-detail');
+  const counts = {};
+  regions.forEach(r => { counts[r['구']] = (counts[r['구']] || 0) + 1; });
+  const data = Object.entries(counts)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
 
-    async function openRegion(gu, dong) {
-      const data = await api(`/regions/${gu}/${dong}`);
-      const fields = Object.entries(data)
-        .filter(([k]) => k !== '구' && k !== '행정동명')
-        .map(([k, v]) => field(k, k, v, { type: 'number' })).join('');
+  box.innerHTML = `<div class="detail-body">
+    ${card('자치구별 행정동 수', bars(data, { color: 'var(--s2)' }),
+           `서울 ${data.length}개 구 · ${regions.length}개 동`)}
+    <div class="card"><div class="card-title">고치기 전에</div>
+      <div style="font-size:13px;color:var(--ink-2);line-height:1.7">
+        지표 값을 고치면 427개 동 전체의 백분위가 함께 움직입니다.
+        한 동만 올려도 다른 동의 "상위 몇 %" 가 바뀐다는 뜻입니다.<br>
+        저장하면 캐시가 비워지므로 다음 추천부터 새 값이 쓰입니다.
+      </div></div>
+  </div>`;
+}
 
-      document.getElementById('region-board').innerHTML = `
-        <h3>${esc(data.구)} ${esc(data.행정동명)}</h3>
-        <div class="grid">${fields}</div>
-        <button onclick="saveRegion('${data.구}', '${data.행정동명}')">저장</button>
-      `;
-    }
+async function openRegion(gu, dong) {
+  currentRegion = gu + dong;
+  $$('#region-rows .row').forEach(el =>
+    el.classList.toggle('on', el.dataset.gu + el.dataset.dong === currentRegion));
 
-    async function saveRegion(gu, dong) {
-      const inputs = document.querySelectorAll('#region-board input');
-      const patch = {};
-      inputs.forEach(el => { patch[el.name] = Number(el.value); });
+  const box = $('#region-detail');
+  box.innerHTML = '<div class="empty">불러오는 중…</div>';
+  const data = await api(`/regions/${encodeURIComponent(gu)}/${encodeURIComponent(dong)}`);
 
-      await api(`/regions/${gu}/${dong}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
+  const metrics = Object.entries(data.values).map(([k, v]) => {
+    const pct = data.percentiles[k];
+    return `<div class="metric">
+      <div class="m-top">
+        <span class="m-name">${esc(k)}</span>
+        <span class="m-rank">${pct === null ? '순위 없음' : `상위 ${100 - pct}%`}</span>
+      </div>
+      <input type="number" name="${k}" min="0" step="any" value="${esc(round4(v))}">
+      <div class="meter"><i style="width:${pct ?? 0}%"></i></div>
+      <div class="err" data-err="${k}"></div>
+    </div>`;
+  }).join('');
 
-      openRegion(gu, dong);
-      toast('저장했다');            // 수정
-    }
+  box.innerHTML = `
+    <div class="detail-head">
+      <h3>${esc(data['행정동명'])}</h3>
+      <span class="id">${esc(data['구'])}</span>
+      <div class="acts">
+        <button class="btn sm primary" id="region-save" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>저장</button>
+      </div>
+    </div>
+    <div class="detail-body" id="region-form">
+      ${card('지표 <span class="hint">12개</span>', `<div class="grid2">${metrics}</div>`,
+             '막대는 427개 동 중 이 동의 위치다 · 값은 소수점 4자리까지 보여 준다')}
+    </div>`;
 
-    showTab('member');
-  </script>
+  $('#region-save').addEventListener('click', () => saveRegion(gu, dong, data.values));
+}
+
+async function saveRegion(gu, dong, before) {
+  const patch = {};
+  $$('#region-form input[name]').forEach(el => {
+    if (el.value !== round4(before[el.name])) patch[el.name] = Number(el.value);
+  });
+  if (!Object.keys(patch).length) return toast('바뀐 값이 없습니다');
+
+  clearErrors();
+  try {
+    await api(`/regions/${encodeURIComponent(gu)}/${encodeURIComponent(dong)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+  } catch (e) { return showErrors(e); }
+
+  await openRegion(gu, dong);
+  loaded.dash = false;
+  refreshStatus();
+  toast(`저장했습니다 · ${Object.keys(patch).length}칸`);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. 시스템
+   ═══════════════════════════════════════════════════════════ */
+async function loadSystem() {
+  const pane = $('#system-pane');
+  pane.innerHTML = '<div class="skel">불러오는 중…</div>';
+
+  const [s, logs, sum] = await Promise.all([
+    api('/ready'), api('/logs?limit=50'), api('/summary'),
+  ]);
+  paintStatus(s);
+
+  const rows = [
+    ['DB 연결', s.ok ? '정상' : '문제 있음 — ' + (s.error || ''), s.ok],
+    ['행정동', num(s.regions) + '개', s.regions > 0],
+    ['회원', num(s.members) + '명', s.members > 0],
+    ['추천 캐시', s.cache_warm ? '데워져 있음' : '비어 있음 (다음 요청 때 채워진다)', true],
+    ['쓰기 스위치', s.write_enabled ? '열림 (ADMIN_WRITE_ENABLED=1)' : '잠김 — 수정이 405 로 막힌다', s.write_enabled],
+  ].map(([k, v, ok]) => `
+    <div class="log">
+      <span class="pill ${ok ? 'ok' : 'bad'}" style="min-width:0"><span class="led"></span>${esc(k)}</span>
+      <span class="l-val">${esc(v)}</span>
+    </div>`).join('');
+
+  pane.innerHTML = `
+    <div class="pane-head"><h2>시스템</h2>
+      <span class="sub">상태 · 캐시 · 수정 이력</span></div>
+
+    ${card('상태', `<div class="logs">${rows}</div>`)}
+
+    ${card('캐시', `
+      <div style="font-size:13px;color:var(--ink-2);line-height:1.7;margin-bottom:12px">
+        추천 결과와 지역 설명을 메모리에 들고 있습니다.
+        DB 를 화면 밖에서 직접 고쳤다면 여기서 한 번 비워야 새 값이 반영됩니다.
+        (관리자 화면에서 저장한 것은 서버가 알아서 비웁니다.)
+      </div>
+      <button class="btn" id="cache-clear" ${s.write_enabled ? '' : 'disabled'}>캐시 비우기</button>`)}
+
+    ${sum.ok ? card('페르소나 칸별 평균 길이 <span class="hint">글자</span>',
+        bars(sum.charts.persona.map(d => ({ ...d, label: PERSONA_LABELS[d.label] || d.label })),
+             { color: 'var(--s3)', labelWidth: '110px' }),
+        '짧은 칸이 많으면 엉뚱한 이웃이 뽑힌다') : ''}
+
+    ${card(`수정 이력 <span class="hint">최근 ${logs.length}건</span>`, logList(logs))}
+
+    ${card('토큰', `
+      <div style="font-size:13px;color:var(--ink-2);line-height:1.7;margin-bottom:12px">
+        이 브라우저에 저장된 관리자 토큰을 지우고 입력 화면으로 돌아갑니다.
+      </div>
+      <button class="btn" id="token-reset">토큰 지우기</button>`)}
+  `;
+
+  $('#cache-clear')?.addEventListener('click', async () => {
+    await api('/cache/clear', { method: 'POST' });
+    toast('캐시를 비웠습니다');
+    loadSystem();
+  });
+  $('#token-reset').addEventListener('click', () => lock());
+}
+
+/* ═══════════════════════════════════════════════════════════
+   9. 들어가기 · 잠그기
+   ═══════════════════════════════════════════════════════════ */
+function lock(message = '') {
+  localStorage.removeItem('adminToken');
+  TOKEN = '';
+  $('#app').hidden = true;
+  $('#gate').hidden = false;
+  $('#gate-err').textContent = message;
+  $('#gate-token').value = '';
+}
+
+async function unlock(token) {
+  const err = $('#gate-err');
+  err.textContent = '';
+  const res = await fetch(API + '/ready', { headers: { Authorization: 'Bearer ' + token } });
+  if (!res.ok) { err.textContent = res.status === 401 ? '토큰이 맞지 않습니다' : '서버에 연결할 수 없습니다'; return; }
+
+  TOKEN = token;
+  localStorage.setItem('adminToken', token);
+  $('#gate').hidden = true;
+  $('#app').hidden = false;
+  paintStatus(await res.json());
+  loaded = {};
+  showView('dash');
+}
+
+$('#gate-go').addEventListener('click', () => unlock($('#gate-token').value.trim()));
+$('#gate-token').addEventListener('keydown', e => {
+  if (e.key === 'Enter') unlock($('#gate-token').value.trim());
+});
+
+/* 저장된 토큰이 있으면 바로 들어간다 — 없으면 입력 화면에 머문다 */
+if (TOKEN) unlock(TOKEN);
+else $('#gate-token').focus();
+</script>
 
 </body>
 </html>

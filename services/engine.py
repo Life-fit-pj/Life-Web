@@ -3,7 +3,7 @@
 
 이 파일만 엔진 저장소를 안다. 다른 파일은 몰라도 된다.
 엔진을 바꾸더라도 여기만 고치면 된다 —
-조원이 만든 다른 엔진을 붙일 때도 이 파일의 import 두 줄만 바꾸면 된다.
+조원이 만든 다른 엔진을 붙일 때도 이 파일의 import 두 줄만 바꾸면 된다..
 """
 
 import os
@@ -19,10 +19,15 @@ sys.path.insert(0, EMBED_DIR)
 
 from app.core.db import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
 from app.core.db import facilities, facility_counts, region_extras
-from app.features.pipeline_api import search, recommend_by_weights
+from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
-from app.features.admin import get_member, list_members, get_region, list_regions, update_member, update_region
+from app.features.scoring import score_survey 
+from app.features.admin import (
+    get_member, list_members, get_region, list_regions,
+    update_member, update_region, preview_member, similar_members, InvalidPatch, health,
+    clear_caches, privacy_preview, dashboard, recent_logs,
+)
 
 
 print("✅ LLM 파이프라인 연결 성공!")
@@ -80,25 +85,55 @@ def to_housing(prefs):
     return {"건물유형": bldg, "거래유형": deal, "targets": targets}
 
 
-def get_regions(user_prefs):
+def get_regions(user_prefs, weights_override=None):
+    """추천 TOP 5 를 만든다.
+
+    weights_override 는 "화면이 이미 확정한 가중치"다 —
+    1차 유형 카드가 키워드로 만든 7개 값. 이게 있으면 엔진이 검색어를 다시
+    읽어 만든 가중치 대신 이걸 쓴다. 반드시 search() 안으로 넘겨야 한다 —
+    반환값의 weights 만 바꾸면 regions·explanation 은 옛 가중치로 만들어진
+    상태로 남아 응답이 서로 다른 기준을 가리키게 된다
+    """
     query = (user_prefs.get('query') or '').strip()
     housing = to_housing(user_prefs)
-    extracted_housing = None   # 검색어 경로에서만 채워진다
+
+    # "순위를 매길 때 실제로 쓰인" housing. 두 경로 모두에서 채운다.
+    #
+    # 예전에는 검색어 경로에서만 채우고 슬라이더 경로는 None 으로 뒀다 —
+    # "화면이 만든 값이니 되돌려줄 필요 없다"는 판단이었는데, 핀 모달의
+    # 동네 설명(/api/region/explain)이 이 값을 다시 받아야 하게 되면서
+    # 슬라이더로만 조건을 준 사용자는 시세 이야기를 못 듣게 됐다.
+    # 순위 기준과 설명 기준이 다르면 앞뒤가 안 맞는 말을 하게 된다
+    used_housing = None
 
     if query:
-        result = search(query, top_k=5, housing_override=housing)
+        result = search(query, top_k=5, housing_override=housing,
+                        weights_override=weights_override)
         weights = result["weights"]
         regions = result["regions"]
         explanation = result["explanation"]
-        extracted_housing = result.get("housing")
+        # search() 는 housing_override 가 있으면 그걸 그대로,
+        # 없으면 검색어에서 뽑아낸 조건을 돌려준다 — 어느 쪽이든 "실제로 쓰인" 값
+        used_housing = result.get("housing")
     else:
-        # 슬라이더 경로는 애초에 화면 값 그대로 housing을 만들었으니
-        # 다시 화면에 되돌려줄 필요가 없다 (이미 일치함)
-        weights = to_korean_weights(user_prefs)
+        # 슬라이더 경로에도 같은 규칙을 적용한다 — 화면이 확정한 값이 우선
+        weights = weights_override or to_korean_weights(user_prefs)
         regions = recommend_by_weights(weights, top_k=5, housing=housing)
         explanation = ""
+        used_housing = housing        # ← 이 한 줄이 빠져 있었다
 
-    return weights, regions, explanation, extracted_housing
+    return weights, regions, explanation, used_housing
+
+
+def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5):
+    """서술형 설문(2차 유형)에서 이미 뽑은 가중치로 추천한다.
+
+    /api/predict 의 검색어 경로와 달리 ask_claude() 의 LLM 가중치 추정을
+    건너뛴다 — 설문은 services/persona_type.py 가 이미 구조화된 축 점수로
+    가중치를 계산해 뒀기 때문이다.
+    """
+    return recommend_by_weights_explained(weights_kor, persona_query,
+                                           top_k=top_k, housing=housing)
 
 
 def get_facilities(gu, dong, limit=5):
@@ -110,9 +145,14 @@ def get_facilities(gu, dong, limit=5):
     }
 
 
-def get_region_explain(gu, dong, query="", weights=None, scores=None):
-    """동네 하나에 대한 LLM 설명을 만든다. 지도 핀을 눌렀을 때 쓴다."""
-    return region_explain_cached(gu, dong, query, weights, scores)
+def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=None):
+    """동네 하나에 대한 LLM 설명을 만든다. 지도 핀을 눌렀을 때 쓴다.
+
+    housing 이 있으면 엔진이 설명문에 "원하시는 가격대보다 조금 높은 편입니다"
+    같은 문장을 넣는다. None 이면 프롬프트에 "가격 이야기를 꺼내지 마라"가
+    들어가므로, 가격 조건이 없을 때 억지로 기본값을 만들어 넣지 말 것
+    """
+    return region_explain_cached(gu, dong, query, weights, scores, housing)
 
 def get_chat_answer(question, regions=None, weights=None, history=None):
     """추천 결과에 대한 후속 질문에 답한다."""

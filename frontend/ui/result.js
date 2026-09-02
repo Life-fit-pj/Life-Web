@@ -61,6 +61,7 @@ export function renderResult(data) {
 
   state.lastQuery = data.query || "";
   state.lastResult = data;
+  state.lastHousing = data.housing || null;   // 가격 조건이 없었으면 null 그대로
   initChatWithResult(data); // 채팅이 이 결과를 근거로 답한다
 
   // ① 주거 만족도 점수

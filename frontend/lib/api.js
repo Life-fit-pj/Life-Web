@@ -67,13 +67,16 @@ export function postRegion(gu, dong) {
   return postJSON("/api/region", { gu, dong });
 }
 
-/** 핀 클릭 — LLM 설명 */
-export function postRegionExplain(gu, dong, query, weights, scores) {
+/** 핀 클릭 — LLM 설명.
+ *  housing 은 /api/predict 응답에서 받은 값을 그대로 실어 보낸다.
+ *  여기서 조립하지 않는다 — 만드는 규칙은 services/engine.py 의 to_housing() 하나뿐이다 */
+export function postRegionExplain(gu, dong, query, weights, scores, housing) {
   return postJSON("/api/region/explain", {
     gu, dong,
     query: query || "",
     weights: weights || null,
     scores: scores || null,
+    housing: housing || null,
   });
 }
 

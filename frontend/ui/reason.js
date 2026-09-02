@@ -72,13 +72,13 @@ async function loadFacilities(fullName) {
   try {
     const data = await postRegion(gu, dong);
     box.innerHTML = buildFacilityHtml(data);
-  } 
-
-    catch (err) {
-    console.error(err);
-    box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
-  }
-}
+  } catch (err) {
+    console.error("[reason] 시설 정보 실패", err);
+    // 빈칸으로 두면 "실패"와 "원래 정보가 없음"을 구분할 수 없다.
+    // 레이더·점수표는 이미 보이므로 화면을 망치지 않는 선에서 한 줄만 남긴다
+    box.innerHTML = `<div class="rc-empty">이 동네 정보를 불러오지 못했어요.</div>`;
+  }     // try/catch 닫기
+} 
 
 
 /** 동네 하나에 대한 LLM 설명을 받아 채운다 */
@@ -91,7 +91,8 @@ async function loadRegionExplain(item, weights) {
   box.innerHTML = `<div class="rc-loading">이 동네가 왜 맞는지 정리하는 중...</div>`;
 
   try {
-    const data = await postRegionExplain(gu, dong, state.lastQuery, weights, item.scores);
+    const data = await postRegionExplain(
+      gu, dong, state.lastQuery, weights, item.scores, state.lastHousing);
     if (!data.explanation) { box.innerHTML = ""; return; }
 
     box.innerHTML = `
@@ -99,10 +100,10 @@ async function loadRegionExplain(item, weights) {
       <div class="rc-llm-body">${escapeAndFormat(data.explanation)}</div>`;
 
   } catch (err) {
-    console.error(err);
-    box.innerHTML = "";      // 실패하면 조용히 비운다. 나머지는 이미 보인다
-  }
-}
+    console.error("[reason] 동네 설명 실패", err);
+    box.innerHTML = `<div class="rc-empty">추천 사유를 불러오지 못했어요.</div>`;
+  }     // try/catch 닫기
+}   
 
 
 function closeReasonModal() {
