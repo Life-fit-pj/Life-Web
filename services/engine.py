@@ -19,6 +19,7 @@ sys.path.insert(0, EMBED_DIR)
 
 from app.core.db import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
 from app.core.db import facilities, facility_counts, region_extras
+from app.core.db import customer_one
 from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
@@ -135,6 +136,11 @@ def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5)
     """
     return recommend_by_weights_explained(weights_kor, persona_query,
                                            top_k=top_k, housing=housing)
+
+
+def get_customer(customer_id):
+    """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
+    return customer_one(customer_id)
 
 
 def get_facilities(gu, dong, limit=5):
