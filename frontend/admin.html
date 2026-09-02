@@ -669,8 +669,11 @@ async function loadDashboard() {
 
   /* 성별이 빈 회원(로그인만 발급된 계정)은 라벨이 없어 범례가 빈칸으로 뜬다.
      숨기지 않고 이름을 붙인다 — 숨기면 합계가 왜 안 맞는지 알 수 없어진다 */
-  const genders = ch.genders.map(g => ({ ...g, label: g.label || '미입력' }));
-
+  const isEmptyLabel = v => !v || v === 'None' || v === 'null';
+  const genders = ch.genders.map(g => ({
+    ...g, label: isEmptyLabel(g.label) ? '미입력' : g.label,
+  }));
+  
   const top10 = ch.memberGu.slice(0, 10);
   $('#dash').innerHTML = `
     ${card('희망 조건 평균 <span class="hint">1~5</span>', bars(ch.weights, { max: 5, fmt: v => v.toFixed(2) }),
