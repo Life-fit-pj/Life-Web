@@ -15,7 +15,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from services.coords import lookup_coords
-from services.engine import get_survey_recommendation
+from services.engine import get_survey_recommendation, score_survey
 from services import persona_type
 
 router = APIRouter(prefix="/api", tags=["2차 유형"])
@@ -29,7 +29,20 @@ class SurveyRequest(BaseModel):
 
 @router.post("/survey")
 def survey_api(body: SurveyRequest):
+    # ① 규칙으로 먼저 채점해 본다 (무료·즉시)
     p = persona_type.profile(body.answers, first_axes=body.firstAxes)
+
+    # ② 규칙이 절반도 못 채웠으면 그때만 LLM 에게 물어본다.
+    #    매번 부르면 응답이 3~5초 느려지고 돈도 든다
+    if p["scored"] * 2 < p["scorable"]:
+        prompt = persona_type.build_llm_prompt(body.answers)
+        raw = score_survey(prompt)                       # engine.py 통로
+        llm_scores = persona_type.parse_llm_scores(raw)
+        if llm_scores:                                    # 파싱 실패하면 ①을 그대로 쓴다
+            p = persona_type.profile(body.answers,
+                                     first_axes=body.firstAxes,
+                                     llm_scores=llm_scores)
+
     result = get_survey_recommendation(p["weights"], p["personaQuery"])
 
     top_regions = []
@@ -60,3 +73,8 @@ def survey_api(body: SurveyRequest):
         "explanation": result["explanation"],
         "housing": result["housing"],
     }
+
+
+
+
+

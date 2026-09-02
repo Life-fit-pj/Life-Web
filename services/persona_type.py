@@ -317,6 +317,14 @@ def merge_axes(first: dict | None, second: dict) -> dict:
 # 가구 정보로 한 번 더 보정한다(1차에는 없는, 서술형이라 가능한 보정)
 # ============================================================
 def to_weights(axis: dict, household: dict | None = None) -> dict:
+    """축 점수 + 가구 정보 -> 7개 지표 가중치(1.0~5.0).
+
+    정수로 반올림하지 않는다 — lifetype.to_weights() 와 같은 이유다.
+    엔진의 recommend() 가 (w/평균)**6 으로 차이를 증폭하는데, round() 로 접으면
+    그 차이가 사라진다. 게다가 commute=car(-0.5), care=monthly(+0.8) 같은
+    작은 보정이 반올림에 통째로 묻혀 "뽑아놓고 안 쓰는" 상태가 된다
+    """
+
     w = {k: 3.0 for k in lt.WEIGHT_KEYS}
     for a, eff in lt.AXIS_TO_WEIGHT.items():
         s = axis.get(a, 0.0)
@@ -343,7 +351,7 @@ def to_weights(axis: dict, household: dict | None = None) -> dict:
     elif h.get("commute") == "car":
         w["교통"] -= 0.5
 
-    return {k: max(1, min(5, round(v))) for k, v in w.items()}
+    return {k: round(max(1.0, min(5.0, v)), 2) for k, v in w.items()}
 
 
 def _build_persona_query(answers: dict) -> str:
