@@ -36,9 +36,16 @@ export function isLatest(seq) {
 }
 
 
-// 로그인이 없어서 기기 단위 익명 ID를 하나 발급해 좋아요에 쓴다.
+// 기기 단위 익명 ID. 로그인하면 이 값이 customer_id("C101")로 바뀐다 —
+// 좋아요/검색/채팅 기록 호출부는 anonId 하나만 참조하므로 로그인 여부와
+// 무관하게 그대로 동작한다. 로그아웃하면 새 익명 UUID로 되돌아간다.
 export const anonId = localStorage.getItem("lf-anon") ?? (() => {
   const id = crypto.randomUUID();
   localStorage.setItem("lf-anon", id);
   return id;
 })();
+
+// customer_id 형식("C101")인지로 로그인 여부를 가른다 — 별도 플래그를 안 둔다
+export function isLoggedIn() {
+  return /^C\d+$/.test(anonId);
+}
