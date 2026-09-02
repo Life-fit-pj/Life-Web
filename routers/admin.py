@@ -174,12 +174,6 @@ class AnalyzeRequest(BaseModel):
     question: str
 
 
-@router.get("/analysis/facts", dependencies=[Depends(check_admin)])
-def admin_analysis_facts():
-    """LLM 없이 집계만. 숫자만 필요할 때 쓴다."""
-    return analysis_engine.collect_facts()
-
-
 @router.post("/analysis", dependencies=[Depends(check_admin), Depends(check_writable)])
 def admin_analyze(body: AnalyzeRequest):
     """질문 → Claude 답변. 대화는 자동 저장된다.
