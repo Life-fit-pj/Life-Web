@@ -1,4 +1,6 @@
 import { openHistory } from "./history.js";
+import { issueAccount, login } from "../lib/api.js";
+import { anonId, isLoggedIn } from "../lib/state.js";
 
 let menuModalEl = null;
 let comingSoonEl = null;
@@ -66,42 +68,116 @@ function closeMenu() {
     menuModalEl.classList.remove("is-open");
 }
 
-// 헤더 "로그인" 버튼을 누르면 뜨는 안내 모달.
-// 로그인은 아직 기능이 없어 "준비중" 문구만 보여주고,
-// 회원가입은 라이프스타일 설문(signup.html)으로 보낸다.
-// 크기는 맵 핀 클릭 시 뜨는 .reason-modal(ui/reason.css)과 동일하게 맞췄다.
+// 헤더 "로그인" 버튼을 누르면 뜨는 모달.
+// 임시 로그인이라 별도 인증 프레임워크 없이 아이디/비번을 그 자리에서 발급하고,
+// 로그인 성공 시 state.js 의 anonId 자리(localStorage "lf-anon")를 customer_id 로
+// 덮어쓴 뒤 새로고침한다 — 좋아요/검색/채팅 기록이 전부 anonId 하나만 보고 동작하므로
+// 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
+// 회원가입(설문)은 아직 별도 계정 발급과 안 이어져 있어 그대로 링크만 둔다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
 
     authModalEl = document.createElement("div");
     authModalEl.className = "auth-backdrop";
-    authModalEl.innerHTML = `
-        <div class="auth-modal">
-            <button class="auth-close" aria-label="닫기">&times;</button>
-            <div class="auth-section">
-                <h3 class="auth-title">로그인</h3>
-                <p class="auth-notice">🔒 로그인 기능은 아직 준비 중입니다.</p>
-            </div>
-            <div class="auth-divider"></div>
-            <div class="auth-section">
-                <h3 class="auth-title">회원가입</h3>
-                <p class="auth-notice">라이프스타일 설문을 먼저 받습니다. 계정 발급은 준비 중입니다.</p>
-                <a class="auth-cta" href="signup.html">설문 시작하기</a>
-            </div>
-        </div>
-    `;
     document.body.appendChild(authModalEl);
 
     authModalEl.addEventListener("click", (e) => {
         if (e.target === authModalEl) closeAuthModal();
     });
-    authModalEl.querySelector(".auth-close").addEventListener("click", closeAuthModal);
 
     return authModalEl;
 }
 
+function renderLoggedInAuthModal(el) {
+    el.innerHTML = `
+        <div class="auth-modal">
+            <button class="auth-close" aria-label="닫기">&times;</button>
+            <div class="auth-section">
+                <h3 class="auth-title">로그인 중</h3>
+                <p class="auth-notice">아이디: <strong>${anonId}</strong></p>
+                <button id="logoutBtn" class="auth-cta">로그아웃</button>
+            </div>
+        </div>
+    `;
+    el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
+    el.querySelector("#logoutBtn").addEventListener("click", () => {
+        localStorage.removeItem("lf-anon");
+        location.reload();
+    });
+}
+
+function renderGuestAuthModal(el) {
+    el.innerHTML = `
+        <div class="auth-modal">
+            <button class="auth-close" aria-label="닫기">&times;</button>
+            <div class="auth-section">
+                <h3 class="auth-title">로그인</h3>
+                <form id="loginForm" class="auth-form">
+                    <input id="loginIdInput" type="text" placeholder="아이디" autocomplete="off" required>
+                    <input id="loginPwInput" type="password" placeholder="비밀번호" autocomplete="off" required>
+                    <button type="submit" class="auth-cta">로그인</button>
+                </form>
+                <p id="loginError" class="auth-error"></p>
+            </div>
+            <div class="auth-divider"></div>
+            <div class="auth-section">
+                <h3 class="auth-title">임시 계정 발급</h3>
+                <p class="auth-notice">아이디·비밀번호를 바로 만들어 드립니다. 잊지 않게 적어 두세요.</p>
+                <button id="issueBtn" class="auth-cta">임시 계정 발급받기</button>
+                <div id="issuedBox" class="auth-issued" hidden></div>
+            </div>
+            <div class="auth-divider"></div>
+            <div class="auth-section">
+                <h3 class="auth-title">회원가입</h3>
+                <p class="auth-notice">라이프스타일 설문을 먼저 받습니다.</p>
+                <a class="auth-cta" href="signup.html">설문 시작하기</a>
+            </div>
+        </div>
+    `;
+    el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
+
+    el.querySelector("#loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const loginId = el.querySelector("#loginIdInput").value.trim();
+        const password = el.querySelector("#loginPwInput").value.trim();
+        const errorEl = el.querySelector("#loginError");
+        errorEl.textContent = "";
+        try {
+            const { customerId } = await login(loginId, password);
+            localStorage.setItem("lf-anon", customerId);
+            location.reload();
+        } catch (err) {
+            errorEl.textContent = "아이디 또는 비밀번호가 맞지 않아요.";
+        }
+    });
+
+    el.querySelector("#issueBtn").addEventListener("click", async () => {
+        const box = el.querySelector("#issuedBox");
+        box.hidden = false;
+        try {
+            const { customer_id, login_id, password } = await issueAccount();
+            box.innerHTML = `
+                <p>아이디: <strong>${login_id}</strong></p>
+                <p>비밀번호: <strong>${password}</strong></p>
+                <p class="auth-notice">지금 자동으로 로그인됩니다. 이 정보를 꼭 저장해 두세요.</p>
+            `;
+            localStorage.setItem("lf-anon", customer_id);
+            setTimeout(() => location.reload(), 1500);
+        } catch (err) {
+            console.error(err);
+            box.textContent = "계정 발급에 실패했어요.";
+        }
+    });
+}
+
 export function openAuthModal() {
-    ensureAuthModal().classList.add("is-open");
+    const el = ensureAuthModal();
+    if (isLoggedIn()) {
+        renderLoggedInAuthModal(el);
+    } else {
+        renderGuestAuthModal(el);
+    }
+    el.classList.add("is-open");
 }
 
 function closeAuthModal() {
