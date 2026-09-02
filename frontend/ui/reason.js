@@ -1,5 +1,5 @@
-import { postRegion, postRegionExplain } from "../lib/api.js";
-import { state } from "../lib/state.js";
+import { postRegion, postRegionExplain, postLike, deleteLike } from "../lib/api.js";
+import { state, anonId } from "../lib/state.js";
 import { escapeAndFormat, splitRegionName } from "../lib/format.js";
 
 // ===== 추천 사유 패널 =====
@@ -50,6 +50,7 @@ export function openReasonModal(item, weights) {
   el.querySelector(".reason-close").focus();
 
   bindReasonTabs(el, item);
+  bindLikeButton(el, item);
 
   // 카드가 화면에 붙은 뒤에 그려야 canvas 크기가 잡힌다
   drawRadar(buildRows(item, weights));
@@ -110,6 +111,32 @@ function closeReasonModal() {
   modalEl.classList.remove("is-open");
   document.body.style.overflow = "";
   roadviewInstance = null;     // 다음에 열릴 모달에서 로드뷰가 다시 초기화되도록
+}
+
+
+/** 좋아요 버튼 클릭에 맞춰 추가/취소를 보낸다 */
+function bindLikeButton(el, item) {
+  const btn = el.querySelector("#rcLike");
+  if (!btn) return;
+
+  const { gu, dong } = splitRegionName(item.name);
+  let liked = false;
+  btn.textContent = "❤";
+
+  btn.addEventListener("click", async () => {
+    try {
+      if (liked) {
+        await deleteLike(anonId, gu, dong);
+        btn.textContent = "🖤";
+      } else {
+        await postLike(anonId, gu, dong);
+        btn.textContent = "❤️";
+      }
+      liked = !liked;
+    } catch (err) {
+      console.error(err);
+    }
+  });
 }
 
 
@@ -213,6 +240,7 @@ function buildReasonCard(item, weights) {
       <div class="rc-eyebrow">${item.rank}순위 추천 지역</div>
       <div class="rc-head">
         <div class="rc-name">${item.name.replace("서울특별시 ", "")}</div>
+        <button class="rc-like" id="rcLike" aria-label="좋아요">🤍</button>
         <div class="rc-score">${Math.round(item.score ?? 0)}<span>MATCH</span></div>
       </div>
       <div class="rc-reason">

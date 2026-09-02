@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 이 파일은 이 저장소에서 작업할 때 Claude Code(claude.ai/code)에게 지침을 제공합니다.
 
 ## 이 저장소는 무엇인가
@@ -57,10 +59,19 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 - `routers/lifetype.py` — `/api/lifetype`, `/api/lifetype/keywords`. 1차 유형 판정입니다.
 - `routers/admin.py` — `/api/admin/*`. `Authorization: Bearer <ADMIN_TOKEN>` 헤더를 요구하고,
   수정(PATCH)은 `.env`의 `ADMIN_WRITE_ENABLED=1`까지 있어야 통과합니다.
+<<<<<<< HEAD
   `/summary`는 대시보드가 쓰는 집계 한 덩어리(카운트 + 차트 8종 + 최근 수정)이고
   `/logs`는 `admin_log` 표를 읽습니다. 둘 다 엔진의 `dashboard()`·`recent_logs()`를 부릅니다.
   쓰기 스위치 상태(`write_enabled`)는 이 저장소의 `.env`가 갖고 있으므로 엔진이 아니라
   여기서 `/ready`·`/summary` 응답에 붙입니다.
+=======
+- `routers/survey.py` — `/api/survey`. 서술형 설문 15문항을 받아 `services/persona_type.py`로
+  축 점수·가중치를 규칙 기반(LLM 없이)으로 계산하고, `/api/predict`와 같은 자리
+  (`recommend_by_weights_explained`)로 추천을 돌립니다. **아직 프론트에 연결되지 않았습니다** —
+  `frontend/signup.html`은 지금도 답변을 문장으로 이어 붙여 `/api/predict`의 `query`(LLM 경로)로
+  보냅니다(`ui/search.js`의 `SURVEY_KEY` 처리부). 프론트를 이 엔드포인트로 옮길 때는 이 차이를
+  먼저 확인하세요.
+>>>>>>> origin/HEAD
 - `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. 다른 추천 엔진으로
   교체하려면 여기 있는 import 줄만 바꾸면 됩니다(README의 "다른 엔진 붙이기" 참고).
   7개 라이프스타일 지표의 한국어⇄영어 매핑(`KEY_MAP`)도 여기 하나만 있습니다 — 다른 파일에서
@@ -69,7 +80,13 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
   `(구, 동) → (lat, lng)` 딕셔너리(`COORDS`)로 한 번만 로드합니다. `lookup_coords`와
   `/api/regions/gudong`이 이를 읽어옵니다. pandas가 아닌 `csv`를 사용합니다.
 - `services/lifetype.py` — 1차 유형 판정. 고른 키워드를 축 점수로 바꾸고 유형 이름과 7지표
-  가중치를 만듭니다. **LLM을 쓰지 않습니다** — 의존성이 `random` 뿐입니다.
+  가중치를 만듭니다. **LLM을 쓰지 않습니다** — 의존성이 `random` 뿐입니다. 4개 축(EI/BQ/TP/WD),
+  16유형, `AXIS_TO_WEIGHT` 표가 여기 하나뿐인 원본입니다 — `services/persona_type.py`가 이를
+  그대로 import해서 씁니다.
+- `services/persona_type.py` — 2차(서술형 설문) 유형 판정. `services/lifetype.py`의 축·유형
+  표를 그대로 가져다 쓰고(따로 베끼지 않음), 15문항 답변을 키워드 사전으로 규칙 기반 채점합니다.
+  `first_axes`를 주면 1차 결과를 덮어쓰지 않고 보강합니다(`merge_axes`). LLM 채점용
+  `build_llm_prompt`/`parse_llm_scores`도 있지만 지금 `profile()`은 호출하지 않습니다(추후 확장 자리).
 - `services/typespot.py` — 1차 유형에 어울리는 동네 2곳. `life.db`(없으면
   `master_dataset_v3.csv`)를 `_find()`로 형제 폴더에서 찾아 **그 표 하나만** 읽습니다.
   시세도 그 안에 있습니다(`아파트_전세_보증금`) — 따로 열 파일이 없습니다. 시세는
@@ -129,6 +146,10 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 - `POST /api/region/explain` — 동네별 개별 LLM 설명. 시설 정보는 즉시 나오지만 설명은 3~5초
   걸려서 `/api/region`과 나눴습니다.
 - `GET /api/regions/gudong` — `{구: [동...]}`. 25개 구 / 427개 동. 회원가입 2단 드롭다운용.
+- `POST /api/survey` — 요청 `{ answers: {p1, p2, ...}, firstAxes? }`. `services/persona_type.py`가
+  규칙 기반으로 축·가중치를 계산해 `/api/predict`와 같은 추천 함수를 LLM 가중치 추정 없이
+  바로 돌립니다. 응답에 `typeCode`/`typeName`/`axisScores`/`household`/`weights`/`topRegions`가
+  담깁니다. 위에서 언급했듯 **프론트는 아직 이 엔드포인트를 호출하지 않습니다.**
 
 ## 회원 데이터 3계층 (설문·회원가입을 건드릴 때 필수)
 
@@ -192,6 +213,11 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 엉뚱한 이웃이 뽑히고 그들의 7지표를 신규 회원이 물려받습니다(오류 없이 조용히 틀림).
 자세한 내용과 권장 대안은 README의 "그 전에 확인해야 할 것" 참고.
 
+**`services/persona_type.py`에 축·유형 표를 다시 적지 마세요.** EI/BQ/TP/WD 4개 축, 16유형,
+`AXIS_TO_WEIGHT`는 `services/lifetype.py`가 원본입니다. 예전 `Lifestyle-type/2차유형.py`가
+독립된 사본을 갖고 있다가 실제로 어긋난 적이 있습니다(README 참고). 1차와 2차가 같은 유형
+이름·가중치를 내야 하므로 항상 `from services import lifetype as lt`로 가져다 쓰세요.
+
 **`frontend/index.html`의 `<script>`는 `main.js` 하나뿐이어야 합니다.** `front-ds-v2`
 브랜치는 `script.js`/`search.js`/`menu.js`를 각각 불러오는 옛 구조입니다. 그쪽에서 마크업을
 가져올 때 script 줄까지 따라오면 모듈과 옛 monolith가 동시에 돌아 조용히 깨집니다.
@@ -217,7 +243,12 @@ API 키, 토큰, 기타 비밀 정보는 반드시 `.env`(gitignore 처리됨)�
 
 1. **회원가입 백엔드** — `POST /api/signup` + 엔진 쪽 적재(`resync_member` → 벡터,
    `find_similar_members` + `blend` → 7지표). 회원가입 폼(목업 또는 카카오 API) 확정 후 착수.
-   설문 답변은 지금 추천에만 쓰이고 저장되지 않습니다.
+   설문 답변은 지금 추천에만 쓰이고 저장되지 않습니다. `POST /api/survey`(규칙 기반 축·가중치
+   계산)는 이미 있지만, 이것만으로는 부족합니다 — `persona_type.profile()`의 결과는 추천용
+   가중치일 뿐 `CHUNK_COLUMNS` 9칸 원문이 아니라서, 저장하려면 여전히 문항별 답변 원문을
+   persona 칸에 매핑하는 로직이 따로 필요합니다. 또한 프론트(`signup.html`)는 아직
+   `/api/survey`를 호출하지 않고 `/api/predict`의 LLM 검색어 경로로 우회하고 있으니, 백엔드를
+   붙일 때 프론트 전환도 함께 검토하세요.
 2. **설문 최소 길이 실험** — 기존 회원 100명을 정답지로 삼아 5/10/15자 역테스트.
    최소 길이를 추측이 아니라 숫자로 정할 수 있습니다(README 참고).
 3. **LLM persona 정제** — 목적은 "짧은 답 늘리기"가 아니라 "기존 데이터와 문체 맞추기".

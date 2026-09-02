@@ -17,8 +17,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
+from app.core.db import add_like, remove_like
 from app.core.db import facilities, facility_counts, region_extras
-from app.features.pipeline_api import search, recommend_by_weights
+from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
 from app.features.admin import (
@@ -123,6 +124,17 @@ def get_regions(user_prefs, weights_override=None):
     return weights, regions, explanation, used_housing
 
 
+def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5):
+    """서술형 설문(2차 유형)에서 이미 뽑은 가중치로 추천한다.
+
+    /api/predict 의 검색어 경로와 달리 ask_claude() 의 LLM 가중치 추정을
+    건너뛴다 — 설문은 services/persona_type.py 가 이미 구조화된 축 점수로
+    가중치를 계산해 뒀기 때문이다.
+    """
+    return recommend_by_weights_explained(weights_kor, persona_query,
+                                           top_k=top_k, housing=housing)
+
+
 def get_facilities(gu, dong, limit=5):
     """행정동 하나의 시설 정보를 돌려준다. 지도 핀을 눌렀을 때 쓴다."""
     return {
@@ -146,6 +158,14 @@ def get_chat_answer(question, regions=None, weights=None, history=None):
     """추천 결과에 대한 후속 질문에 답한다."""
     return chat_engine(question, regions=regions, weights=weights, history=history)
 
+
+def like_region(anon_id, gu, dong):
+    """지도 핀에서 좋아요 클릭시 호출한다."""
+    add_like(anon_id, gu, dong)
+
+def unlike_region(anon_id, gu, dong):
+    """좋아요를 취소하면 호출한다."""
+    remove_like(anon_id, gu, dong)
 
 if __name__ == "__main__":
     w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})

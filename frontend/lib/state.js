@@ -34,3 +34,11 @@ export function nextSeq() {
 export function isLatest(seq) {
   return seq === requestSeq;
 }
+
+
+// 로그인이 없어서 기기 단위 익명 ID를 하나 발급해 좋아요에 쓴다.
+export const anonId = localStorage.getItem("lf-anon") ?? (() => {
+  const id = crypto.randomUUID();
+  localStorage.setItem("lf-anon", id);
+  return id;
+})();

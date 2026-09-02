@@ -1,5 +1,5 @@
 import { postChat } from "../lib/api.js";
-import { state } from "../lib/state.js";
+import { state, anonId } from "../lib/state.js";
 import { escapeAndFormat } from "../lib/format.js";
 
 
@@ -89,7 +89,7 @@ async function sendChat() {
   const loading = addChatMsg("생각하는 중...", "loading");
 
   try {
-    const data = await postChat(question, state.lastResult?.topRegions, state.lastResult?.weights);
+    const data = await postChat(question, state.lastResult?.topRegions, state.lastResult?.weights, anonId);
     loading.remove();
     addChatMsg(data.answer || "답을 만들지 못했어요.", "bot");
 
