@@ -104,3 +104,8 @@ export function postLike(anonId, gu, dong) {
 export function deleteLike(anonId, gu, dong) {
   return deleteJSON("/api/likes", { anonId, gu, dong });
 }
+
+/** 로그인 (처음 보는 아이디면 서버가 그 자리에서 발급도 겸한다) */
+export function login(loginId, password) {
+  return postJSON("/api/login", { loginId, password });
+}

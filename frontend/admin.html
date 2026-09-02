@@ -785,6 +785,32 @@ function when(iso) {
   return String(iso).replace('T', ' ').slice(5, 16);
 }
 
+/* 좋아요·검색·채팅 — 전부 anon_id 를 customer_id 로 삼아 쌓인 것만 잡힌다.
+   로그인 전(임시 UUID로 활동) 기록은 이 회원 것으로 안 이어진다 */
+function activityBody(likes, searches, chats) {
+  const likeChips = likes.length
+    ? likes.map(l => `<span class="tag">${esc(l.구)} ${esc(l.행정동명)}</span>`).join(' ')
+    : '<div class="skel">좋아요 기록이 없습니다</div>';
+
+  const searchRows = searches.length
+    ? searches.map(s => `<div class="log"><span class="l-fields">${esc(s.query)}</span><span class="l-when">${when(s.created_at)}</span></div>`).join('')
+    : '<div class="skel">검색 기록이 없습니다</div>';
+
+  const chatRows = chats.length
+    ? chats.map(c => `
+      <div class="log" style="flex-direction:column; align-items:flex-start; gap:4px">
+        <div><b>Q.</b> ${esc(c.question)}</div>
+        <div style="color:var(--muted)"><b>A.</b> ${esc(c.answer)}</div>
+        <span class="l-when">${when(c.created_at)}</span>
+      </div>`).join('')
+    : '<div class="skel">대화 기록이 없습니다</div>';
+
+  return `
+    <div style="margin-bottom:14px"><div class="card-title" style="margin-bottom:6px">좋아요</div>${likeChips}</div>
+    <div style="margin-bottom:14px"><div class="card-title" style="margin-bottom:6px">검색 기록</div><div class="logs">${searchRows}</div></div>
+    <div><div class="card-title" style="margin-bottom:6px">채팅 기록</div><div class="logs">${chatRows}</div></div>`;
+}
+
 function logList(list) {
   if (!list || !list.length) return '<div class="skel">아직 수정 기록이 없습니다</div>';
   return '<div class="logs">' + list.map(l => `
@@ -855,7 +881,7 @@ async function openMember(id) {
   const board = $('#member-detail');
   board.innerHTML = '<div class="empty">불러오는 중…</div>';
 
-  const { customer, preferences, preferences_initial, persona } = await api('/members/' + id);
+  const { customer, preferences, preferences_initial, persona, likes, searches, chats } = await api('/members/' + id);
   /* initial 은 "저장할 때 바뀐 칸 골라내는 기준"이다. preferences_initial(가입 시 값)과
      이름이 비슷하지만 전혀 다른 것이니 섞지 말 것 */
   initial = { ...customer, ...preferences, ...persona };
@@ -937,6 +963,8 @@ async function openMember(id) {
              '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다')}
       ${card('페르소나 <span class="hint">9칸</span>', personas,
              '이 글을 고치면 벡터가 다시 만들어진다')}
+      ${card('활동', activityBody(likes, searches, chats),
+             '로그인한 뒤 쌓인 좋아요·검색·채팅만 보인다')}
       <div id="panel-preview"></div>
       <div id="panel-similar"></div>
       <div id="panel-privacy"></div>

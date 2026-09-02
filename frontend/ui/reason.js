@@ -1,5 +1,5 @@
 import { postRegion, postRegionExplain, postLike, deleteLike } from "../lib/api.js";
-import { state, anonId } from "../lib/state.js";
+import { state, getAnonId } from "../lib/state.js";
 import { escapeAndFormat, splitRegionName } from "../lib/format.js";
 
 // ===== 추천 사유 패널 =====
@@ -126,10 +126,10 @@ function bindLikeButton(el, item) {
   btn.addEventListener("click", async () => {
     try {
       if (liked) {
-        await deleteLike(anonId, gu, dong);
+        await deleteLike(getAnonId(), gu, dong);
         btn.textContent = "🖤";
       } else {
-        await postLike(anonId, gu, dong);
+        await postLike(getAnonId(), gu, dong);
         btn.textContent = "❤️";
       }
       liked = !liked;

@@ -6,7 +6,7 @@
             "detail": "실제 배포될 웹서비스를 실행하여 연다.",
             "type": "shell",
             "command": "${command:python.interpreterPath}",
-            "args": ["-m", "pipeline.schema"],
+            "args": ["-m", "uvicorn", "main:app", "--reload", "--port", "5000"],
             "problemMatcher": [],
             "presentation": { "clear": true }
 

@@ -4,6 +4,7 @@ POST /api/region           행정동 하나의 시설 정보
 POST /api/region/explain   행정동 하나의 LLM 설명
 POST /api/chat             추천 결과 후속 질문
 GET  /api/regions/gudong   구 → 동 목록 (회원가입 2단 드롭다운용)
+GET  /api/history          검색·대화 기록 조회 (anonId 기준)
 """
 
 from collections import defaultdict
@@ -12,7 +13,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from services.coords import COORDS, lookup_coords
-from services.engine import KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer
+from services.engine import (
+    KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer,
+    save_search, save_chat, get_history,
+)
 from services.floorplan import find_floorplan
 
 router = APIRouter(prefix="/api", tags=["추천"])
@@ -25,6 +29,7 @@ router = APIRouter(prefix="/api", tags=["추천"])
 # Flask 때는 int(body.get('area', 59)) 처럼 매번 방어해야 했다
 class PredictRequest(BaseModel):
     query: str | None = None
+    anonId: str | None = None      # 기기 단위 익명 ID. 검색어 기록에 쓴다
 
     greenery: int = 3
     safety: int = 3
@@ -73,6 +78,7 @@ class ChatRequest(BaseModel):
     # 대화 기록. 지금은 안 쓰지만 자리를 열어 둔다 —
     # 로그인·저장 기능을 붙이면 여기로 들어온다
     history: list | None = None
+    anonId: str | None = None      # 기기 단위 익명 ID. 대화 기록에 쓴다
 
 
 # ==========================================
@@ -88,6 +94,10 @@ def predict(body: PredictRequest):
     """
     # services 는 사전을 기대하므로 모델을 사전으로 바꿔 넘긴다
     prefs = body.model_dump()
+
+    # 검색어로 찾아본 요청만 기록한다 — 슬라이더만 만진 요청은 "검색"이 아니다
+    if body.query and body.anonId:
+        save_search(body.anonId, body.query)
 
     # 1차 유형 카드에서 넘어왔고 슬라이더를 직접 만지지 않았으면,
     # 1차 가중치를 "확정값"으로 엔진에 넘긴다. 이게 없으면 1차에서 본 동네가
@@ -194,11 +204,20 @@ def region_explain_api(body: RegionRequest):
 @router.post("/chat")
 def chat_api(body: ChatRequest):
     """추천 결과에 대한 후속 질문에 답한다."""
-    return {
-        "answer": get_chat_answer(
-            body.question,
-            regions=body.regions,
-            weights=body.weights,
-            history=body.history,
-        )
-    }
+    answer = get_chat_answer(
+        body.question,
+        regions=body.regions,
+        weights=body.weights,
+        history=body.history,
+    )
+
+    if body.anonId:
+        save_chat(body.anonId, body.question, answer)
+
+    return {"answer": answer}
+
+
+@router.get("/history")
+def history_api(anonId: str):
+    """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
+    return get_history(anonId)

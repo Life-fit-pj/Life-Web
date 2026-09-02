@@ -3,7 +3,7 @@
 
 이 파일만 엔진 저장소를 안다. 다른 파일은 몰라도 된다.
 엔진을 바꾸더라도 여기만 고치면 된다 —
-조원이 만든 다른 엔진을 붙일 때도 이 파일의 import 두 줄만 바꾸면 된다.
+조원이 만든 다른 엔진을 붙일 때도 이 파일의 import 두 줄만 바꾸면 된다..
 """
 
 import os
@@ -17,7 +17,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
-from app.core.db import add_like, remove_like
+from app.core.db import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
 from app.core.db import facilities, facility_counts, region_extras
 from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
@@ -28,6 +28,7 @@ from app.features.admin import (
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs,
 )
+from app.features.auth import login as auth_login, backfill_logins
 
 
 print("✅ LLM 파이프라인 연결 성공!")
@@ -154,12 +155,11 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
     """
     return region_explain_cached(gu, dong, query, weights, scores, housing)
 
-
 def get_chat_answer(question, regions=None, weights=None, history=None):
     """추천 결과에 대한 후속 질문에 답한다."""
     return chat_engine(question, regions=regions, weights=weights, history=history)
 
-
+# => 좋아요
 def like_region(anon_id, gu, dong):
     """지도 핀에서 좋아요 클릭시 호출한다."""
     add_like(anon_id, gu, dong)
@@ -167,6 +167,22 @@ def like_region(anon_id, gu, dong):
 def unlike_region(anon_id, gu, dong):
     """좋아요를 취소하면 호출한다."""
     remove_like(anon_id, gu, dong)
+
+# => 검색
+def save_search(anon_id, query):
+    """검색어를 기록한다. 검색창에 입력한 문장이 있을 때만 부른다."""
+    add_search_history(anon_id, query)
+
+def save_chat(anon_id, question, answer):
+    """후속 질문/답변을 기록한다."""
+    add_chat_history(anon_id, question, answer)
+
+def get_history(anon_id):
+    """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
+    return {
+        "searches": list_search_history(anon_id),
+        "chats": list_chat_history(anon_id),
+    }
 
 if __name__ == "__main__":
     w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})
