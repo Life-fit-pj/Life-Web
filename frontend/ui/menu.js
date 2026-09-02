@@ -1,4 +1,5 @@
 import { openHistory } from "./history.js";
+import { openMypage } from "./mypage.js";
 import { login } from "../lib/api.js";
 import { getAnonId, isLoggedIn } from "../lib/state.js";
 
@@ -39,7 +40,7 @@ function renderMenuItems() {
     const box = document.getElementById("menuItems");
 
     box.innerHTML = `
-        <a class="menu-item" href="#" data-feature="마이페이지">마이페이지</a>
+        <a class="menu-item" id="menuMypage" href="#">마이페이지</a>
         <a class="menu-item" id="menuHistory" href="#">검색 및 대화 기록 저장소</a>
         <a class="menu-item" href="#" data-feature="좋아요 한 거주지">좋아요 한 거주지</a>
         <a class="menu-item" href="#" data-feature="원본 데이터 및 출처 안내">원본 데이터 및 출처 안내</a>
@@ -49,6 +50,15 @@ function renderMenuItems() {
             e.preventDefault();
             openComingSoon(link.dataset.feature);
         });
+    });
+    box.querySelector("#menuMypage").addEventListener("click", (e) => {
+        e.preventDefault();
+        closeMenu();
+        if (!isLoggedIn()) {
+            openAuthModal();
+            return;
+        }
+        openMypage();
     });
     box.querySelector("#menuHistory").addEventListener("click", (e) => {
         e.preventDefault();

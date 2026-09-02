@@ -109,3 +109,8 @@ export function deleteLike(anonId, gu, dong) {
 export function login(loginId, password) {
   return postJSON("/api/login", { loginId, password });
 }
+
+/** 마이페이지 — 로그인한 회원의 기본정보 */
+export function getMe(customerId) {
+  return getJSON(`/api/auth/me?customerId=${encodeURIComponent(customerId)}`);
+}

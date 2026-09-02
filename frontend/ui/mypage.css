@@ -1,0 +1,67 @@
+/*
+마이페이지 모달
+크기·구조는 ui/history.css 를 그대로 따른다
+*/
+
+.mypage-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(30, 26, 22, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.mypage-backdrop.is-open { display: flex; }
+
+.mypage-modal {
+  position: relative;
+  width: min(460px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.mypage-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mypage-close:hover { color: var(--text); }
+
+.mypage-title {
+  margin: 0 0 14px;
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
+  font-size: 19px;
+  color: var(--text);
+}
+
+.mypage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.mypage-row:last-child { border-bottom: none; }
+
+.mypage-label { color: var(--muted); }
+.mypage-value { color: var(--text); font-weight: 600; text-align: right; }
+
+.mypage-empty {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 12px 0;
+}
