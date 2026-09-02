@@ -1,6 +1,6 @@
 import { openHistory } from "./history.js";
-import { issueAccount, login } from "../lib/api.js";
-import { anonId, isLoggedIn } from "../lib/state.js";
+import { login } from "../lib/api.js";
+import { getAnonId, isLoggedIn } from "../lib/state.js";
 
 let menuModalEl = null;
 let comingSoonEl = null;
@@ -69,10 +69,12 @@ function closeMenu() {
 }
 
 // 헤더 "로그인" 버튼을 누르면 뜨는 모달.
-// 임시 로그인이라 별도 인증 프레임워크 없이 아이디/비번을 그 자리에서 발급하고,
-// 로그인 성공 시 state.js 의 anonId 자리(localStorage "lf-anon")를 customer_id 로
-// 덮어쓴 뒤 새로고침한다 — 좋아요/검색/채팅 기록이 전부 anonId 하나만 보고 동작하므로
-// 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
+// 임시 로그인이라 별도 인증 프레임워크 없이, 처음 보는 아이디/비번을 입력하면
+// 서버(auth.login)가 그 자리에서 계정을 발급하고 바로 로그인시킨다 —
+// 발급과 로그인이 폼 하나로 합쳐져 있다. 로그인 성공 시 localStorage
+// "lf-anon"을 customer_id로 덮어쓴다 —
+// 좋아요/검색/채팅 기록이 전부 getAnonId() 하나만 보고 동작하므로(state.js),
+// 새로고침 없이도 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
 // 회원가입(설문)은 아직 별도 계정 발급과 안 이어져 있어 그대로 링크만 둔다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
@@ -94,15 +96,15 @@ function renderLoggedInAuthModal(el) {
             <button class="auth-close" aria-label="닫기">&times;</button>
             <div class="auth-section">
                 <h3 class="auth-title">로그인 중</h3>
-                <p class="auth-notice">아이디: <strong>${anonId}</strong></p>
+                <p class="auth-notice">아이디: <strong>${getAnonId()}</strong></p>
                 <button id="logoutBtn" class="auth-cta">로그아웃</button>
             </div>
         </div>
     `;
     el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
     el.querySelector("#logoutBtn").addEventListener("click", () => {
-        localStorage.removeItem("lf-anon");
-        location.reload();
+        localStorage.setItem("lf-anon", crypto.randomUUID());
+        renderGuestAuthModal(el);
     });
 }
 
@@ -117,14 +119,8 @@ function renderGuestAuthModal(el) {
                     <input id="loginPwInput" type="password" placeholder="비밀번호" autocomplete="off" required>
                     <button type="submit" class="auth-cta">로그인</button>
                 </form>
+                <p class="auth-notice">처음 쓰는 아이디·비밀번호를 입력하면 그 자리에서 계정이 만들어집니다.</p>
                 <p id="loginError" class="auth-error"></p>
-            </div>
-            <div class="auth-divider"></div>
-            <div class="auth-section">
-                <h3 class="auth-title">임시 계정 발급</h3>
-                <p class="auth-notice">아이디·비밀번호를 바로 만들어 드립니다. 잊지 않게 적어 두세요.</p>
-                <button id="issueBtn" class="auth-cta">임시 계정 발급받기</button>
-                <div id="issuedBox" class="auth-issued" hidden></div>
             </div>
             <div class="auth-divider"></div>
             <div class="auth-section">
@@ -145,27 +141,9 @@ function renderGuestAuthModal(el) {
         try {
             const { customerId } = await login(loginId, password);
             localStorage.setItem("lf-anon", customerId);
-            location.reload();
+            renderLoggedInAuthModal(el);
         } catch (err) {
             errorEl.textContent = "아이디 또는 비밀번호가 맞지 않아요.";
-        }
-    });
-
-    el.querySelector("#issueBtn").addEventListener("click", async () => {
-        const box = el.querySelector("#issuedBox");
-        box.hidden = false;
-        try {
-            const { customer_id, login_id, password } = await issueAccount();
-            box.innerHTML = `
-                <p>아이디: <strong>${login_id}</strong></p>
-                <p>비밀번호: <strong>${password}</strong></p>
-                <p class="auth-notice">지금 자동으로 로그인됩니다. 이 정보를 꼭 저장해 두세요.</p>
-            `;
-            localStorage.setItem("lf-anon", customer_id);
-            setTimeout(() => location.reload(), 1500);
-        } catch (err) {
-            console.error(err);
-            box.textContent = "계정 발급에 실패했어요.";
         }
     });
 }

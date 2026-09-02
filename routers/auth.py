@@ -1,12 +1,11 @@
 """
-POST /api/account/issue   임시 계정 발급
-POST /api/login            로그인
+POST /api/login   로그인 (처음 보는 아이디면 그 자리에서 발급도 겸한다)
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.engine import issue_account, auth_login
+from services.engine import auth_login
 
 router = APIRouter(prefix="/api", tags=["로그인"])
 
@@ -14,11 +13,6 @@ router = APIRouter(prefix="/api", tags=["로그인"])
 class LoginRequest(BaseModel):
     loginId: str
     password: str
-
-
-@router.post("/account/issue")
-def issue():
-    return issue_account()
 
 
 @router.post("/login")

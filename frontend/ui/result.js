@@ -1,5 +1,5 @@
 import { postPredict } from "../lib/api.js";
-import { state, nextSeq, isLatest, anonId } from "../lib/state.js";
+import { state, nextSeq, isLatest, getAnonId } from "../lib/state.js";
 import { currentDeal, isPriceAny } from "./deal.js";
 import { renderKakaoMapMarkers, panToRegion } from "./map.js";
 import { initChatWithResult } from "./chat.js";
@@ -13,7 +13,7 @@ export async function runSimulation() {
   const seq = nextSeq();
   const priceAny = isPriceAny();
   const payload = {
-    anonId,
+    anonId: getAnonId(),
     // "가격 상관없음"이 켜지면 null 로 보낸다.
     // 슬라이더 값을 그대로 보내면 서버가 "이 가격을 원한다" 로 알아듣기 때문이다
     bldgType: priceAny ? null : (document.getElementById('bldgType')?.value || "아파트"),

@@ -28,7 +28,7 @@ from app.features.admin import (
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs,
 )
-from app.features.auth import issue_account, login as auth_login
+from app.features.auth import login as auth_login, backfill_logins
 
 
 print("✅ LLM 파이프라인 연결 성공!")

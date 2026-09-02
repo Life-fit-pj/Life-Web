@@ -8,6 +8,7 @@ GET   /api/admin/regions/{gu}/{dong}      행정동 하나의 지표 12개
 GET   /api/admin/members/{customer_id}/preview   이 회원 조건으로 추천 TOP 5
 PATCH /api/admin/members/{customer_id}    회원 수정
 PATCH /api/admin/regions/{gu}/{dong}      행정동 수정
+POST  /api/admin/logins/backfill          기존 회원에게 로그인 계정 일괄 발급
 
 조회는 관리자 토큰만, 수정은 토큰 + 쓰기 스위치를 요구한다 (6단계).
 """
@@ -22,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches, privacy_preview, dashboard, recent_logs,
+    clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -156,3 +157,12 @@ def admin_summary():
 def admin_logs(limit: int = 30):
     """관리자 수정 이력. 최근 것이 위로 온다."""
     return recent_logs(min(max(limit, 1), 200))
+
+
+@router.post("/logins/backfill", dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_backfill_logins():
+    """로그인 계정이 없는 기존 회원(C001~C099 등)에게 임시 아이디/비번을 발급한다.
+
+    새로 만든 계정만 응답에 담긴다 — 이미 있던 사람은 건드리지 않으므로 여러 번 눌러도 안전하다.
+    """
+    return backfill_logins()
