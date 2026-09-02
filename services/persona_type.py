@@ -171,19 +171,25 @@ def score_text_rule(qid: str, text: str) -> float | None:
         return None
 
     no_neg = q.get("no_negate", False)
+    # 부정어는 같은 절 안에 있을 때만 그 단어를 부정한다.
+    # "재택이라 안 나가요" 의 '안'은 재택을 부정하는 게 아니라 재택이라서 생긴 결과다
+    parts = [p.strip() for p in re.split(r"[,.!?]|(?<=라)\s|(?<=서)\s|(?<=고)\s|(?<=며)\s|(?<=만)\s", t) if p.strip()]
+
     total, hits = 0.0, 0
     for word, val in q["keywords"]:
-        pos = t.find(word)
-        if pos < 0:
-            continue
-        sign = 1
-        if not no_neg:
-            head = t[max(0, pos - 6):pos]
-            tail = t[pos + len(word):pos + len(word) + 10]
-            if any(n in head or n in tail for n in NEGATORS):
-                sign = -1
-        total += val * sign
-        hits += 1
+        for part in parts:                      # 절마다 찾는다
+            pos = part.find(word)
+            if pos < 0:
+                continue
+            sign = 1
+            if not no_neg:
+                head = part[max(0, pos - 6):pos]
+                tail = part[pos + len(word):pos + len(word) + 10]
+                if any(n in head or n in tail for n in NEGATORS):
+                    sign = -1
+            total += val * sign
+            hits += 1
+            break                               # 이 단어는 찾았으니 다음 단어로
 
     return max(-2.0, min(2.0, total / hits ** 0.5)) if hits else None
 
