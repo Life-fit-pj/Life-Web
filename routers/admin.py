@@ -19,11 +19,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel    
 
 from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins,
+    clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins, analysis_engine,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -166,3 +167,47 @@ def admin_backfill_logins():
     새로 만든 계정만 응답에 담긴다 — 이미 있던 사람은 건드리지 않으므로 여러 번 눌러도 안전하다.
     """
     return backfill_logins()
+
+
+# ── 분석 (대시보드의 접이식 막대) ────────────────
+class AnalyzeRequest(BaseModel):
+    question: str
+
+
+@router.get("/analysis/facts", dependencies=[Depends(check_admin)])
+def admin_analysis_facts():
+    """LLM 없이 집계만. 숫자만 필요할 때 쓴다."""
+    return analysis_engine.collect_facts()
+
+
+@router.post("/analysis", dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_analyze(body: AnalyzeRequest):
+    """질문 → Claude 답변. 대화는 자동 저장된다.
+
+    쓰기 스위치를 같이 거는 이유 — 답변을 표에 남기므로 쓰기 작업이고,
+    LLM 비용도 든다. 잠갔을 때 같이 잠기는 게 맞다
+    """
+    out = analysis_engine.ask(body.question)
+    if out.get("error"):
+        raise HTTPException(status_code=422, detail=out["error"])
+    return out
+
+
+@router.get("/analysis", dependencies=[Depends(check_admin)])
+def admin_analysis_list(limit: int = 50):
+    return analysis_engine.list_chats(limit=limit)
+
+
+@router.get("/analysis/{chat_id}", dependencies=[Depends(check_admin)])
+def admin_analysis_one(chat_id: int):
+    found = analysis_engine.get_chat(chat_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="그런 대화가 없다")
+    return found
+
+
+@router.delete("/analysis/{chat_id}", status_code=204,
+               dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_analysis_delete(chat_id: int):
+    if not analysis_engine.delete_chat(chat_id):
+        raise HTTPException(status_code=404, detail="그런 대화가 없다")

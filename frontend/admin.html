@@ -304,6 +304,45 @@ details.persona[open] > summary::before { content: "\25BE"; }
 details.persona > summary .len { margin-left: auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 details.persona .body { padding: 0 14px 12px; }
 
+/* 분석 막대 (접이식)
+   details.persona 와 같은 방식이다. 다른 점은 대시보드 격자에서 한 줄을
+   통째로 쓰는 "긴 막대"라는 것뿐 */
+details.ask { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+details.ask > summary {
+  cursor: pointer; padding: 13px 16px; font-size: 14px; font-weight: 650;
+  display: flex; align-items: center; gap: 9px; list-style: none;
+}
+details.ask > summary::-webkit-details-marker { display: none; }
+details.ask > summary .hint { font-weight: 400; font-size: 11.5px; color: var(--muted); }
+details.ask > summary::after { content: "\25BE"; margin-left: auto; color: var(--muted); font-size: 11px; }
+details.ask[open] > summary::after { content: "\25B4"; }
+details.ask > .body { padding: 16px; border-top: 1px solid var(--line); }
+
+/* 분석 패널 안쪽 */
+.an-ex { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.an-ask { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.an-ask textarea { width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; resize: vertical;
+                   border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2);
+                   color: var(--ink); }
+.an-item { margin-top: 12px; }
+.an-q { font-weight: 650; font-size: 13px; margin-bottom: 6px; }
+.an-a { font-size: 13px; line-height: 1.65; white-space: pre-wrap;
+        padding: 11px 13px; border-radius: 9px; background: var(--surface-2);
+        border: 1px solid var(--line); }
+.an-when { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.an-row { cursor: pointer; }
+.an-row:hover { background: var(--surface-2); }
+.an-del { flex: none; align-self: center; padding: 0 7px; color: var(--muted); }
+
+/* 지난 대화 목록 */
+.hist { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.hist li { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.hist li:first-child { border-top: 0; }
+.hist .t { flex: none; width: 108px; color: var(--muted); font-size: 12px;
+           font-variant-numeric: tabular-nums; }
+.hist .q { color: var(--ink); }
+.hist .a { color: var(--ink-2); margin-top: 3px; white-space: pre-wrap; }
+
 .metric { background: var(--surface-2); border-radius: 11px; padding: 12px 14px; }
 .metric .m-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .metric .m-name { font-size: 12.5px; font-weight: 600; }
@@ -673,9 +712,10 @@ async function loadDashboard() {
   const genders = ch.genders.map(g => ({
     ...g, label: isEmptyLabel(g.label) ? '미입력' : g.label,
   }));
-  
+
   const top10 = ch.memberGu.slice(0, 10);
   $('#dash').innerHTML = `
+    ${analysisBar()}
     ${card('희망 조건 평균 <span class="hint">1~5</span>', bars(ch.weights, { max: 5, fmt: v => v.toFixed(2) }),
            `회원들이 무엇을 더 중요하게 꼽았는지 · 7개 지표 평균 ${avgWeight}`)}
     ${card('연령대', cols(ch.ages), '10살 단위')}
@@ -684,8 +724,114 @@ async function loadDashboard() {
     ${card('회원이 사는 자치구 <span class="hint">상위 10</span>', bars(top10, { color: 'var(--s3)' }),
            `25개 구 중 ${ch.memberGu.length}개 구에 회원이 있다`, 'wide')}
   `;
+  /* 그리기(위)와 동작 붙이기(아래)는 순서를 지켜야 한다 —
+     innerHTML 로 넣기 전에는 $('#an-send') 가 아직 없어서 못 찾는다 */
+  wireAnalysis($('#dash'));
 }
 
+/* 분석 막대
+   대시보드 맨 위에 접힌 채로 놓인다. 숫자를 보다가 바로 물어볼 수 있는 자리다.
+   서버가 집계표를 만들어 Claude 에게 주므로, Claude 는 SQL 을 짜지 않는다 */
+
+const EXAMPLES = [
+  '회원들 성향에서 눈에 띄는 게 뭐야?',
+  '어느 자치구에 회원이 몰려 있어?',
+  '사람들이 많이 찾는 검색어가 뭐야?',
+  '홈페이지 개선에 쓸 만한 게 있을까?',
+];
+
+function analysisBar() {
+  return `<details class="ask wide" id="ask">
+    <summary>분석 <span class="hint">집계된 숫자를 Claude 에게 물어봅니다</span></summary>
+    <div class="body">
+      <div class="an-ex">${EXAMPLES.map(q =>
+        `<button class="btn sm an-ex-b" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <div class="an-ask">
+        <textarea id="an-q" rows="2" placeholder="집계된 숫자에 대해 물어보세요"></textarea>
+        <button class="btn primary" id="an-send" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>물어보기</button>
+      </div>
+      <div class="hint" style="margin-top:8px">답변은 집계된 숫자만 보고 만들어집니다. 자료에 없는 건 없다고 답합니다.</div>
+      <div id="an-out"></div>
+      <div class="card-title" style="margin:18px 0 8px">지난 대화</div>
+      <div id="an-list"><div class="skel">펼치면 불러옵니다</div></div>
+    </div>
+  </details>`;
+}
+
+function wireAnalysis(root) {
+  const bar = $('#ask', root);
+  const out = $('#an-out', root);
+  const box = $('#an-q', root);
+  let listLoaded = false;
+
+  /* 펼칠 때 딱 한 번만 지난 대화를 불러온다.
+     대시보드를 열 때마다 부르면, 한 번도 안 펼친 사람에게도 요청이 나간다 */
+  bar.addEventListener('toggle', () => {
+    if (bar.open && !listLoaded) { listLoaded = true; loadAnalysisList(); }
+  });
+
+  $$('.an-ex-b', root).forEach(b => b.onclick = () => { box.value = b.dataset.q; box.focus(); });
+  $('#an-send', root).onclick = () => askAnalysis(box.value);
+  box.onkeydown = e => {
+    /* Ctrl+Enter 로 보낸다. 그냥 Enter 는 줄바꿈이어야 긴 질문을 쓸 수 있다 */
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askAnalysis(box.value);
+  };
+
+  async function askAnalysis(question) {
+    if (!(question || '').trim()) return;
+    out.innerHTML = '<div class="skel">Claude 가 집계를 읽는 중… (3~5초)</div>';
+    try {
+      const r = await api('/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+      out.innerHTML = answerBlock(r.question, r.answer);
+      box.value = '';
+      listLoaded = true;
+      loadAnalysisList();
+    } catch (e) {
+      out.innerHTML = `<div class="an-a" style="color:var(--danger)">답을 못 받았습니다. ${esc(String(e).slice(0, 120))}</div>`;
+    }
+  }
+
+  function answerBlock(q, a) {
+    return `<div class="an-item"><div class="an-q">${esc(q)}</div>
+      <div class="an-a">${esc(a)}</div></div>`;
+  }
+
+  async function loadAnalysisList() {
+    const list = $('#an-list', root);
+    const rows = await api('/analysis');
+    if (!rows.length) { list.innerHTML = '<div class="empty" style="padding:14px 0">아직 저장된 대화가 없습니다</div>'; return; }
+    list.innerHTML = `<ul class="hist">${rows.map(r => `
+      <li data-id="${r.chat_id}" class="an-row">
+        <span class="t">${esc(when(r.created_at))}</span>
+        <div><div class="q">${esc(r.question)}</div>
+          <div class="a">${esc(r.preview || '')}…</div></div>
+        <button class="btn sm an-del" data-id="${r.chat_id}" title="지우기">&times;</button>
+      </li>`).join('')}</ul>`;
+
+    $$('.an-row', list).forEach(li => li.onclick = e => {
+      if (e.target.classList.contains('an-del')) return;
+      openAnalysis(li.dataset.id);
+    });
+    $$('.an-del', list).forEach(b => b.onclick = async e => {
+      e.stopPropagation();
+      await api(`/analysis/${b.dataset.id}`, { method: 'DELETE' });
+      loadAnalysisList();
+    });
+  }
+
+  async function openAnalysis(id) {
+    out.innerHTML = '<div class="skel">불러오는 중…</div>';
+    const r = await api(`/analysis/${id}`);
+    /* 그때의 집계도 같이 저장해 뒀다. 지금 숫자와 다를 수 있으므로
+       "언제 기준인지"를 반드시 같이 보여준다 */
+    out.innerHTML = answerBlock(r.question, r.answer) +
+      `<div class="an-when">${esc(when(r.created_at))} 기준 집계로 만든 답입니다</div>`;
+  }
+}
 
 function card(title, body, hint = '', cls = '') {
   return `<div class="card ${cls}">
