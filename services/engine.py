@@ -30,7 +30,10 @@ from app.features.admin import (
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs,
 )
-from app.features.auth import login as auth_login, backfill_logins
+from app.features.auth import (
+    login as auth_login, backfill_logins,
+    id_exists as auth_id_exists, signup as auth_signup, google_login as auth_google_login,
+)
 
 
 print("✅ LLM 파이프라인 연결 성공!")
@@ -142,6 +145,21 @@ def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5)
 def get_customer(customer_id):
     """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
     return customer_one(customer_id)
+
+
+def check_login_id(login_id):
+    """아이디 중복확인. 이미 쓰이고 있으면 True."""
+    return auth_id_exists(login_id)
+
+
+def signup(login_id, password):
+    """아이디+비밀번호로 새 계정을 만든다. 이미 있는 아이디면 None."""
+    return auth_signup(login_id, password)
+
+
+def google_signin(email):
+    """구글 계정으로 로그인/가입한다. 이메일 하나로 계정을 찾거나 새로 만든다."""
+    return auth_google_login(email)
 
 
 def get_facilities(gu, dong, limit=5):

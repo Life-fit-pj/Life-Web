@@ -14,7 +14,11 @@ async function postJSON(url, body) {
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) throw new Error(`${url} 응답 오류 ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`${url} 응답 오류 ${res.status}`);
+    err.status = res.status;   // 409(중복) 처럼 상태코드로 갈라 보여줄 때 쓴다
+    throw err;
+  }
 
   return res.json();
 }
@@ -23,7 +27,11 @@ async function postJSON(url, body) {
 async function getJSON(url) {
   const res = await fetch(url);
 
-  if (!res.ok) throw new Error(`${url} 응답 오류 ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`${url} 응답 오류 ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
 
   return res.json();
 }
@@ -108,6 +116,21 @@ export function deleteLike(anonId, gu, dong) {
 /** 로그인 (처음 보는 아이디면 서버가 그 자리에서 발급도 겸한다) */
 export function login(loginId, password) {
   return postJSON("/api/login", { loginId, password });
+}
+
+/** 회원가입 화면의 "중복확인" 버튼. 이미 쓰이는 아이디면 available:false */
+export function checkLoginId(loginId) {
+  return getJSON(`/api/check-id?loginId=${encodeURIComponent(loginId)}`);
+}
+
+/** 아이디+비밀번호 회원가입. 이미 있는 아이디면 409 로 실패한다(postJSON 이 err.status 로 담아 던진다) */
+export function signup(loginId, password) {
+  return postJSON("/api/signup", { loginId, password });
+}
+
+/** 구글 로그인. credential 은 Google Identity Services 버튼이 주는 ID 토큰(JWT) */
+export function googleLogin(credential) {
+  return postJSON("/api/login/google", { credential });
 }
 
 /** 마이페이지 — 로그인한 회원의 기본정보 */

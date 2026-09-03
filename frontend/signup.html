@@ -353,6 +353,10 @@ const PERSONA_MAP = {
 };
 
 const STORAGE_KEY = "lifefit-survey";
+// search.js 가 같은 키를 읽어 "검색 화면(searchScreen) 대신 지도 화면을 바로 보여줄지" 정한다.
+// 회원가입은 이미 끝난 상태에서 설문만 건너뛰는 것이므로, 처음 보는 사람이 보는
+// 키워드 고르는 첫 화면을 또 보여줄 이유가 없다
+const SKIP_TO_MAP_KEY = "lifefit-skip-map";
 const MIN_CHARS = 5;
 
 const form = document.getElementById("surveyForm");
@@ -428,6 +432,7 @@ document.getElementById("btnSkipNo").addEventListener("click", () => {
 
 document.getElementById("btnSkipYes").addEventListener("click", () => {
   sessionStorage.removeItem(STORAGE_KEY);   // 이전에 쓰다 만 답이 남아 있을 수 있다
+  sessionStorage.setItem(SKIP_TO_MAP_KEY, "1");
   location.href = "/";
 });
 

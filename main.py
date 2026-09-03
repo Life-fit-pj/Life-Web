@@ -34,6 +34,21 @@ FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
 app = FastAPI(title="LIFE,FIT")
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """프론트 파일(HTML/JS/CSS)을 고쳐도 브라우저가 예전 버전을 계속 쓰는 걸 막는다.
+
+    StaticFiles 는 기본적으로 Cache-Control 을 안 보낸다. 그런데 Last-Modified 만 있으면
+    브라우저가 "방금 바뀐 파일이니 한동안은 새로 안 받아도 된다"고 스스로 판단하는
+    경우(RFC 7234 휴리스틱 캐싱)가 있어, 강력 새로고침 없이는 방금 고친 JS/HTML이
+    반영 안 된 것처럼 보일 수 있다. 이 저장소엔 빌드 단계가 없어 캐시로 아낄 트래픽도
+    거의 없으므로, 개발 중 혼란을 없애는 쪽을 택한다.
+    """
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
 # ==========================================
 # 2. API 라우트: 예측 및 추천 수행
 # ==========================================
@@ -60,7 +75,7 @@ def serve_index():
 app.mount("/LH평면도", StaticFiles(directory=os.path.join(DATA_DIR, 'LH평면도')))
 
 # frontend 전체를 뿌린다. 맨 마지막에 둬야 위의 경로들을 가로채지 않는다
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True))
+app.mount("/", NoCacheStaticFiles(directory=FRONTEND_DIR, html=True))
 
 
 
