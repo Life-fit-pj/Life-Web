@@ -312,28 +312,3 @@
   min-height: 1em;
 }
 .auth-hint--ok { color: #3a9d5d; }
-
-/* 로그인 폼과 구글 버튼 사이 구분선 */
-.auth-or {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 0 10px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.auth-or::before, .auth-or::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--line);
-}
-
-/* Google Identity Services 가 그리는 버튼이 들어갈 자리. 준비 전 안내 문구도 여기 뜬다 */
-.auth-google {
-  display: flex;
-  justify-content: center;
-  min-height: 40px;
-  font-size: 12.5px;
-  color: var(--muted);
-}

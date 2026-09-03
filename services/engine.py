@@ -30,9 +30,10 @@ from app.features.admin import (
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs,
 )
-from app.features.auth import login as auth_login, backfill_logins
-# id_exists / signup / google_login 은 Life-Embed-jh(jihye 브랜치) auth.py에 아직 없어서
-# 임시 비활성화했다 — 자세한 경위는 SIGNUP_DISABLED.md 참고
+from app.features.auth import (
+    login as auth_login, backfill_logins,
+    id_exists as auth_id_exists, signup as auth_signup,
+)
 
 
 print("✅ LLM 파이프라인 연결 성공!")
@@ -146,8 +147,14 @@ def get_customer(customer_id):
     return customer_one(customer_id)
 
 
-# check_login_id / signup / google_signin — 회원가입 연동과 함께 임시 비활성화.
-# SIGNUP_DISABLED.md 참고.
+def check_login_id(login_id: str) -> bool:
+    """아이디 중복확인. 이미 쓰이고 있으면 True."""
+    return auth_id_exists(login_id)
+
+
+def signup(login_id: str, password: str):
+    """아이디+비밀번호로 새 계정을 만든다. 이미 있는 아이디면 None."""
+    return auth_signup(login_id, password)
 
 
 def get_facilities(gu, dong, limit=5):

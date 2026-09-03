@@ -1,6 +1,6 @@
 import { openHistory } from "./history.js";
 import { openMypage } from "./mypage.js";
-import { login, checkLoginId, signup, googleLogin } from "../lib/api.js";
+import { login, checkLoginId, signup } from "../lib/api.js";
 import { getAnonId, isLoggedIn } from "../lib/state.js";
 
 let menuModalEl = null;
@@ -133,10 +133,6 @@ function renderGuestAuthModal(el) {
                 </form>
                 <p class="auth-notice">처음 쓰는 아이디·비밀번호를 입력하면 그 자리에서 계정이 만들어집니다.</p>
                 <p id="loginError" class="auth-error"></p>
-
-                <div class="auth-or"><span>또는</span></div>
-                <div id="googleBtn" class="auth-google"></div>
-                <p id="googleError" class="auth-error"></p>
             </div>
             <div class="auth-divider"></div>
             <div class="auth-section">
@@ -162,7 +158,6 @@ function renderGuestAuthModal(el) {
         }
     });
 
-    setupGoogleButton(el);
     el.querySelector("#gotoSignup").addEventListener("click", () => renderSignupAuthModal(el));
 }
 
@@ -198,38 +193,6 @@ function renderSignupAuthModal(el) {
     el.querySelector("#backToLogin").addEventListener("click", () => renderGuestAuthModal(el));
 
     setupSignupForm(el);
-}
-
-// 구글 로그인 버튼. Google Identity Services 스크립트(index.html)가 만드는
-// window.google.accounts.id 를 쓴다. 클라이언트 ID(window.GOOGLE_CLIENT_ID, index.html에서
-// 정의)가 아직 비어 있으면 안내 문구만 보여주고 버튼은 그리지 않는다 — 키 없이 그려봐야
-// 눌러도 실패하기만 하는 버튼을 보여주는 셈이라 혼란만 준다.
-function setupGoogleButton(el) {
-    const mount = el.querySelector("#googleBtn");
-    const errorEl = el.querySelector("#googleError");
-    const clientId = window.GOOGLE_CLIENT_ID;
-
-    if (!clientId || !window.google?.accounts?.id) {
-        mount.textContent = "구글 로그인은 아직 준비 중이에요.";
-        return;
-    }
-
-    window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async ({ credential }) => {
-            errorEl.textContent = "";
-            try {
-                const { customerId } = await googleLogin(credential);
-                localStorage.setItem("lf-anon", customerId);
-                renderLoggedInAuthModal(el);
-            } catch (err) {
-                errorEl.textContent = "구글 로그인에 실패했어요.";
-            }
-        },
-    });
-    window.google.accounts.id.renderButton(mount, {
-        theme: "outline", size: "large", width: 280, text: "signin_with",
-    });
 }
 
 // 회원가입 폼. 아이디 중복확인 + 비밀번호/비밀번호 확인 일치만 보는 최소 구성이다.
