@@ -59,19 +59,16 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 - `routers/lifetype.py` — `/api/lifetype`, `/api/lifetype/keywords`. 1차 유형 판정입니다.
 - `routers/admin.py` — `/api/admin/*`. `Authorization: Bearer <ADMIN_TOKEN>` 헤더를 요구하고,
   수정(PATCH)은 `.env`의 `ADMIN_WRITE_ENABLED=1`까지 있어야 통과합니다.
-<<<<<<< HEAD
   `/summary`는 대시보드가 쓰는 집계 한 덩어리(카운트 + 차트 8종 + 최근 수정)이고
   `/logs`는 `admin_log` 표를 읽습니다. 둘 다 엔진의 `dashboard()`·`recent_logs()`를 부릅니다.
   쓰기 스위치 상태(`write_enabled`)는 이 저장소의 `.env`가 갖고 있으므로 엔진이 아니라
   여기서 `/ready`·`/summary` 응답에 붙입니다.
-=======
 - `routers/survey.py` — `/api/survey`. 서술형 설문 15문항을 받아 `services/persona_type.py`로
   축 점수·가중치를 규칙 기반(LLM 없이)으로 계산하고, `/api/predict`와 같은 자리
   (`recommend_by_weights_explained`)로 추천을 돌립니다. **아직 프론트에 연결되지 않았습니다** —
   `frontend/signup.html`은 지금도 답변을 문장으로 이어 붙여 `/api/predict`의 `query`(LLM 경로)로
   보냅니다(`ui/search.js`의 `SURVEY_KEY` 처리부). 프론트를 이 엔드포인트로 옮길 때는 이 차이를
   먼저 확인하세요.
->>>>>>> origin/HEAD
 - `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. 다른 추천 엔진으로
   교체하려면 여기 있는 import 줄만 바꾸면 됩니다(README의 "다른 엔진 붙이기" 참고).
   7개 라이프스타일 지표의 한국어⇄영어 매핑(`KEY_MAP`)도 여기 하나만 있습니다 — 다른 파일에서

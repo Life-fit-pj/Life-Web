@@ -17,16 +17,22 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
-from app.core.db import add_like, remove_like
+from app.core.db import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
 from app.core.db import facilities, facility_counts, region_extras
+from app.core.db import customer_one
 from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
 from app.features.scoring import score_survey 
+from app.features import analysis as analysis_engine
 from app.features.admin import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches, privacy_preview, dashboard, recent_logs,
+    clear_caches, privacy_preview, dashboard, recent_logs, create_member,   # ← 추가
+)
+from app.features.auth import (
+    login as auth_login, backfill_logins,
+    id_exists as auth_id_exists, signup as auth_signup,
 )
 
 
@@ -136,6 +142,21 @@ def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5)
                                            top_k=top_k, housing=housing)
 
 
+def get_customer(customer_id):
+    """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
+    return customer_one(customer_id)
+
+
+def check_login_id(login_id: str) -> bool:
+    """아이디 중복확인. 이미 쓰이고 있으면 True."""
+    return auth_id_exists(login_id)
+
+
+def signup(login_id: str, password: str):
+    """아이디+비밀번호로 새 계정을 만든다. 이미 있는 아이디면 None."""
+    return auth_signup(login_id, password)
+
+
 def get_facilities(gu, dong, limit=5):
     """행정동 하나의 시설 정보를 돌려준다. 지도 핀을 눌렀을 때 쓴다."""
     return {
@@ -154,12 +175,11 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
     """
     return region_explain_cached(gu, dong, query, weights, scores, housing)
 
-
 def get_chat_answer(question, regions=None, weights=None, history=None):
     """추천 결과에 대한 후속 질문에 답한다."""
     return chat_engine(question, regions=regions, weights=weights, history=history)
 
-
+# => 좋아요
 def like_region(anon_id, gu, dong):
     """지도 핀에서 좋아요 클릭시 호출한다."""
     add_like(anon_id, gu, dong)
@@ -167,6 +187,22 @@ def like_region(anon_id, gu, dong):
 def unlike_region(anon_id, gu, dong):
     """좋아요를 취소하면 호출한다."""
     remove_like(anon_id, gu, dong)
+
+# => 검색
+def save_search(anon_id, query):
+    """검색어를 기록한다. 검색창에 입력한 문장이 있을 때만 부른다."""
+    add_search_history(anon_id, query)
+
+def save_chat(anon_id, question, answer):
+    """후속 질문/답변을 기록한다."""
+    add_chat_history(anon_id, question, answer)
+
+def get_history(anon_id):
+    """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
+    return {
+        "searches": list_search_history(anon_id),
+        "chats": list_chat_history(anon_id),
+    }
 
 if __name__ == "__main__":
     w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})

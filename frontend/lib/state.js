@@ -36,9 +36,20 @@ export function isLatest(seq) {
 }
 
 
-// 로그인이 없어서 기기 단위 익명 ID를 하나 발급해 좋아요에 쓴다.
-export const anonId = localStorage.getItem("lf-anon") ?? (() => {
-  const id = crypto.randomUUID();
-  localStorage.setItem("lf-anon", id);
-  return id;
-})();
+// 최초 방문 시 익명 UUID를 한 번 발급해 둔다. 로그인하면 이 값이 customer_id("C101")로 바뀐다.
+if (!localStorage.getItem("lf-anon")) {
+  localStorage.setItem("lf-anon", crypto.randomUUID());
+}
+
+// 기기 단위 식별자. 매번 localStorage를 읽어야 로그인/로그아웃이 새로고침 없이 반영된다 —
+// 예전처럼 `export const anonId = ...`로 모듈 로드 시점에 한 번 고정해 버리면, 로그인
+// 직후 새 값을 보게 하려고 페이지를 통째로 reload()해야 했고, 그러면 검색 결과 같은
+// 화면 상태(state.lastResult 등)가 전부 날아가 "뒤로 가진" 것처럼 보였다.
+export function getAnonId() {
+  return localStorage.getItem("lf-anon");
+}
+
+// customer_id 형식("C101")인지로 로그인 여부를 가른다 — 별도 플래그를 안 둔다
+export function isLoggedIn() {
+  return /^C\d+$/.test(getAnonId());
+}

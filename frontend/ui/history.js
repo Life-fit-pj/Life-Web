@@ -6,7 +6,7 @@
  */
 
 import { getHistory } from "../lib/api.js";
-import { anonId } from "../lib/state.js";
+import { getAnonId } from "../lib/state.js";
 import { escapeAndFormat } from "../lib/format.js";
 
 let historyModalEl = null;
@@ -56,7 +56,7 @@ export async function openHistory() {
   chatsEl.innerHTML = "";
 
   try {
-    const { searches = [], chats = [] } = await getHistory(anonId);
+    const { searches = [], chats = [] } = await getHistory(getAnonId());
 
     renderList(searchesEl, searches, "검색 기록이 없어요.",
       (s) => `<div class="history-item">${escapeAndFormat(s.query)}</div>`);
