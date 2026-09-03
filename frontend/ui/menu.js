@@ -1,6 +1,6 @@
 import { openHistory } from "./history.js";
 import { openMypage } from "./mypage.js";
-import { login, checkLoginId, signup } from "../lib/api.js";
+import { login, checkLoginId } from "../lib/api.js";
 import { getAnonId, isLoggedIn } from "../lib/state.js";
 
 let menuModalEl = null;
@@ -87,7 +87,8 @@ function closeMenu() {
 // 새로고침 없이도 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
 // 회원가입은 로그인 화면의 "회원가입" 버튼을 눌러야 나오는 별도 화면이다
 // (renderSignupAuthModal) — 아이디 중복확인 + 비밀번호 확인만 보는 최소 폼이고,
-// 계정을 만든 뒤에는 그대로 라이프스타일 설문(signup.html)으로 넘어간다.
+// 아이디/비번을 임시로 들고 그대로 기본정보·설문(signup.html)으로 넘어간다.
+// 계정은 거기서 모든 정보를 다 받은 뒤 한 번에 만들어진다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
 
@@ -200,7 +201,7 @@ function renderSignupAuthModal(el) {
                     <p id="signupPwError" class="auth-error auth-error--above"></p>
                     <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>
 
-                    <button type="submit" class="auth-cta">가입하고 설문 시작하기</button>
+                    <button type="submit" class="auth-cta">다음: 정보 입력하기</button>
                 </form>
                 <button type="button" id="backToLogin" class="auth-back">← 로그인으로 돌아가기</button>
             </div>
@@ -286,20 +287,11 @@ function setupSignupForm(el) {
             return;
         }
 
-        try {
-            const { customerId } = await signup(loginId, password);
-            localStorage.setItem("lf-anon", customerId);
-            // 가입 다음은 그대로 라이프스타일 설문으로 넘어간다(기존 흐름 유지)
-            location.href = "signup.html";
-        } catch (err) {
-            if (err.status === 409) {
-                idConfirmed = false;
-                idError.textContent = "이미 사용 중인 아이디예요.";
-                idInput.focus();
-            } else {
-                pwError.textContent = "가입에 실패했어요. 잠시 후 다시 시도해 주세요.";
-            }
-        }
+        // 계정 생성은 여기서 하지 않는다 — 기본정보·설문까지 한 번에 모아
+        // signup.html 이 실제 /api/signup 을 부른다(회원가입은 그 화면에서 끝난다).
+        // 아이디/비번만 다음 화면이 쓸 수 있게 임시로 들고 넘어간다.
+        sessionStorage.setItem("lifefit-pending-signup", JSON.stringify({ loginId, password }));
+        location.href = "signup.html";
     });
 }
 
