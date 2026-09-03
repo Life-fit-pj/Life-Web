@@ -28,7 +28,7 @@ from app.features import analysis as analysis_engine
 from app.features.admin import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches, privacy_preview, dashboard, recent_logs,
+    clear_caches, privacy_preview, dashboard, recent_logs, create_member,   # ← 추가
 )
 from app.features.auth import login as auth_login, backfill_logins
 # id_exists / signup / google_login 은 Life-Embed-jh(jihye 브랜치) auth.py에 아직 없어서

@@ -481,8 +481,9 @@ pre.safe { background: rgba(12,163,12,.10); }
         <aside class="side">
           <div class="side-top">
             <input type="text" id="member-search" placeholder="이름 · 아이디 검색">
+            <button class="btn sm" id="member-add">+ 추가</button>
             <div class="side-count" id="member-count"></div>
-          </div>
+          </div> 
           <div class="side-list" id="member-rows"></div>
         </aside>
         <div class="detail" id="member-detail">
@@ -936,6 +937,71 @@ $('#member-rows').addEventListener('click', e => {
   const row = e.target.closest('.row');
   if (row) openMember(row.dataset.id);
 });
+$('#member-add').addEventListener('click', openNewMemberForm);
+
+
+// ── 새로 추가 ──
+function openNewMemberForm() {
+  currentMember = null;
+  markMemberRow();          // 목록에서 켜져 있던 회원 표시를 끈다
+  const board = $('#member-detail');
+
+  const editable = Object.keys(CUSTOMER_LABELS).filter(k => !READONLY.includes(k));
+  const basic = editable.map(k => `
+    <div>
+      <label class="lab" for="f-${k}">${esc(CUSTOMER_LABELS[k])}</label>
+      ${k === 'gender'
+        ? `<select id="f-${k}" name="${k}">
+             <option value="">선택 안 함</option>
+             <option value="M">남성</option>
+             <option value="F">여성</option>
+           </select>`
+        : `<input id="f-${k}" name="${k}" type="${k === 'age' ? 'number' : 'text'}">`}
+      <div class="err" data-err="${k}"></div>
+    </div>`).join('');
+
+  // 기본값 3으로 둔다 — 안 건드리면 "보통"으로 저장된다
+  const sliders = INDICATORS.map(k => `
+    <div class="w-item">
+      <div class="slider-row">
+        <span class="s-lab">${esc(k)}</span>
+        <input type="range" class="w-bar" min="1" max="5" step="0.01" value="3"
+               oninput="this.nextElementSibling.value = this.value">
+        <input type="number" class="w-num" name="${k}" min="1" max="5" step="any" value="3"
+               oninput="this.previousElementSibling.value = this.value">
+      </div>
+    </div>`).join('');
+
+  const personas = Object.keys(PERSONA_LABELS).map(k => `
+    <details class="persona" ${k === 'persona' ? 'open' : ''}>
+      <summary>${esc(PERSONA_LABELS[k])}<span class="len">0자</span></summary>
+      <div class="body">
+        <textarea name="${k}"
+          oninput="this.closest('details').querySelector('.len').textContent = this.value.length + '자'"></textarea>
+        <div class="err" data-err="${k}"></div>
+      </div>
+    </details>`).join('');
+
+  board.innerHTML = `
+    <div class="detail-head">
+      <h3>새 회원</h3>
+      <span class="id">아이디는 저장할 때 자동으로 붙는다</span>
+      <div class="acts">
+        <button class="btn sm primary" id="member-create"
+          ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>추가</button>
+      </div>
+    </div>
+    <div class="detail-body" id="member-form">
+      ${card('기본 정보', `<div class="grid2">${basic}</div>`, '이름만 있어도 저장된다')}
+      ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
+             '기본값 3 · 안 건드리면 그대로 저장된다')}
+      ${card('페르소나 <span class="hint">서술형</span>', personas,
+             `20자 미만으로 쓰면 저장은 되지만 벡터는 안 만들어진다 (MIN_LENGTH=20)`)}
+    </div>`;
+
+  $('#member-create').addEventListener('click', createMember);
+}
+
 
 async function openMember(id) {
   currentMember = id;
@@ -1069,6 +1135,37 @@ function showErrors(e) {
 }
 
 const INDICATORS = ['녹지', '안전', '교통', '상권', '의료', '교육', '문화'];
+
+// ── 새로 추가 ──
+async function createMember() {
+  const payload = {};
+  $$('#member-form [name]').forEach(el => {
+    const raw = el.type === 'number'
+      ? (el.value === '' ? null : Number(el.value))
+      : el.value.trim();
+    if (raw !== '' && raw !== null) payload[el.name] = raw;
+  });
+  if (!payload.name) return toast('이름은 있어야 합니다');
+
+  clearErrors();
+  let created;
+  try {
+    created = await api('/members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    return showErrors(e);
+  }
+
+  members = await api('/members');
+  renderMemberRows(members);
+  await openMember(created.customer.customer_id);   // 방금 만든 회원을 바로 연다
+  loaded.dash = false;                                // 대시보드 숫자가 낡았다
+  refreshStatus();
+  toast(`${created.customer.customer_id} 로 추가했습니다`);
+}
 
 async function saveMember(id) {
   const patch = collectPatch();
