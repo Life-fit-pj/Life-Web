@@ -162,7 +162,7 @@
   cursor: pointer;
 }
 
-#chatSend:hover { background: var(--amber); }
+#chatSend:hover { background: var(--accent-fill); color: var(--accent-ink); }
 
 #chatSend:disabled {
   background: var(--line-strong);

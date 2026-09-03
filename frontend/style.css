@@ -16,22 +16,33 @@ placeholder 공통 색상 규칙
    --navy 같은 이름은 밤 모드에서 남색이 아니게 되어 거짓말이 된다 */
 
 :root {
-  /* ── 낮 : 자연, 편안함 ── */
-  --bg:           #F8F1D8;
-  --surface:      rgba(255, 255, 255, 0.92);
-  --surface-2:    #F1E9CE;
-  --line:         #DAD7CD;
-  --line-strong:  #BFBBA9;
+  /* ── 낮 : 흰 바탕에 베이지·그린 포인트 ──
+     바탕과 글자는 흰색·검정으로 두어 가독성을 확보하고,
+     팔레트 색은 테두리·보조 면·포인트에만 얹는다.
+     베이지를 넓은 면에 깔면 글자가 묻힌다 */
+  --bg:           #FBF8F1;   /* 거의 흰색. 아주 옅은 온기만 남긴다 */
+  --surface:      rgba(255, 255, 255, 0.96);   /* 카드는 흰색 */
+  --surface-2:    #F1E9CE;   /* 보조 면 — 입력칸·말풍선 */
+  --line:         #D7C39B;   /* 카드·보더 */
+  --line-strong:  #B1B695;
 
-  --text:         #2D2A32;
-  --text-muted:   #7B7A6B;
+  --text:         #1C1A20;   /* 검정 글씨 */
+  --text-muted:   #6E6C60;
 
-  --primary:      #344E41;   /* 깊은 숲 초록 */
-  --primary-soft: #A3B18A;   /* 이끼 초록 */
+  --primary:      #344E41;   /* 메인 포인트, 깊은 숲 초록 */
+  --primary-soft: #869481;   /* 서브 포인트 */
 
-  --accent:       #8A6D1F;   /* 포인트 글자. 노랑은 밝아 글자로 안 읽힌다 */
-  --accent-fill:  #FFD24A;   /* 포인트 면 */
-  --accent-soft:  #FBEFC4;
+  /* 포인트 색은 낮과 밤이 다른 계열이다.
+     낮은 흰 바탕이라 팔레트의 깊은 초록이 또렷하게 읽히고,
+     밤은 어두운 바탕이라 노랑이 살아난다 */
+  --accent:       #344E41;   /* 로고 쉼표, h1 강조 단어 */
+  --accent-soft:  #E9EEE3;
+
+  /* 버튼에 마우스를 올렸을 때 채워지는 노랑.
+     낮·밤이 같은 값이라 밤에서 다시 정의하지 않는다.
+     노랑 위에는 흰 글씨가 안 읽히므로 글자색을 따로 둔다 */
+  --accent-fill:  #FFCC00;
+  --accent-ink:   #1C1A20;
 
   --good:         #4A9D6E;
   --radius:       18px;
@@ -42,6 +53,10 @@ placeholder 공통 색상 규칙
   --glow:         none;                    /* 발광. 낮에는 쓰지 않는다 */
   --blur:         blur(8px);
   --map-filter:   none;                    /* 지도는 원본 그대로 */
+
+  /* 화면 안에 쓰는 마크. 탭 아이콘과 달리 배경이 없는 판본이라
+     바탕색에 따라 파일을 바꿔 끼운다 */
+  --logo-mark:    url("img/logo_A_day_344E41.png");
 
   /* ── 옛 이름. CSS 곳곳이 아직 이 이름을 쓰고 있어 당분간 남겨 둔다 ── */
   --paper:        var(--bg);
@@ -60,21 +75,20 @@ placeholder 공통 색상 규칙
    CSS 만으로 prefers-color-scheme 과 수동 선택을 함께 다루려면
    같은 값을 두 벌 써야 해서 관리가 어렵다 */
 [data-theme="dark"] {
-  --bg:           #182A57;
-  --surface:      rgba(45, 79, 143, 0.30);
-  --surface-2:    #21376B;
-  --line:         rgba(255, 255, 255, 0.10);
-  --line-strong:  rgba(255, 255, 255, 0.18);
+  --bg:           #2B2D2D;
+  --surface:      rgba(95, 99, 100, 0.55);   /* #5F6364, 카드 */
+  --surface-2:    #414443;
+  --line:         #5F6364;                   /* 카드·보더 */
+  --line-strong:  #7B7E7F;                   /* 보조 텍스트 */
 
-  --text:         #F8F1D8;
-  --text-muted:   #A9B6D4;
+  --text:         #B1B695;   /* 본문 텍스트 */
+  --text-muted:   #7B7E7F;   /* 보조 텍스트 */
 
-  --primary:      #2D4F8F;
-  --primary-soft: #3D63A8;
+  --primary:      #869481;   /* 메인 포인트 */
+  --primary-soft: #A4AFA1;
 
-  --accent:       #FFD24A;   /* 어두운 바탕에서는 노랑이 글자로도 읽힌다 */
-  --accent-fill:  #D1B15A;
-  --accent-soft:  rgba(255, 210, 74, 0.16);
+  --accent:       #FFCC00;   /* 어두운 바탕에서는 노랑이 글자로도 읽힌다 */
+  --accent-soft:  rgba(255, 204, 0, 0.16);
 
   --good:         #7ED6A5;
 
@@ -86,6 +100,8 @@ placeholder 공통 색상 규칙
   /* 카카오 기본 지도는 흰 배경이라 밤 화면에서 튄다.
      색을 반전하고 색상환을 180도 돌려 어두운 지도로 만든다 */
   --map-filter:   invert(95%) hue-rotate(180deg) brightness(115%) contrast(90%);
+
+  --logo-mark:    url("img/logo_A_night_B1B695.png");
 }
 
 
@@ -138,6 +154,32 @@ body {
   padding: 20px 26px 56px;
   background: linear-gradient(180deg, var(--surface) 0%, transparent 100%);
   pointer-events: none;
+}
+
+/* 마크 + 두 줄 제목.
+   마크 높이는 값을 적지 않고 두 줄에서 받아 온다 —
+   제목이 clamp() 로 화면 폭에 따라 커지므로 고정값을 쓰면 어긋난다.
+   stretch 로 줄 높이를 물려받고, 정사각형이라 aspect-ratio 로 너비를 낸다 */
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 높이는 stretch 로 두 줄에서 받아 오고, 너비는 값을 적는다.
+   aspect-ratio 로 너비를 내려 하면 마크가 아예 안 보인다 —
+   flex 는 너비를 먼저 정한 뒤에 높이를 정하므로, 높이에서 너비를
+   거꾸로 끌어올 수 없어 빈 요소의 너비가 0 이 된다.
+   그림은 contain 이라 이 상자 안에서 늘 정사각형으로 그려진다 */
+.header-brand::before {
+  content: "";
+  flex: none;
+  align-self: stretch;
+  width: 56px;
+  margin-left: 10px;            /* 오른쪽 여백(13px)의 절반만큼 오른쪽으로 */
+  position: relative;
+  top: -3px;                   /* 위로 3px. transform 과 달리 stretch 를 안 건드린다 */
+  background: var(--logo-mark) left center / contain no-repeat;
 }
 
 .eyebrow {
@@ -373,7 +415,8 @@ input[type=range]::-moz-range-thumb {
 }
 
 .run-btn:hover {
-  background: var(--amber);
+  background: var(--accent-fill);
+  color: var(--accent-ink);
   transform: translateY(-1px);
 }
 

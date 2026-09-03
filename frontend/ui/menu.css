@@ -31,12 +31,12 @@
 #menuToggle:hover { background: var(--accent-soft); }
 
 /* 로그인 버튼. 낮/밤 테마 변수(--accent-fill)를 쓰면 밤에는 톤 다운된
-   금색(#D1B15A)으로 바뀌어버리므로, 테마와 무관하게 값을 고정해 둔다 */
+   금색(#E0B400)으로 바뀌어버리므로, 테마와 무관하게 값을 고정해 둔다 */
 #loginToggle {
   padding: 10px 20px;
   border: none;
   border-radius: 999px;
-  background: #FFD24A;
+  background: #FFCC00;
   color: #2D2A32;
   font-size: 13px;
   font-weight: 700;
@@ -206,7 +206,7 @@
   transition: background 0.2s;
 }
 
-.auth-cta:hover { background: var(--accent); }
+.auth-cta:hover { background: var(--accent-fill); color: var(--accent-ink); }
 
 /* 로그인 화면의 "회원가입" 버튼 — 로그인 버튼과 나란히 있을 때 주된 동작으로
    오인되지 않도록 채워진 배경 대신 테두리만 쓴다 */

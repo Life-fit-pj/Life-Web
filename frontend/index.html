@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>당신을 위한 집 · AI 주거 추천 시스템</title>
 
+  <!-- 탭 아이콘. 원형 로고를 쓴다 — 파비콘은 16px 로 줄어들어
+       배경 없는 마크는 브라우저 탭 색에 묻힌다.
+       media 를 모르는 브라우저는 첫 줄(낮)을 쓴다 -->
+  <link rel="icon" type="image/png" href="img/logo_B_day_circle.png">
+  <link rel="icon" type="image/png" href="img/logo_B_night_circle.png" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="img/logo_B_day_circle.png">
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,8 +124,14 @@
 
   <!-- 상단 헤더 -->
   <div class="header">
-    <p class="eyebrow">AI Housing Recommendation</p>
-    <h1>당신에게 딱 맞는 <em>집</em>과 <em>공간</em></h1>
+    <!-- 마크는 .header-brand 의 ::before 다. 두 줄을 감싸야
+         마크 높이가 "eyebrow + 제목" 만큼 잡힌다 -->
+    <div class="header-brand">
+      <div class="header-titles">
+        <p class="eyebrow">AI Housing Recommendation</p>
+        <h1>당신에게 딱 맞는 <em>집</em>과 <em>공간</em></h1>
+      </div>
+    </div>
     <!-- 결과 화면에서도 검색어를 보고 다시 검색할 수 있게 한다.
          첫 화면으로 돌아갈 이유를 없애는 것이 목적이다 -->
     <div class="top-search">

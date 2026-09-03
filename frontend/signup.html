@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LIFE,FIT 회원가입 — 라이프스타일 설문</title>
+  <link rel="icon" type="image/png" href="img/logo_B_day_circle.png">
+  <link rel="icon" type="image/png" href="img/logo_B_night_circle.png" media="(prefers-color-scheme: dark)">
 
   <!-- 테마를 CSS 보다 먼저 정한다. index.html 과 같은 키를 읽어
        두 화면의 낮/밤이 어긋나지 않게 한다 -->
@@ -26,27 +28,32 @@
   -->
   <style>
     :root {
-      --bg:          #F8F1D8;
+      --bg:          #FBF8F1;
       --surface:     #FFFFFF;
       --surface-2:   #F1E9CE;
-      --line:        #DAD7CD;
-      --text:        #2D2A32;
-      --text-muted:  #7B7A6B;
+      --line:        #D7C39B;
+      --text:        #1C1A20;
+      --text-muted:  #6E6C60;
       --primary:     #344E41;
-      --accent:      #8A6D1F;
+      --accent:      #344E41;
       --danger:      #C0563F;
+      /* 버튼 hover 노랑 — 낮·밤이 같아 밤에서 다시 정의하지 않는다 */
+      --accent-fill: #FFCC00;
+      --accent-ink:  #1C1A20;
+      --logo-mark:   url("img/logo_A_day_344E41.png");
     }
 
     [data-theme="dark"] {
-      --bg:          #1B1A17;
-      --surface:     #262420;
-      --surface-2:   #2F2C26;
-      --line:        #45413A;
-      --text:        #EDE8DA;
-      --text-muted:  #A09A88;
-      --primary:     #A3B18A;
-      --accent:      #E3C36B;
+      --bg:          #2B2D2D;
+      --surface:     #5F6364;
+      --surface-2:   #414443;
+      --line:        #5F6364;
+      --text:        #B1B695;
+      --text-muted:  #7B7E7F;
+      --primary:     #869481;
+      --accent:      #FFCC00;
       --danger:      #E08A72;
+      --logo-mark:   url("img/logo_A_night_B1B695.png");
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,6 +74,17 @@
       font-weight: 700;
       color: var(--primary);
       letter-spacing: -0.5px;
+
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand::before {
+      content: "";
+      flex: none;
+      width: 28px;
+      height: 28px;
+      background: var(--logo-mark) center / contain no-repeat;
     }
     .brand i { color: var(--accent); font-style: normal; }
 
@@ -88,6 +106,9 @@
       letter-spacing: 0.05em;
       margin-bottom: 14px;
     }
+    /* 밤 화면에서는 회색 카드 위 회색 글씨라 소제목이 묻힌다.
+       포인트 색(노랑)으로 띄운다 */
+    [data-theme="dark"] .sec { color: var(--accent); }
 
     .sq-item { margin-bottom: 16px; }
     .sq-item:last-child { margin-bottom: 0; }
@@ -135,7 +156,7 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    .btn-submit:hover { background: var(--accent); }
+    .btn-submit:hover { background: var(--accent-fill); color: var(--accent-ink); }
 
     .btn-skip {
       padding: 10px;
