@@ -102,7 +102,7 @@ function updateTopRegionsList(regions, dropped) {
 
     // 1차에서도 나왔던 동네에 표시를 달아 준다
     const mark = item.fromFirst
-      ? '<span class="li-from-first" title="1차 유형에서도 추천된 동네">처음부터</span>'
+      ? '<span class="li-from-first" title="1차 유형에서도 추천된 동네">1차</span>'
       : '';
 
     div.innerHTML = `

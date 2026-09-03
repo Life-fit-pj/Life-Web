@@ -1,5 +1,12 @@
 # 회원가입 연동 임시 비활성화 (2026-09-03)
 
+> **해제됨 (2026-09-03)** — `Life-Embed-jh`가 `work_ds` 브랜치 `2e570c0 auth.py 파일 수정`
+> 커밋에서 `id_exists` / `signup` / `google_login` 세 함수를 구현해, 아래 조치를 되돌렸다.
+> `services/engine.py`의 세 import와 `check_login_id` / `signup` / `google_signin` 래퍼,
+> `routers/auth.py`의 `/api/check-id` · `/api/signup` · `/api/login/google` 본문이 모두
+> 복원된 상태다. 이 문서는 같은 증상(엔진 함수 부재로 인한 기동 실패)이 다시 났을 때를
+> 위한 기록으로만 남긴다.
+
 ## 무슨 일이 있었나
 
 `uvicorn main:app --reload --port 5000`이 서버 기동 단계에서 죽었다. 마지막 줄:

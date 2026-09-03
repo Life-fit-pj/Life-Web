@@ -128,11 +128,6 @@ export function signup(loginId, password) {
   return postJSON("/api/signup", { loginId, password });
 }
 
-/** 구글 로그인. credential 은 Google Identity Services 버튼이 주는 ID 토큰(JWT) */
-export function googleLogin(credential) {
-  return postJSON("/api/login/google", { credential });
-}
-
 /** 마이페이지 — 로그인한 회원의 기본정보 */
 export function getMe(customerId) {
   return getJSON(`/api/auth/me?customerId=${encodeURIComponent(customerId)}`);
