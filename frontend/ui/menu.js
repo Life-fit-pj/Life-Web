@@ -85,8 +85,9 @@ function closeMenu() {
 // "lf-anon"을 customer_id로 덮어쓴다 —
 // 좋아요/검색/채팅 기록이 전부 getAnonId() 하나만 보고 동작하므로(state.js),
 // 새로고침 없이도 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
-// 회원가입은 아이디 중복확인 + 비밀번호 확인만 하는 최소 폼이다. 계정을 만든 뒤에는
-// 그대로 라이프스타일 설문(signup.html)으로 넘어간다 — 기존 흐름을 그대로 이어받는다.
+// 회원가입은 로그인 화면의 "회원가입" 버튼을 눌러야 나오는 별도 화면이다
+// (renderSignupAuthModal) — 아이디 중복확인 + 비밀번호 확인만 보는 최소 폼이고,
+// 계정을 만든 뒤에는 그대로 라이프스타일 설문(signup.html)으로 넘어간다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
 
@@ -139,22 +140,8 @@ function renderGuestAuthModal(el) {
             </div>
             <div class="auth-divider"></div>
             <div class="auth-section">
-                <h3 class="auth-title">회원가입</h3>
-                <form id="signupForm" class="auth-form">
-                    <p id="signupIdError" class="auth-error auth-error--above"></p>
-                    <div class="auth-id-row">
-                        <input id="signupIdInput" type="text" placeholder="아이디" autocomplete="off" required>
-                        <button type="button" id="checkIdBtn" class="auth-check-btn">중복확인</button>
-                    </div>
-                    <p id="signupIdStatus" class="auth-hint"></p>
-
-                    <input id="signupPwInput" type="password" placeholder="비밀번호" autocomplete="off" required>
-
-                    <p id="signupPwError" class="auth-error auth-error--above"></p>
-                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="off" required>
-
-                    <button type="submit" class="auth-cta">가입하고 설문 시작하기</button>
-                </form>
+                <p class="auth-notice">아직 계정이 없으신가요?</p>
+                <button type="button" id="gotoSignup" class="auth-cta auth-cta--ghost">회원가입</button>
             </div>
         </div>
     `;
@@ -176,6 +163,40 @@ function renderGuestAuthModal(el) {
     });
 
     setupGoogleButton(el);
+    el.querySelector("#gotoSignup").addEventListener("click", () => renderSignupAuthModal(el));
+}
+
+// 로그인 화면의 "회원가입" 버튼을 눌러야 나오는 회원가입 폼.
+// 로그인 폼과 한 화면에 같이 두면 "지금 어디에 입력하고 있는지" 헷갈리기 쉬워
+// 화면을 통째로 바꿔 끼운다 — 로그인/구글 로그인 쪽으로는 아래 "로그인으로 돌아가기"로 되돌아간다.
+function renderSignupAuthModal(el) {
+    el.innerHTML = `
+        <div class="auth-modal">
+            <button class="auth-close" aria-label="닫기">&times;</button>
+            <div class="auth-section">
+                <h3 class="auth-title">회원가입</h3>
+                <form id="signupForm" class="auth-form">
+                    <p id="signupIdError" class="auth-error auth-error--above"></p>
+                    <div class="auth-id-row">
+                        <input id="signupIdInput" type="text" placeholder="아이디" autocomplete="off" required>
+                        <button type="button" id="checkIdBtn" class="auth-check-btn">중복확인</button>
+                    </div>
+                    <p id="signupIdStatus" class="auth-hint"></p>
+
+                    <input id="signupPwInput" type="password" placeholder="비밀번호" autocomplete="off" required>
+
+                    <p id="signupPwError" class="auth-error auth-error--above"></p>
+                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="off" required>
+
+                    <button type="submit" class="auth-cta">가입하고 설문 시작하기</button>
+                </form>
+                <button type="button" id="backToLogin" class="auth-back">← 로그인으로 돌아가기</button>
+            </div>
+        </div>
+    `;
+    el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
+    el.querySelector("#backToLogin").addEventListener("click", () => renderGuestAuthModal(el));
+
     setupSignupForm(el);
 }
 

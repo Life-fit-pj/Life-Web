@@ -208,6 +208,29 @@
 
 .auth-cta:hover { background: var(--accent); }
 
+/* 로그인 화면의 "회원가입" 버튼 — 로그인 버튼과 나란히 있을 때 주된 동작으로
+   오인되지 않도록 채워진 배경 대신 테두리만 쓴다 */
+.auth-cta--ghost {
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+.auth-cta--ghost:hover { background: var(--primary); color: var(--bg); }
+
+/* 회원가입 화면 하단의 "로그인으로 돌아가기" */
+.auth-back {
+  display: block;
+  margin: 16px auto 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.auth-back:hover { color: var(--text); }
+
 .auth-divider {
   height: 1px;
   background: var(--line);
