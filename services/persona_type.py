@@ -156,6 +156,38 @@ QUESTIONS = [
 ]
 QMAP = {q["id"]: q for q in QUESTIONS}
 
+# 설문 문항 -> persona 9칸(청킹용). frontend/signup.html 의 PERSONA_MAP(자바스크립트)과
+# 글자 하나까지 같아야 한다 — 둘이 어긋나면 화면에서 보여주는 요약과 실제로 저장되는
+# persona 문장이 달라진다. persona/career_goals_and_ambitions 는 대응 문항이 없어 비운다.
+PERSONA_MAP = {
+    "professional_persona": ["p1", "p2"],
+    "sports_persona":       ["s1", "s2"],
+    "arts_persona":         ["a1", "a2", "h1"],
+    "travel_persona":       ["t1", "t2"],
+    "culinary_persona":     ["c1", "c2"],
+    "family_persona":       ["f1", "f2"],
+    "cultural_background":  ["g1", "g2"],
+}
+
+
+# Life-Embed-jh app/core/config.py 의 MIN_LENGTH 와 같은 값이다. persona_type.py는
+# 그 저장소를 몰라도 되게 만든 파일(services/engine.py만 안다)이라 값만 그대로 옮겨
+# 적었다 — 저쪽 값이 바뀌면 여기도 같이 고쳐야 한다.
+_MIN_LENGTH = 20
+
+
+def answers_to_persona(answers: dict) -> dict:
+    """설문 답변 -> persona 9칸. 합친 글자 수가 _MIN_LENGTH 미만인 칸은 아예 뺀다 —
+    그대로 보내면 create_member() 가 "짧다"며 가입 자체를 막아버리기 때문이다
+    (그 검사는 관리자가 손으로 입력한 칸을 위한 것이라 설문 자동 매핑에는 안 맞는다).
+    질문 라벨은 붙이지 않는다(signup.html 과 같은 이유)."""
+    persona = {}
+    for column, ids in PERSONA_MAP.items():
+        text = " ".join(t for qid in ids if (t := str(answers.get(qid) or "").strip()))
+        if len(text) >= _MIN_LENGTH:
+            persona[column] = text
+    return persona
+
 NEGATORS = ("안 ", "않", "못 ", "없", "별로", "아니", "싫", "질색", "힘들")
 
 

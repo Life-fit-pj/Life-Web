@@ -152,9 +152,13 @@ def check_login_id(login_id: str) -> bool:
     return auth_id_exists(login_id)
 
 
-def signup(login_id: str, password: str):
-    """아이디+비밀번호로 새 계정을 만든다. 이미 있는 아이디면 None."""
-    return auth_signup(login_id, password)
+def signup(login_id: str, password: str, payload: dict):
+    """아이디+비밀번호+회원정보로 새 계정을 만든다. 이미 있는 아이디면 None.
+
+    payload 는 기본정보(name/gender/age/city/city_dong/work_city/work_dong/
+    phone/email) + 희망조건 7지표(한국어 키) + persona 9칸을 한데 담은 딕셔너리다.
+    """
+    return auth_signup(login_id, password, payload)
 
 
 def get_facilities(gu, dong, limit=5):

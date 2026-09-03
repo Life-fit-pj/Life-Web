@@ -1,6 +1,6 @@
 import { openHistory } from "./history.js";
 import { openMypage } from "./mypage.js";
-import { login, checkLoginId, signup } from "../lib/api.js";
+import { login, checkLoginId } from "../lib/api.js";
 import { getAnonId, isLoggedIn } from "../lib/state.js";
 
 let menuModalEl = null;
@@ -87,7 +87,8 @@ function closeMenu() {
 // 새로고침 없이도 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
 // 회원가입은 로그인 화면의 "회원가입" 버튼을 눌러야 나오는 별도 화면이다
 // (renderSignupAuthModal) — 아이디 중복확인 + 비밀번호 확인만 보는 최소 폼이고,
-// 계정을 만든 뒤에는 그대로 라이프스타일 설문(signup.html)으로 넘어간다.
+// 아이디/비번을 임시로 들고 그대로 기본정보·설문(signup.html)으로 넘어간다.
+// 계정은 거기서 모든 정보를 다 받은 뒤 한 번에 만들어진다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
 
@@ -116,8 +117,23 @@ function renderLoggedInAuthModal(el) {
     el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
     el.querySelector("#logoutBtn").addEventListener("click", () => {
         localStorage.setItem("lf-anon", crypto.randomUUID());
+        syncLoginToggle();
         renderGuestAuthModal(el);
     });
+}
+
+// 로그인 성공 직후 잠깐 보여주는 로딩 화면. 계정 정보 화면(renderLoggedInAuthModal)으로
+// 안 보내고 바로 닫는 이유는, 로그인의 목적이 "세션 연결"이지 계정 화면을 보여주는 게
+// 아니기 때문이다 — 확인차 잠깐 스피너만 보여주고 자동으로 닫는다.
+function renderLoginLoadingModal(el) {
+    el.innerHTML = `
+        <div class="auth-modal">
+            <div class="auth-section">
+                <div class="auth-spinner"></div>
+                <p class="auth-notice">로그인 중이에요...</p>
+            </div>
+        </div>
+    `;
 }
 
 function renderGuestAuthModal(el) {
@@ -152,7 +168,9 @@ function renderGuestAuthModal(el) {
         try {
             const { customerId } = await login(loginId, password);
             localStorage.setItem("lf-anon", customerId);
-            renderLoggedInAuthModal(el);
+            syncLoginToggle();
+            renderLoginLoadingModal(el);
+            setTimeout(closeAuthModal, 700);
         } catch (err) {
             errorEl.textContent = "아이디 또는 비밀번호가 맞지 않아요.";
         }
@@ -183,7 +201,7 @@ function renderSignupAuthModal(el) {
                     <p id="signupPwError" class="auth-error auth-error--above"></p>
                     <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>
 
-                    <button type="submit" class="auth-cta">가입하고 설문 시작하기</button>
+                    <button type="submit" class="auth-cta">다음: 정보 입력하기</button>
                 </form>
                 <button type="button" id="backToLogin" class="auth-back">← 로그인으로 돌아가기</button>
             </div>
@@ -269,21 +287,29 @@ function setupSignupForm(el) {
             return;
         }
 
-        try {
-            const { customerId } = await signup(loginId, password);
-            localStorage.setItem("lf-anon", customerId);
-            // 가입 다음은 그대로 라이프스타일 설문으로 넘어간다(기존 흐름 유지)
-            location.href = "signup.html";
-        } catch (err) {
-            if (err.status === 409) {
-                idConfirmed = false;
-                idError.textContent = "이미 사용 중인 아이디예요.";
-                idInput.focus();
-            } else {
-                pwError.textContent = "가입에 실패했어요. 잠시 후 다시 시도해 주세요.";
-            }
-        }
+        // 계정 생성은 여기서 하지 않는다 — 기본정보·설문까지 한 번에 모아
+        // signup.html 이 실제 /api/signup 을 부른다(회원가입은 그 화면에서 끝난다).
+        // 아이디/비번만 다음 화면이 쓸 수 있게 임시로 들고 넘어간다.
+        sessionStorage.setItem("lifefit-pending-signup", JSON.stringify({ loginId, password }));
+        location.href = "signup.html";
     });
+}
+
+// 우상단 로그인 버튼의 표시 문구. 로그아웃은 계정을 지우는 게 아니라
+// 새 익명 id를 발급하는 것뿐이라(state.js), 로그인 폼과 별도 화면 없이 그 자리에서 처리한다.
+export function syncLoginToggle() {
+    const btn = document.getElementById("loginToggle");
+    if (!btn) return;
+    btn.textContent = isLoggedIn() ? "로그아웃" : "로그인";
+}
+
+export function handleLoginToggleClick() {
+    if (isLoggedIn()) {
+        localStorage.setItem("lf-anon", crypto.randomUUID());
+        syncLoginToggle();
+    } else {
+        openAuthModal();
+    }
 }
 
 export function openAuthModal() {
