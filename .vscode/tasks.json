@@ -9,7 +9,30 @@
             "args": ["-m", "uvicorn", "main:app", "--reload", "--port", "5000"],
             "problemMatcher": [],
             "presentation": { "clear": true }
-
         },
+        {
+            "label": "🚀FastAPI 서버 실행 (8000)",
+            "detail": "FastAPI 앱(main:app)을 8000 포트로 띄운다. --reload 라 코드를 고치면 자동으로 다시 뜬다.",
+            "type": "shell",
+            "command": "${command:python.interpreterPath}",
+            "args": ["-m", "uvicorn", "main:app", "--reload", "--port", "8000"],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": { "clear": true }
+        },
+        {
+            "label": "🛑8000 포트 종료",
+            "detail": "8000 포트를 잡고 있는 프로세스를 찾아 강제 종료한다. 열려 있지 않으면 아무 일도 하지 않는다.",
+            "type": "shell",
+            "command": "$pids = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; if ($pids) { $pids | ForEach-Object { Stop-Process -Id $_ -Force; Write-Host \"PID $_ 종료\" } } else { Write-Host '8000 포트를 쓰는 프로세스가 없습니다.' }",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-NoProfile", "-Command"]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": { "clear": true }
+        }
     ]
 }

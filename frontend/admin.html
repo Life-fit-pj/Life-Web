@@ -204,12 +204,8 @@ label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom:
 .card-title .hint { font-weight: 400; font-size: 11.5px; }
 
 /* ══ 대시보드 ═══════════════════════════════════════════════ */
-.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
-.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px; box-shadow: var(--shadow); }
-.kpi .k-lab { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-.kpi .k-val { font-size: 27px; font-weight: 680; letter-spacing: -.02em; line-height: 1.15; }
-.kpi .k-val small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 3px; }
-.kpi .k-sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+/* 규모(회원 수)는 박스가 아니라 제목 줄에 적는다 — 숫자 하나에 카드 한 장은 과하다 */
+#dash-sub b { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
 
 .dash { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dash .wide { grid-column: 1 / -1; }
@@ -243,17 +239,6 @@ label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom:
 .legend .lg-lab { color: var(--ink-2); }
 .legend .lg-val { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
 .legend .lg-pct { color: var(--muted); font-size: 11.5px; width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
-
-.area-wrap { position: relative; }
-.area-wrap svg { width: 100%; height: auto; display: block; }
-.area-wrap .tip {
-  position: absolute; pointer-events: none; transform: translate(-50%, -130%);
-  background: var(--ink); color: var(--bg); font-size: 11.5px; font-weight: 550;
-  padding: 5px 9px; border-radius: 7px; white-space: nowrap;
-}
-.g-line { stroke: var(--grid); stroke-width: 1; }
-.g-axis { stroke: var(--axis); stroke-width: 1; }
-.g-txt  { fill: var(--muted); font-size: 11px; }
 
 /* ══ 목록 + 상세 (회원 · 행정동) ════════════════════════════ */
 .split { display: flex; height: 100%; }
@@ -291,11 +276,23 @@ label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom:
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 13px; }
 
 .sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 24px; }
-.slider-row { display: grid; grid-template-columns: 44px 1fr 22px; align-items: center; gap: 10px; }
+.slider-row { display: grid; grid-template-columns: 44px 1fr 62px; align-items: center; gap: 10px; }
 .slider-row .s-lab { font-size: 13px; color: var(--ink-2); }
 .slider-row .s-val { font-size: 13px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--accent); background: none; padding: 0; border: 0; }
-
+.w-item { position: relative; }
+/* 고정 블록 — 흐리게 해서 "못 고치는 값"임을 눈으로 구분한다 */
+.sliders.fixed { opacity: .62; }
+.sliders.fixed input[type=range] { accent-color: var(--ink-2); }
+.sliders.fixed .w-init { font-size: 13px; text-align: right; color: var(--ink-2);
+                         font-variant-numeric: tabular-nums; }
+/* 가입 때와 달라진 지표는 위아래 양쪽에 점을 찍는다 */
+.w-item.moved .s-lab::after { content: "•"; color: var(--accent); margin-left: 3px; }
+.sliders.fixed .w-item.moved { opacity: 1; }
+.slider-row .w-num { width: 100%; padding: 3px 5px; font-size: 13px; text-align: right;
+                     font-variant-numeric: tabular-nums;
+                     border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
+                     
 details.persona { border: 1px solid var(--line); border-radius: 11px; margin-bottom: 9px; background: var(--surface-2); }
 details.persona > summary {
   cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 550;
@@ -306,6 +303,45 @@ details.persona > summary::before { content: "\25B8"; color: var(--muted); font-
 details.persona[open] > summary::before { content: "\25BE"; }
 details.persona > summary .len { margin-left: auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 details.persona .body { padding: 0 14px 12px; }
+
+/* 분석 막대 (접이식)
+   details.persona 와 같은 방식이다. 다른 점은 대시보드 격자에서 한 줄을
+   통째로 쓰는 "긴 막대"라는 것뿐 */
+details.ask { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+details.ask > summary {
+  cursor: pointer; padding: 13px 16px; font-size: 14px; font-weight: 650;
+  display: flex; align-items: center; gap: 9px; list-style: none;
+}
+details.ask > summary::-webkit-details-marker { display: none; }
+details.ask > summary .hint { font-weight: 400; font-size: 11.5px; color: var(--muted); }
+details.ask > summary::after { content: "\25BE"; margin-left: auto; color: var(--muted); font-size: 11px; }
+details.ask[open] > summary::after { content: "\25B4"; }
+details.ask > .body { padding: 16px; border-top: 1px solid var(--line); }
+
+/* 분석 패널 안쪽 */
+.an-ex { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.an-ask { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+.an-ask textarea { width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; resize: vertical;
+                   border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2);
+                   color: var(--ink); }
+.an-item { margin-top: 12px; }
+.an-q { font-weight: 650; font-size: 13px; margin-bottom: 6px; }
+.an-a { font-size: 13px; line-height: 1.65; white-space: pre-wrap;
+        padding: 11px 13px; border-radius: 9px; background: var(--surface-2);
+        border: 1px solid var(--line); }
+.an-when { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.an-row { cursor: pointer; }
+.an-row:hover { background: var(--surface-2); }
+.an-del { flex: none; align-self: center; padding: 0 7px; color: var(--muted); }
+
+/* 지난 대화 목록 */
+.hist { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.hist li { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.hist li:first-child { border-top: 0; }
+.hist .t { flex: none; width: 108px; color: var(--muted); font-size: 12px;
+           font-variant-numeric: tabular-nums; }
+.hist .q { color: var(--ink); }
+.hist .a { color: var(--ink-2); margin-top: 3px; white-space: pre-wrap; }
 
 .metric { background: var(--surface-2); border-radius: 11px; padding: 12px 14px; }
 .metric .m-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
@@ -338,6 +374,22 @@ details.persona .body { padding: 0 14px 12px; }
 pre.raw  { background: rgba(208,59,59,.09); }
 pre.safe { background: rgba(12,163,12,.10); }
 @media (max-width: 820px) { .two { grid-template-columns: 1fr; } }
+
+/* 작은 지표 상자 — 시스템 화면에서 "얼마나 실려 있나"를 숫자로 짚어 준다 */
+.facts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); margin-bottom: 14px; }
+.fact { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.fact .f-lab { font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.fact .f-val { font-size: 17px; font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.fact .f-val small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+.fact .f-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.fact.bad  .f-val { color: var(--bad); }
+.fact.warn .f-val { color: var(--warn); }
+
+.tag.bad  { background: color-mix(in srgb, var(--bad) 15%, transparent);  color: var(--bad); }
+.tag.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.log.issue { align-items: flex-start; }
+.log.issue b { flex: none; }
+.ok-note { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
 
 .logs { display: grid; gap: 8px; }
 .log { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 10px; font-size: 12.5px; flex-wrap: wrap; }
@@ -419,7 +471,6 @@ pre.safe { background: rgba(12,163,12,.10); }
           <span class="sub" id="dash-sub">불러오는 중…</span>
           <span style="margin-left:auto"><button class="btn sm" id="dash-reload">새로고침</button></span>
         </div>
-        <div class="kpis" id="kpis"></div>
         <div class="dash" id="dash"></div>
       </div>
     </section>
@@ -584,84 +635,6 @@ function donut(data) {
   </div>`;
 }
 
-/* 면적 차트 — 점마다 값을 적을 수 없으므로 십자선 + 툴팁을 붙인다 */
-function area(data, { color = 'var(--s1)' } = {}) {
-  if (!data.length) return '<div class="skel">자료 없음</div>';
-  const W = 1000, H = 240, L = 36, R = 12, T = 14, B = 26;
-  const top = Math.max(...data.map(d => d.value), 1);
-  const step = (W - L - R) / Math.max(data.length - 1, 1);
-  const x = i => L + i * step;
-  const y = v => T + (H - T - B) * (1 - v / top);
-
-  const line = data.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(d.value).toFixed(1)}`).join(' ');
-  const fill = `${line} L${x(data.length - 1).toFixed(1)},${y(0)} L${x(0)},${y(0)} Z`;
-
-  /* 가로 눈금 3줄이면 크기를 가늠하기에 충분하다. 더 그으면 데이터가 안 보인다 */
-  const grid = [0, .5, 1].map(f => {
-    const gy = y(top * f).toFixed(1);
-    return `<line class="g-line" x1="${L}" y1="${gy}" x2="${W - R}" y2="${gy}"/>
-            <text class="g-txt" x="${L - 7}" y="${+gy + 3.5}" text-anchor="end">${Math.round(top * f)}</text>`;
-  }).join('');
-
-  /* x 라벨은 6개쯤만 — 다 적으면 겹친다 */
-  const every = Math.max(1, Math.ceil(data.length / 6));
-  const ticks = data.map((d, i) => {
-    if (i % every !== 0 && i !== data.length - 1) return '';
-    /* 양 끝은 가운데 정렬하면 그림 밖으로 나가 잘린다 */
-    const anchor = i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle';
-    return `<text class="g-txt" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="${anchor}">${esc(d.label)}</text>`;
-  }).join('');
-
-  const dots = data.map((d, i) =>
-    `<circle class="hit" data-i="${i}" cx="${x(i).toFixed(1)}" cy="${y(d.value).toFixed(1)}" r="11" fill="transparent"/>`
-  ).join('');
-
-  return `<div class="area-wrap" data-chart="area">
-    <svg viewBox="0 0 ${W} ${H}">
-      ${grid}
-      <path d="${fill}" fill="${color}" opacity=".13"/>
-      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <line class="cross" x1="0" y1="${T}" x2="0" y2="${H - B}" stroke="var(--axis)" stroke-width="1" opacity="0"/>
-      <circle class="knob" r="4.5" fill="${color}" stroke="var(--surface)" stroke-width="2" opacity="0"/>
-      <line class="g-axis" x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}"/>
-      ${ticks}
-      ${dots}
-    </svg>
-    <div class="tip" hidden></div>
-  </div>`;
-}
-
-/* 면적 차트의 툴팁 배선 — 그린 뒤에 한 번 부른다 */
-function wireArea(root, data, unit = '명') {
-  const wrap = $('[data-chart="area"]', root);
-  if (!wrap) return;
-  const svg = $('svg', wrap), tip = $('.tip', wrap);
-  const cross = $('.cross', svg), knob = $('.knob', svg);
-
-  svg.addEventListener('mousemove', e => {
-    const hit = e.target.closest('.hit');
-    if (!hit) return;
-    const i = +hit.dataset.i;
-    const cx = +hit.getAttribute('cx'), cy = +hit.getAttribute('cy');
-    cross.setAttribute('x1', cx); cross.setAttribute('x2', cx);
-    cross.setAttribute('opacity', '.7');
-    knob.setAttribute('cx', cx); knob.setAttribute('cy', cy);
-    knob.setAttribute('opacity', '1');
-
-    /* SVG 좌표를 화면 좌표로 바꾼다 — viewBox 라 배율이 1이 아니다 */
-    const box = svg.getBoundingClientRect();
-    const scale = box.width / svg.viewBox.baseVal.width;
-    tip.hidden = false;
-    tip.style.left = (cx * scale) + 'px';
-    tip.style.top  = (cy * scale) + 'px';
-    tip.textContent = `${data[i].label} · ${num(data[i].value)}${unit}`;
-  });
-  svg.addEventListener('mouseleave', () => {
-    tip.hidden = true;
-    cross.setAttribute('opacity', '0');
-    knob.setAttribute('opacity', '0');
-  });
-}
 
 /* ═══════════════════════════════════════════════════════════
    3. 화면 전환
@@ -718,10 +691,10 @@ async function loadDashboard() {
 
   loaded.dash = true;
   paintStatus(d);
-  $('#dash-sub').textContent = new Date().toLocaleString('ko-KR') + ' 기준';
+  const stamp = new Date().toLocaleString('ko-KR') + ' 기준';
 
   if (!d.ok) {
-    $('#kpis').innerHTML = '';
+    $('#dash-sub').textContent = stamp;
     $('#dash').innerHTML = `<div class="card wide">DB 를 읽지 못했습니다 — ${esc(d.error || '원인 불명')}</div>`;
     return;
   }
@@ -730,35 +703,134 @@ async function loadDashboard() {
   const avgWeight = ch.weights.length
     ? (ch.weights.reduce((s, w) => s + w.value, 0) / ch.weights.length).toFixed(2) : '-';
 
-  $('#kpis').innerHTML = [
-    kpi('회원', c.members, '명', '가입 기록이 있는 계정'),
-    kpi('행정동', c.regions, '개', `서울 ${c.gu}개 자치구`),
-    kpi('페르소나 청크', c.chunks, '개', `회원당 ${(c.chunks / (c.members || 1)).toFixed(1)}칸`),
-    kpi('평균 희망 가중치', avgWeight, '/5', '7개 지표 평균'),
-    kpi('관리자 수정', c.edits, '건', d.recent[0] ? when(d.recent[0].changed_at) + ' 최근' : '아직 없음'),
-  ].join('');
+  /* 규모는 카드가 아니라 제목 줄에 적는다 — 행정동 수와 캐시 상태는 상단 알약이 이미 들고 있다 */
+  $('#dash-sub').innerHTML = `회원 <b>${num(c.members)}</b>명 · ${esc(stamp)}`;
+
+  /* 성별이 빈 회원(로그인만 발급된 계정)은 라벨이 없어 범례가 빈칸으로 뜬다.
+     숨기지 않고 이름을 붙인다 — 숨기면 합계가 왜 안 맞는지 알 수 없어진다 */
+  const isEmptyLabel = v => !v || v === 'None' || v === 'null';
+  const genders = ch.genders.map(g => ({
+    ...g, label: isEmptyLabel(g.label) ? '미입력' : g.label,
+  }));
 
   const top10 = ch.memberGu.slice(0, 10);
   $('#dash').innerHTML = `
-    ${card('월별 가입 추이', area(ch.joins), '가입일이 있는 회원만 센다', 'wide')}
+    ${analysisBar()}
     ${card('희망 조건 평균 <span class="hint">1~5</span>', bars(ch.weights, { max: 5, fmt: v => v.toFixed(2) }),
-           '회원들이 무엇을 더 중요하게 꼽았는지')}
+           `회원들이 무엇을 더 중요하게 꼽았는지 · 7개 지표 평균 ${avgWeight}`)}
     ${card('연령대', cols(ch.ages), '10살 단위')}
-    ${card('성별', donut(ch.genders))}
+    ${card('성별', donut(genders))}
     ${card('희망 거래형태', donut(ch.dealType))}
     ${card('회원이 사는 자치구 <span class="hint">상위 10</span>', bars(top10, { color: 'var(--s3)' }),
-           `25개 구 중 ${ch.memberGu.length}개 구에 회원이 있다`)}
-    ${card('최근 수정', logList(d.recent), '무엇을 고쳤는지 칸 이름까지 남는다')}
+           `25개 구 중 ${ch.memberGu.length}개 구에 회원이 있다`, 'wide')}
   `;
-  wireArea($('#dash'), ch.joins);
+  /* 그리기(위)와 동작 붙이기(아래)는 순서를 지켜야 한다 —
+     innerHTML 로 넣기 전에는 $('#an-send') 가 아직 없어서 못 찾는다 */
+  wireAnalysis($('#dash'));
 }
 
-function kpi(label, value, unit, sub) {
-  return `<div class="kpi">
-    <div class="k-lab">${label}</div>
-    <div class="k-val">${typeof value === 'number' ? num(value) : esc(value)}<small>${unit}</small></div>
-    <div class="k-sub">${esc(sub)}</div>
-  </div>`;
+/* 분석 막대
+   대시보드 맨 위에 접힌 채로 놓인다. 숫자를 보다가 바로 물어볼 수 있는 자리다.
+   서버가 집계표를 만들어 Claude 에게 주므로, Claude 는 SQL 을 짜지 않는다 */
+
+const EXAMPLES = [
+  '회원들 성향에서 눈에 띄는 게 뭐야?',
+  '어느 자치구에 회원이 몰려 있어?',
+  '사람들이 많이 찾는 검색어가 뭐야?',
+  '홈페이지 개선에 쓸 만한 게 있을까?',
+];
+
+function analysisBar() {
+  return `<details class="ask wide" id="ask">
+    <summary>분석 <span class="hint">집계된 숫자를 Claude 에게 물어봅니다</span></summary>
+    <div class="body">
+      <div class="an-ex">${EXAMPLES.map(q =>
+        `<button class="btn sm an-ex-b" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <div class="an-ask">
+        <textarea id="an-q" rows="2" placeholder="집계된 숫자에 대해 물어보세요"></textarea>
+        <button class="btn primary" id="an-send" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>물어보기</button>
+      </div>
+      <div class="hint" style="margin-top:8px">답변은 집계된 숫자만 보고 만들어집니다. 자료에 없는 건 없다고 답합니다.</div>
+      <div id="an-out"></div>
+      <div class="card-title" style="margin:18px 0 8px">지난 대화</div>
+      <div id="an-list"><div class="skel">펼치면 불러옵니다</div></div>
+    </div>
+  </details>`;
+}
+
+function wireAnalysis(root) {
+  const bar = $('#ask', root);
+  const out = $('#an-out', root);
+  const box = $('#an-q', root);
+  let listLoaded = false;
+
+  /* 펼칠 때 딱 한 번만 지난 대화를 불러온다.
+     대시보드를 열 때마다 부르면, 한 번도 안 펼친 사람에게도 요청이 나간다 */
+  bar.addEventListener('toggle', () => {
+    if (bar.open && !listLoaded) { listLoaded = true; loadAnalysisList(); }
+  });
+
+  $$('.an-ex-b', root).forEach(b => b.onclick = () => { box.value = b.dataset.q; box.focus(); });
+  $('#an-send', root).onclick = () => askAnalysis(box.value);
+  box.onkeydown = e => {
+    /* Ctrl+Enter 로 보낸다. 그냥 Enter 는 줄바꿈이어야 긴 질문을 쓸 수 있다 */
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askAnalysis(box.value);
+  };
+
+  async function askAnalysis(question) {
+    if (!(question || '').trim()) return;
+    out.innerHTML = '<div class="skel">Claude 가 집계를 읽는 중… (3~5초)</div>';
+    try {
+      const r = await api('/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+      });
+      out.innerHTML = answerBlock(r.question, r.answer);
+      box.value = '';
+      listLoaded = true;
+      loadAnalysisList();
+    } catch (e) {
+      out.innerHTML = `<div class="an-a" style="color:var(--danger)">답을 못 받았습니다. ${esc(String(e).slice(0, 120))}</div>`;
+    }
+  }
+
+  function answerBlock(q, a) {
+    return `<div class="an-item"><div class="an-q">${esc(q)}</div>
+      <div class="an-a">${esc(a)}</div></div>`;
+  }
+
+  async function loadAnalysisList() {
+    const list = $('#an-list', root);
+    const rows = await api('/analysis');
+    if (!rows.length) { list.innerHTML = '<div class="empty" style="padding:14px 0">아직 저장된 대화가 없습니다</div>'; return; }
+    list.innerHTML = `<ul class="hist">${rows.map(r => `
+      <li data-id="${r.chat_id}" class="an-row">
+        <span class="t">${esc(when(r.created_at))}</span>
+        <div><div class="q">${esc(r.question)}</div>
+          <div class="a">${esc(r.preview || '')}…</div></div>
+        <button class="btn sm an-del" data-id="${r.chat_id}" title="지우기">&times;</button>
+      </li>`).join('')}</ul>`;
+
+    $$('.an-row', list).forEach(li => li.onclick = e => {
+      if (e.target.classList.contains('an-del')) return;
+      openAnalysis(li.dataset.id);
+    });
+    $$('.an-del', list).forEach(b => b.onclick = async e => {
+      e.stopPropagation();
+      await api(`/analysis/${b.dataset.id}`, { method: 'DELETE' });
+      loadAnalysisList();
+    });
+  }
+
+  async function openAnalysis(id) {
+    out.innerHTML = '<div class="skel">불러오는 중…</div>';
+    const r = await api(`/analysis/${id}`);
+    /* 그때의 집계도 같이 저장해 뒀다. 지금 숫자와 다를 수 있으므로
+       "언제 기준인지"를 반드시 같이 보여준다 */
+    out.innerHTML = answerBlock(r.question, r.answer) +
+      `<div class="an-when">${esc(when(r.created_at))} 기준 집계로 만든 답입니다</div>`;
+  }
 }
 
 function card(title, body, hint = '', cls = '') {
@@ -856,7 +928,9 @@ function markMemberRow() {
 
 $('#member-search').addEventListener('input', e => {
   const q = e.target.value.trim();
-  renderMemberRows(members.filter(m => (m.name + m.customer_id).includes(q)));
+  /* 이름이 없는 계정(로그인만 발급)은 name 이 null 이다.
+     그냥 더하면 "null" + "C101" = "nullC101" 이 되어 검색어 "null" 에 걸린다 */
+  renderMemberRows(members.filter(m => ((m.name || '') + m.customer_id).includes(q)));
 });
 $('#member-rows').addEventListener('click', e => {
   const row = e.target.closest('.row');
@@ -869,7 +943,9 @@ async function openMember(id) {
   const board = $('#member-detail');
   board.innerHTML = '<div class="empty">불러오는 중…</div>';
 
-  const { customer, preferences, persona, likes, searches, chats } = await api('/members/' + id);
+  const { customer, preferences, preferences_initial, persona, likes, searches, chats } = await api('/members/' + id);
+  /* initial 은 "저장할 때 바뀐 칸 골라내는 기준"이다. preferences_initial(가입 시 값)과
+     이름이 비슷하지만 전혀 다른 것이니 섞지 말 것 */
   initial = { ...customer, ...preferences, ...persona };
 
   const basic = Object.entries(customer).map(([k, v]) => `
@@ -883,13 +959,40 @@ async function openMember(id) {
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
 
-  const sliders = Object.entries(preferences).map(([k, v]) => `
-    <div>
+  /* 가중치 블록을 둘로 나눈다.
+       위 = 가입 때 받은 값(고정, 읽기 전용)   아래 = 지금 값(조정 가능)
+     같은 지표를 위아래 같은 자리에 놓아 눈으로 바로 비교되게 한다 */
+  const movedKeys = new Set(
+    Object.keys(preferences).filter(k => {
+      const init = preferences_initial?.[k];
+      return init != null && Math.abs(Number(preferences[k]) - Number(init)) >= 0.005;
+    }));
+
+  /* 고정 블록 — disabled 이고 name 이 없으므로 저장에 안 잡힌다 */
+  const fixedSliders = Object.entries(preferences_initial || {}).map(([k, v]) => `
+    <div class="w-item${movedKeys.has(k) ? ' moved' : ''}">
       <div class="slider-row">
         <span class="s-lab">${esc(k)}</span>
-        <input type="range" name="${k}" min="1" max="5" step="1" value="${esc(v)}"
-               oninput="this.closest('.slider-row').querySelector('.s-val').textContent = this.value">
-        <span class="s-val">${esc(v)}</span>
+        <input type="range" class="w-bar" min="1" max="5" step="0.01"
+               value="${esc(round4(v))}" disabled>
+        <span class="w-init">${esc(round4(v))}</span>
+      </div>
+    </div>`).join('');
+
+  /* 변동 블록 — 실제로 저장되는 값 */
+  const sliders = Object.entries(preferences).map(([k, v]) => `
+    <div class="w-item${movedKeys.has(k) ? ' moved' : ''}">
+      <div class="slider-row">
+        <span class="s-lab">${esc(k)}</span>
+
+        <!-- 보여주기·대충 조절용. name 이 없으므로 저장 대상이 아니다 -->
+        <input type="range" class="w-bar" min="1" max="5" step="0.01" value="${esc(round4(v))}"
+               oninput="this.nextElementSibling.value = this.value">
+
+        <!-- 진짜 값. name 이 여기에만 있다 -->
+        <input type="number" class="w-num" name="${k}" min="1" max="5" step="any"
+               value="${esc(round4(v))}"
+               oninput="this.previousElementSibling.value = this.value">
       </div>
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
@@ -914,8 +1017,12 @@ async function openMember(id) {
     </div>
     <div class="detail-body" id="member-form">
       ${card('기본 정보', `<div class="grid2">${basic}</div>`, '아이디와 가입일은 고칠 수 없다')}
-      ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
-             '추천 점수를 매기는 가중치다')}
+      ${Object.keys(preferences_initial || {}).length ? card(
+          '가입 시 희망 조건 <span class="hint">고정</span>',
+          `<div class="sliders fixed">${fixedSliders}</div>`,
+          '회원가입 때 받은 값이다. 여기서는 못 고친다') : ''}
+      ${card('현재 희망 조건 <span class="hint">1~5 · 조정 가능</span>', `<div class="sliders">${sliders}</div>`,
+             '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다')}
       ${card('페르소나 <span class="hint">9칸</span>', personas,
              '이 글을 고치면 벡터가 다시 만들어진다')}
       ${card('활동', activityBody(likes, searches, chats),
@@ -1162,6 +1269,7 @@ async function openRegion(gu, dong) {
     <div class="detail-head">
       <h3>${esc(data['행정동명'])}</h3>
       <span class="id">${esc(data['구'])}</span>
+      ${data.likes ? `<span class="tag">♥ ${data.likes}</span>` : ''}
       <div class="acts">
         <button class="btn sm primary" id="region-save" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>저장</button>
       </div>
@@ -1199,7 +1307,102 @@ async function saveRegion(gu, dong, before) {
 /* ═══════════════════════════════════════════════════════════
    8. 시스템
    ═══════════════════════════════════════════════════════════ */
-async function loadSystem() {
+/* 엔진 config.py 와 맞춰 둔 상수 — 여기 숫자를 고치기 전에 그쪽부터 확인한다 */
+const CHUNK_SLOTS    = 9;   /* CHUNK_COLUMNS 칸 수 */
+const CHUNK_MIN_LEN  = 20;  /* MIN_LENGTH — 이보다 짧은 글은 청킹에서 통째로 버려진다 */
+const CHUNK_WARN_LEN = 60;  /* 기존 900청크의 실측 최소가 55자 — 평균이 이 밑이면 눈에 띄게 짧다 */
+
+/* 차트 한 장에 담긴 사람 수를 센다.
+   /summary 의 차트는 값이 없는 회원을 빼고 만들어지므로,
+   합계가 회원 수보다 적으면 그만큼 그 칸이 빈 회원이 있다는 뜻이다 */
+const sumOf = list => (list || []).reduce((total, item) => total + item.value, 0);
+
+/* DB 특이사항 점검 — /ready · /summary 가 이미 주는 숫자만 보고 판단한다.
+   서버에 이슈 표가 없어 "지금 보이는 것"만 나온다 — 사람이 직접 적어 넣거나
+   해결 표시를 하려면 엔진 쪽에 표가 하나 필요하다 */
+function findIssues(s, sum) {
+  const out = [];
+  const add = (level, title, detail) => out.push({ level, title, detail });
+
+  if (!s.ok)   add('bad', 'DB 연결', s.error || '원인 불명');
+  if (!sum.ok) return out;
+
+  const c = sum.counts, ch = sum.charts;
+  const members = c.members || 0;
+  if (!members) return out;
+
+  /* 세 방향에서 "비어 있는 회원 수"를 센다 */
+  const noProfile = members - sumOf(ch.ages);            /* 나이가 빈 회원 */
+  const noPrefs   = members - sumOf(ch.dealType);        /* 선호도 행이 없는 회원 */
+  const gap       = members * CHUNK_SLOTS - c.chunks;    /* 비어 있는 페르소나 칸 */
+  const asMembers = gap / CHUNK_SLOTS;                   /* 그 칸을 사람 수로 환산 */
+
+  /* 셋이 딱 맞으면 같은 계정들이다 — 세 번 말할 이유가 없다 */
+  if (noProfile > 0 && noProfile === noPrefs && asMembers === noProfile) {
+    add('warn', `가입이 덜 끝난 회원 ${noProfile}명`,
+      '기본정보 · 선호도 · 페르소나가 모두 비어 있습니다. '
+      + '로그인만 발급되고 설문을 안 마친 계정이면 정상입니다');
+  } else {
+    /* 숫자가 어긋나면 "일부만 실리다 말았다"는 뜻이다 — 이게 진짜 유실 신호다 */
+    if (gap > 0) {
+      const empty = Object.keys(PERSONA_LABELS)
+        .filter(k => !ch.persona.some(x => x.label === k))
+        .map(k => PERSONA_LABELS[k]);
+      add('bad', '페르소나 칸 유실',
+        `회원당 ${(c.chunks / members).toFixed(1)}칸 · `
+        + `${num(gap)}칸(회원 ${asMembers.toFixed(1)}명분)이 비었습니다`
+        + (empty.length ? ` — 한 명도 없는 칸: ${empty.join(', ')}` : '')
+        + '. 빈 칸은 벡터가 안 만들어져 이웃 찾기에서 빠집니다');
+    }
+    if (noProfile > 0) {
+      add('warn', '기본정보 결측',
+        `나이가 빈 회원 ${noProfile}명 — 연령대 차트에서 빠집니다`);
+    }
+    if (noPrefs > 0) {
+      add('bad', '선호도 미적재',
+        `user_preferences 행이 없는 회원 ${noPrefs}명 — 추천 가중치가 없습니다`);
+    }
+  }
+
+  /* 짧은 칸 — MIN_LENGTH 미만은 저장도 안 되므로,
+     평균이 낮다는 건 간신히 통과한 글이 많다는 뜻이다 */
+  const shorts = ch.persona.filter(x => x.value < CHUNK_WARN_LEN);
+  if (shorts.length) {
+    add('warn', '짧은 페르소나 칸',
+      shorts.map(x => `${PERSONA_LABELS[x.label] || x.label} ${x.value}자`).join(' · ')
+      + ` — 짧을수록 엉뚱한 이웃이 뽑힌다 (${CHUNK_MIN_LEN}자 미만은 아예 버려짐)`);
+  }
+
+  /* 가중치 미적재 — 0 이면 그 지표는 추천 점수에 전혀 안 실린다 */
+  const zeros = ch.weights.filter(w => !w.value).map(w => w.label);
+  if (zeros.length) {
+    add('bad', '가중치 비어 있음',
+      `${zeros.join(', ')} — user_preferences 적재를 확인하세요`);
+  }
+
+  return out;
+}
+
+function issueList(list, okNote) {
+  if (!list.length) return `<div class="ok-note">${esc(okNote)}</div>`;
+  return '<div class="logs">' + list.map(i => `
+    <div class="log issue ${i.level}">
+      <span class="tag ${i.level}">${i.level === 'bad' ? '심각' : '주의'}</span>
+      <b>${esc(i.title)}</b>
+      <span class="l-fields">${esc(i.detail)}</span>
+    </div>`).join('') + '</div>';
+}
+
+/* value 만 날 HTML 을 받는다 — 단위를 <small> 로 작게 붙이려는 것이다 */
+function fact(label, value, sub = '', level = '') {
+  return `<div class="fact ${level}">
+    <div class="f-lab">${esc(label)}</div>
+    <div class="f-val">${value}</div>
+    ${sub ? `<div class="f-sub">${esc(sub)}</div>` : ''}
+  </div>`;
+}
+
+   async function loadSystem() {
   const pane = $('#system-pane');
   pane.innerHTML = '<div class="skel">불러오는 중…</div>';
 
@@ -1220,11 +1423,71 @@ async function loadSystem() {
       <span class="l-val">${esc(v)}</span>
     </div>`).join('');
 
+  const issues = findIssues(s, sum);
+  const okNote = sum.ok
+    ? `특이사항 없음 — 회원 ${num(sum.counts.members)}명의 기본정보 · 선호도 · `
+      + `페르소나가 모두 실려 있고, 7개 지표도 비지 않았습니다`
+    : '집계를 읽지 못해 적재 상태를 점검하지 못했습니다';
+
+  /* 청킹 · 가중치 상자 — 대시보드에서 빼 낸 숫자들의 제자리다.
+     "지금 몇 명인가"가 아니라 "제대로 실렸나"를 보는 자리라 시스템 쪽이 맞다 */
+  let chunkCard = '', weightCard = '';
+  if (sum.ok) {
+    const c = sum.counts, ch = sum.charts;
+    const per = c.members ? c.chunks / c.members : 0;
+    const gap = Math.max(0, c.members * CHUNK_SLOTS - c.chunks);
+    const filled = ch.persona.length;
+    const shortest = filled ? ch.persona.reduce((x, y) => (x.value <= y.value ? x : y)) : null;
+
+    chunkCard = card('청킹 <span class="hint">페르소나 → 벡터</span>', `
+      <div class="facts">
+        ${fact('총 청크', num(c.chunks) + '<small>개</small>', `회원 ${num(c.members)}명`)}
+        ${fact('회원당', per.toFixed(1) + '<small>칸</small>', `${CHUNK_SLOTS}칸이면 정상`,
+               per < CHUNK_SLOTS ? 'bad' : '')}
+        ${fact('빈 칸', num(gap) + '<small>칸</small>',
+               gap ? `회원 ${(gap / CHUNK_SLOTS).toFixed(1)}명분` : '없다', gap ? 'bad' : '')}
+        ${fact('채워진 칸', `${filled}<small>/${CHUNK_SLOTS}</small>`, '한 명도 없는 칸은 제외',
+               filled < CHUNK_SLOTS ? 'warn' : '')}
+        ${shortest ? fact('가장 짧은 칸', shortest.value + '<small>자</small>',
+               PERSONA_LABELS[shortest.label] || shortest.label,
+               shortest.value < CHUNK_WARN_LEN ? 'warn' : '') : ''}
+      </div>
+      ${bars(ch.persona.map(d => ({ ...d, label: PERSONA_LABELS[d.label] || d.label })),
+             { color: 'var(--s3)', labelWidth: '110px' })}`,
+      `칸별 평균 길이 · ${CHUNK_MIN_LEN}자 미만은 청킹에서 버려진다`);
+
+    const ws = ch.weights;
+    const avg = ws.length ? (ws.reduce((t, w) => t + w.value, 0) / ws.length).toFixed(2) : '-';
+    const hi = ws.length ? ws.reduce((x, y) => (x.value >= y.value ? x : y)) : null;
+    const lo = ws.length ? ws.reduce((x, y) => (x.value <= y.value ? x : y)) : null;
+    const noPrefs = Math.max(0, c.members - sumOf(ch.dealType));
+
+    weightCard = card('가중치 <span class="hint">user_preferences 7지표</span>', `
+      <div class="facts">
+        ${fact('전체 평균', avg + '<small>/5</small>', '회원들이 준 점수')}
+        ${hi ? fact('가장 높음', hi.value.toFixed(2), hi.label) : ''}
+        ${lo ? fact('가장 낮음', lo.value.toFixed(2), lo.label) : ''}
+        ${fact('선호도 없는 회원', num(noPrefs) + '<small>명</small>',
+               noPrefs ? '추천 가중치가 없다' : '모두 실려 있다', noPrefs ? 'bad' : '')}
+      </div>`,
+      '추천 점수에 그대로 곱해지는 값 · 분포는 대시보드에서 본다');
+  }
+
   pane.innerHTML = `
     <div class="pane-head"><h2>시스템</h2>
-      <span class="sub">상태 · 캐시 · 수정 이력</span></div>
+      <span class="sub">상태 · 이슈 · 적재 · 캐시</span></div>
 
     ${card('상태', `<div class="logs">${rows}</div>`)}
+
+    ${card(`이슈 <span class="hint">${issues.length ? issues.length + '건' : '없음'}</span>`, `
+      ${issueList(issues, okNote)}
+      <div class="card-title" style="margin:18px 0 8px">관리자 수정 이력
+        <span class="hint">최근 ${logs.length}건</span></div>
+      ${logList(logs)}`,
+      'DB 특이사항과 손대던 기록을 한자리에 모은다')}
+
+    ${chunkCard}
+    ${weightCard}
 
     ${card('캐시', `
       <div style="font-size:13px;color:var(--ink-2);line-height:1.7;margin-bottom:12px">
@@ -1233,13 +1496,6 @@ async function loadSystem() {
         (관리자 화면에서 저장한 것은 서버가 알아서 비웁니다.)
       </div>
       <button class="btn" id="cache-clear" ${s.write_enabled ? '' : 'disabled'}>캐시 비우기</button>`)}
-
-    ${sum.ok ? card('페르소나 칸별 평균 길이 <span class="hint">글자</span>',
-        bars(sum.charts.persona.map(d => ({ ...d, label: PERSONA_LABELS[d.label] || d.label })),
-             { color: 'var(--s3)', labelWidth: '110px' }),
-        '짧은 칸이 많으면 엉뚱한 이웃이 뽑힌다') : ''}
-
-    ${card(`수정 이력 <span class="hint">최근 ${logs.length}건</span>`, logList(logs))}
 
     ${card('토큰', `
       <div style="font-size:13px;color:var(--ink-2);line-height:1.7;margin-bottom:12px">

@@ -46,6 +46,10 @@ const PULL_MAX = 18;        // 최대로 끌려오는 거리(px)
 // signup.html 이 설문 답을 넣어 두는 자리. 키 이름을 바꾸면 양쪽 다 고쳐야 한다
 const SURVEY_KEY = "lifefit-survey";
 
+// signup.html 에서 "설문 건너뛰기"를 눌렀을 때 세워 두는 표시. 이미 회원가입을 마친
+// 상태이므로 처음 보는 사람용 검색 화면(searchScreen) 대신 지도 화면을 바로 보여준다
+const SKIP_TO_MAP_KEY = "lifefit-skip-map";
+
 // 서버가 준 한국어 지표명 → 슬라이더 id
 const SLIDER_ID = {
   "녹지": "greenery", "안전": "safety", "교통": "transport",
@@ -532,6 +536,28 @@ function runSurveyIfPending() {
   return true;
 }
 
+/**
+ * 회원가입은 마쳤지만 설문은 건너뛴 채 돌아왔으면 검색 화면을 보여주지 않고
+ * 첫 화면의 "직접 설정할게요"(skipSearch)를 눌렀을 때와 똑같은 메인 화면(지도+슬라이더
+ * 패널, 기본값 그대로)으로 넘어간다. 분석은 자동으로 돌리지 않는다 — 사용자가 슬라이더를
+ * 조정한 뒤 직접 [AI 분석 실행]을 누르는 게 skipSearch 흐름과 같은 동작이다
+ *
+ * @returns 건너뛰고 온 길이면 true
+ */
+function skipToMapIfPending() {
+  let pending;
+  try {
+    pending = sessionStorage.getItem(SKIP_TO_MAP_KEY);
+    if (pending) sessionStorage.removeItem(SKIP_TO_MAP_KEY);
+  } catch {
+    return false;                 // 사생활 보호 모드 등으로 막혀 있으면 그냥 넘어간다
+  }
+  if (!pending) return false;
+
+  closeSearch();
+  return true;
+}
+
 
 /* =========================================================
    연결
@@ -570,6 +596,15 @@ function bindEvents() {
 
 // 페이지가 다 읽히면 시작한다
 document.addEventListener("DOMContentLoaded", async () => {
+  // 로그인·메뉴 버튼(#topActions)은 검색 화면 밖에 있어 지도 화면으로 바로 가는
+  // 경우에도 눌러야 하므로 무엇보다 먼저 연결한다
+  bindEvents();
+
+  // 설문만 건너뛰고 돌아온 길이면, 아래 키워드 fetch·배경 단어 준비를 시작하기도 전에
+  // 곧장 지도 화면으로 넘어간다. 순서를 바꾸지 않고 준비를 먼저 하면 첫 화면이
+  // (떠다니는 단어까지) 다 그려진 채로 잠깐 보였다가 닫히는 깜빡임이 생긴다
+  if (skipToMapIfPending()) return;
+
   // 키워드 목록은 서버가 쥔다. 프론트에 박아 두면 lifetype.py 와 어긋난다
   try {
     const d = await getLifeTypeKeywords();
@@ -582,7 +617,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   placeWords();
   startMagnetic();
   startRotation();
-  bindEvents();
 
   // 설문을 마치고 돌아온 길이면 검색 화면을 띄우지 않고 바로 추천한다
   if (!runSurveyIfPending()) {

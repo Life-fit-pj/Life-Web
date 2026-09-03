@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import csv
 import os
-import random
 import sqlite3
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -79,15 +78,19 @@ WEIGHT_KEYS = ["녹지", "안전", "교통", "상권", "의료", "교육", "문�
 # 7개 지표를 만들 원본 컬럼과 방향.
 #   +1 이면 값이 클수록 좋고, -1 이면 클수록 나쁘다(소음·범죄).
 #   여러 컬럼을 섞을 때는 평균을 낸다.
+#
+# 엔진(Life-Embed-jh/app/engine/recommend.py 의 INDICATOR_COLUMNS)과 반드시 같은
+# 컬럼 조합이어야 한다. 컬럼이 다르면 같은 가중치를 넣어도 동네별 원점수 자체가
+# 달라져 1차에서 본 동네가 2차 순위에서 통째로 밀려난다(실측: 1차 top-8 안에
+# 들어 있던 동네가 2차 top5 밖으로 사라짐)
 INDICATOR_COLS = {
-    "녹지": [("공원_밀도", 1), ("녹지면적_구", 1)],
-    "안전": [("CCTV_밀도", 1), ("경찰관서_밀도", 1), ("소방관서_밀도", 1),
-             ("범죄발생_구", -1), ("소음_야간_구", -1)],
+    "녹지": [("공원_밀도", 1)],
+    "안전": [("CCTV_밀도", 1), ("경찰관서_밀도", 1)],
     "교통": [("지하철역_밀도", 1), ("버스정류장_밀도", 1)],
     "상권": [("점포_밀도", 1), ("대형점포_밀도", 1)],
     "의료": [("의료기관_밀도", 1)],
     "교육": [("학교_밀도", 1), ("학원_밀도", 1)],
-    "문화": [("문화시설_밀도", 1), ("도서관_밀도", 1), ("전시시설_밀도", 1)],
+    "문화": [("문화시설_밀도", 1), ("도서관_밀도", 1)],
 }
 
 # 화면에 붙일 한 줄 설명. 정규화 점수보다 실제 개수가 와닿는다
@@ -106,8 +109,7 @@ BLURB_COLS = {
 BAND_LOW, BAND_HIGH = 0.65, 1.35
 USE_PRICE_BAND = True
 
-POOL = 8      # 상위 몇 곳을 후보로 둘지
-SHOW = 2      # 그중 몇 곳을 보여줄지
+SHOW = 2      # 상위 몇 곳을 보여줄지
 
 _ROWS = None      # [(구, 동, {컬럼: 값})]
 _SCORES = None    # {(구, 동): {지표: 0~100}}
@@ -298,13 +300,15 @@ def _blurb(d, weights):
 # ============================================================
 # 추천
 # ============================================================
-def recommend(weights: dict, show: int = SHOW, seed=None) -> list:
+def recommend(weights: dict, show: int = SHOW) -> list:
     """
-    가중치로 427개 동을 채점해 상위 POOL 중 show 곳을 돌려준다.
+    가중치로 427개 동을 채점해 상위 show 곳을 돌려준다.
 
-    상위에서 무작위로 고르는 이유 —
-    같은 키워드 조합이면 늘 같은 결과가 나와 김이 샌다.
-    점수 차이가 미미한 구간이라 정확도 손실은 없다.
+    예전엔 상위 8곳 중 2곳을 무작위로 뽑았다("같은 조합이면 늘 같은 결과가
+    나와 김이 샌다"는 이유였다). 그런데 2차(엔진의 recommend_by_weights)는
+    무작위 없이 순수 top5를 보여주므로, 1차가 무작위로 상위권 밖을 집으면
+    "아까 그 동네는 어디 갔지"가 된다. 그래서 여기도 무작위 없이 top show를
+    그대로 돌려준다 — 같은 가중치면 1차·2차가 겹칠 확률이 훨씬 높아진다
     """
     scores = _load_scores()
     if not scores:
@@ -362,11 +366,7 @@ def recommend(weights: dict, show: int = SHOW, seed=None) -> list:
         return []
 
     ranked.sort(reverse=True)
-    pool = ranked[:POOL]
-
-    rnd = random.Random(seed) if seed is not None else random
-    picked = rnd.sample(pool, min(show, len(pool)))
-    picked.sort(reverse=True)
+    picked = ranked[:show]
 
     return [{
         "gu": gu,
@@ -388,7 +388,6 @@ if __name__ == "__main__":
                      "상권": 5, "의료": 3, "교육": 3, "문화": 5}),
     ]:
         print(f"\n--- {name} ---")
-        for i in range(3):
-            r = recommend(w, show=2)
-            print("  " + " / ".join(
-                f"{x['gu']} {x['dong']}({x['blurb']})" for x in r))
+        r = recommend(w, show=5)
+        print("  " + " / ".join(
+            f"{x['gu']} {x['dong']}({x['blurb']})" for x in r))

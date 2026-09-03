@@ -208,6 +208,29 @@
 
 .auth-cta:hover { background: var(--accent); }
 
+/* 로그인 화면의 "회원가입" 버튼 — 로그인 버튼과 나란히 있을 때 주된 동작으로
+   오인되지 않도록 채워진 배경 대신 테두리만 쓴다 */
+.auth-cta--ghost {
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+}
+.auth-cta--ghost:hover { background: var(--primary); color: var(--bg); }
+
+/* 회원가입 화면 하단의 "로그인으로 돌아가기" */
+.auth-back {
+  display: block;
+  margin: 16px auto 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.auth-back:hover { color: var(--text); }
+
 .auth-divider {
   height: 1px;
   background: var(--line);
@@ -254,3 +277,38 @@
   font-size: 13px;
 }
 .auth-issued p { margin: 4px 0; }
+
+/* 칸 "위"에 뜨는 오류(비밀번호 확인 불일치, 중복 아이디). 내용 없을 때는
+   min-height 로 자리만 차지해 오류가 나타났다 사라졌다 할 때 아래 칸이 덜컥이지 않는다 */
+.auth-error--above { margin: 0 0 4px; min-height: 1em; }
+
+/* 아이디 + 중복확인 버튼 한 줄 */
+.auth-id-row {
+  display: flex;
+  gap: 8px;
+}
+.auth-id-row input { flex: 1; min-width: 0; }
+
+.auth-check-btn {
+  flex-shrink: 0;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-1, var(--bg));
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.auth-check-btn:hover { border-color: var(--primary); }
+.auth-check-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* 중복확인 결과("사용할 수 있는 아이디예요") 안내. 오류가 아니라 muted, 통과하면 초록 */
+.auth-hint {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  min-height: 1em;
+}
+.auth-hint--ok { color: #3a9d5d; }
