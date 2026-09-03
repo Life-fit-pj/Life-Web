@@ -116,8 +116,23 @@ function renderLoggedInAuthModal(el) {
     el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
     el.querySelector("#logoutBtn").addEventListener("click", () => {
         localStorage.setItem("lf-anon", crypto.randomUUID());
+        syncLoginToggle();
         renderGuestAuthModal(el);
     });
+}
+
+// 로그인 성공 직후 잠깐 보여주는 로딩 화면. 계정 정보 화면(renderLoggedInAuthModal)으로
+// 안 보내고 바로 닫는 이유는, 로그인의 목적이 "세션 연결"이지 계정 화면을 보여주는 게
+// 아니기 때문이다 — 확인차 잠깐 스피너만 보여주고 자동으로 닫는다.
+function renderLoginLoadingModal(el) {
+    el.innerHTML = `
+        <div class="auth-modal">
+            <div class="auth-section">
+                <div class="auth-spinner"></div>
+                <p class="auth-notice">로그인 중이에요...</p>
+            </div>
+        </div>
+    `;
 }
 
 function renderGuestAuthModal(el) {
@@ -152,7 +167,9 @@ function renderGuestAuthModal(el) {
         try {
             const { customerId } = await login(loginId, password);
             localStorage.setItem("lf-anon", customerId);
-            renderLoggedInAuthModal(el);
+            syncLoginToggle();
+            renderLoginLoadingModal(el);
+            setTimeout(closeAuthModal, 700);
         } catch (err) {
             errorEl.textContent = "아이디 또는 비밀번호가 맞지 않아요.";
         }
@@ -284,6 +301,23 @@ function setupSignupForm(el) {
             }
         }
     });
+}
+
+// 우상단 로그인 버튼의 표시 문구. 로그아웃은 계정을 지우는 게 아니라
+// 새 익명 id를 발급하는 것뿐이라(state.js), 로그인 폼과 별도 화면 없이 그 자리에서 처리한다.
+export function syncLoginToggle() {
+    const btn = document.getElementById("loginToggle");
+    if (!btn) return;
+    btn.textContent = isLoggedIn() ? "로그아웃" : "로그인";
+}
+
+export function handleLoginToggleClick() {
+    if (isLoggedIn()) {
+        localStorage.setItem("lf-anon", crypto.randomUUID());
+        syncLoginToggle();
+    } else {
+        openAuthModal();
+    }
 }
 
 export function openAuthModal() {
