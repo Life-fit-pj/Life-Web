@@ -25,6 +25,7 @@ from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins, analysis_engine,
+    create_member,                                                        # ← 추가
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -54,6 +55,20 @@ router = APIRouter(prefix="/api/admin", tags=["관리자"])
 def admin_members():
     return list_members()
 
+
+# ── 새 라우트 (admin_members 함수 바로 아래) ──
+@router.post("/members", dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_create_member(payload: dict):
+    """관리자가 회원 한 명을 새로 만든다. 이름 정도만 있어도 저장은 된다.
+
+    422 면 payload 안에 규칙에 안 맞는 칸(나이 범위, 20자 미만 페르소나 등)이
+    있다는 뜻 — detail 을 보면 어느 칸인지 나온다.
+    """
+    try:
+        return create_member(payload)
+    except InvalidPatch as e:
+        raise HTTPException(status_code=422, detail=e.errors)
+    
 
 # 없는 회원을 물었을 때는 `None`을 그대로 돌려주지 말고 404를 낸다.
 @router.get("/members/{customer_id}", dependencies=[Depends(check_admin)])
