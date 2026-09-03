@@ -127,8 +127,8 @@ function renderGuestAuthModal(el) {
             <div class="auth-section">
                 <h3 class="auth-title">로그인</h3>
                 <form id="loginForm" class="auth-form">
-                    <input id="loginIdInput" type="text" placeholder="아이디" autocomplete="off" required>
-                    <input id="loginPwInput" type="password" placeholder="비밀번호" autocomplete="off" required>
+                    <input id="loginIdInput" type="text" placeholder="아이디" autocomplete="username" required>
+                    <input id="loginPwInput" type="password" placeholder="비밀번호" autocomplete="current-password" required>
                     <button type="submit" class="auth-cta">로그인</button>
                 </form>
                 <p class="auth-notice">처음 쓰는 아이디·비밀번호를 입력하면 그 자리에서 계정이 만들어집니다.</p>
@@ -178,15 +178,15 @@ function renderSignupAuthModal(el) {
                 <form id="signupForm" class="auth-form">
                     <p id="signupIdError" class="auth-error auth-error--above"></p>
                     <div class="auth-id-row">
-                        <input id="signupIdInput" type="text" placeholder="아이디" autocomplete="off" required>
+                        <input id="signupIdInput" type="text" placeholder="아이디" autocomplete="username" required>
                         <button type="button" id="checkIdBtn" class="auth-check-btn">중복확인</button>
                     </div>
                     <p id="signupIdStatus" class="auth-hint"></p>
 
-                    <input id="signupPwInput" type="password" placeholder="비밀번호" autocomplete="off" required>
+                    <input id="signupPwInput" type="password" placeholder="비밀번호" autocomplete="new-password" required>
 
                     <p id="signupPwError" class="auth-error auth-error--above"></p>
-                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="off" required>
+                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>
 
                     <button type="submit" class="auth-cta">가입하고 설문 시작하기</button>
                 </form>
