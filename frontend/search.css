@@ -44,6 +44,27 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  /* 이 줄이 없으면 마크가 글자와 안 맞는다.
+     line-height 가 normal 이면 글자 상자에 위아래 여백이 붙는데,
+     그 여백까지 포함해 가운데를 맞추므로 글자만 아래로 밀려 보인다 */
+  line-height: 1;
+}
+
+/* 집모양 아랫선을 글자 밑줄에 붙인다.
+   가운데 정렬이면 마크가 글자 상자보다 4px 씩 위아래로 삐져나오는데,
+   그만큼과 글자 밑선 여유를 합쳐 끌어올린다.
+   transform 이라 옆 글자 위치는 그대로다 */
+.ss-logo::before {
+  content: "";
+  flex: none;
+  width: 26px;
+  height: 26px;
+  transform: translateY(-4px);
+  background: var(--logo-mark) center / contain no-repeat;
 }
 
 .ss-logo i {                    /* LIFE 와 FIT 사이의 쉼표만 색을 다르게 */
@@ -312,7 +333,7 @@
   transition: background 0.2s;
 }
 
-#topSearchBtn:hover { background: var(--amber); }
+#topSearchBtn:hover { background: var(--accent-fill); color: var(--accent-ink); }
 
 #topSearchBtn:disabled {
   background: var(--line-strong);

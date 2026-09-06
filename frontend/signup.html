@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>LIFE,FIT 회원가입 — 라이프스타일 설문</title>
+  <link rel="icon" type="image/png" href="img/logo_B_day_circle.png">
+  <link rel="icon" type="image/png" href="img/logo_B_night_circle.png" media="(prefers-color-scheme: dark)">
 
   <!-- 테마를 CSS 보다 먼저 정한다. index.html 과 같은 키를 읽어
        두 화면의 낮/밤이 어긋나지 않게 한다 -->
@@ -26,27 +28,32 @@
   -->
   <style>
     :root {
-      --bg:          #F8F1D8;
+      --bg:          #FBF8F1;
       --surface:     #FFFFFF;
       --surface-2:   #F1E9CE;
-      --line:        #DAD7CD;
-      --text:        #2D2A32;
-      --text-muted:  #7B7A6B;
+      --line:        #D7C39B;
+      --text:        #1C1A20;
+      --text-muted:  #6E6C60;
       --primary:     #344E41;
-      --accent:      #8A6D1F;
+      --accent:      #344E41;
       --danger:      #C0563F;
+      /* 버튼 hover 노랑 — 낮·밤이 같아 밤에서 다시 정의하지 않는다 */
+      --accent-fill: #FFCC00;
+      --accent-ink:  #1C1A20;
+      --logo-mark:   url("img/logo_A_day_344E41.png");
     }
 
     [data-theme="dark"] {
-      --bg:          #1B1A17;
-      --surface:     #262420;
-      --surface-2:   #2F2C26;
-      --line:        #45413A;
-      --text:        #EDE8DA;
-      --text-muted:  #A09A88;
-      --primary:     #A3B18A;
-      --accent:      #E3C36B;
+      --bg:          #2B2D2D;
+      --surface:     #5F6364;
+      --surface-2:   #414443;
+      --line:        #5F6364;
+      --text:        #B1B695;
+      --text-muted:  #7B7E7F;
+      --primary:     #869481;
+      --accent:      #FFCC00;
       --danger:      #E08A72;
+      --logo-mark:   url("img/logo_A_night_B1B695.png");
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -67,6 +74,17 @@
       font-weight: 700;
       color: var(--primary);
       letter-spacing: -0.5px;
+
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand::before {
+      content: "";
+      flex: none;
+      width: 28px;
+      height: 28px;
+      background: var(--logo-mark) center / contain no-repeat;
     }
     .brand i { color: var(--accent); font-style: normal; }
 
@@ -88,6 +106,9 @@
       letter-spacing: 0.05em;
       margin-bottom: 14px;
     }
+    /* 밤 화면에서는 회색 카드 위 회색 글씨라 소제목이 묻힌다.
+       포인트 색(노랑)으로 띄운다 */
+    [data-theme="dark"] .sec { color: var(--accent); }
 
     .sq-item { margin-bottom: 16px; }
     .sq-item:last-child { margin-bottom: 0; }
@@ -118,6 +139,25 @@
       background: var(--surface);
     }
 
+    .sq-item select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .sq-item select:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+    .sq-row { display: flex; gap: 8px; }
+    .sq-row select { flex: 1; }
+
     /* 5글자를 못 채운 칸. 다시 쓰기 시작하면 JS 가 뗀다 */
     .sq-item input.error { border-color: var(--danger); }
 
@@ -135,7 +175,7 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    .btn-submit:hover { background: var(--accent); }
+    .btn-submit:hover { background: var(--accent-fill); color: var(--accent-ink); }
 
     .btn-skip {
       padding: 10px;
@@ -213,6 +253,48 @@
   <p class="lead">상세한 라이프스타일 분석을 위해 아래 질문들에 답해 주세요. (건너뛰기 가능)</p>
 
   <form id="surveyForm">
+
+    <div class="card" id="basicInfoCard">
+      <div class="sec">👤 기본정보</div>
+      <div class="sq-item">
+        <label for="basicName">이름</label>
+        <input id="basicName" type="text" placeholder="예) 김라이프" required>
+      </div>
+      <div class="sq-item">
+        <label for="basicGender">성별</label>
+        <select id="basicGender" required>
+          <option value="">선택</option>
+          <option value="F">여성</option>
+          <option value="M">남성</option>
+        </select>
+      </div>
+      <div class="sq-item">
+        <label for="basicAge">나이</label>
+        <input id="basicAge" type="number" min="0" max="120" placeholder="예) 32" required>
+      </div>
+      <div class="sq-item">
+        <label>거주 지역</label>
+        <div class="sq-row">
+          <select id="basicCityGu" required><option value="">구 선택</option></select>
+          <select id="basicCityDong" required><option value="">동 선택</option></select>
+        </div>
+      </div>
+      <div class="sq-item">
+        <label>직장 지역 (선택)</label>
+        <div class="sq-row">
+          <select id="basicWorkGu"><option value="">구 선택</option></select>
+          <select id="basicWorkDong"><option value="">동 선택</option></select>
+        </div>
+      </div>
+      <div class="sq-item">
+        <label for="basicEmail">이메일 (선택)</label>
+        <input id="basicEmail" type="email" placeholder="예) lifefit@example.com">
+      </div>
+      <div class="sq-item">
+        <label for="basicPhone">전화번호 (선택)</label>
+        <input id="basicPhone" type="tel" placeholder="예) 010-1234-5678">
+      </div>
+    </div>
 
     <div class="card">
       <div class="sec">💼 일·커리어</div>
@@ -327,7 +409,9 @@
 </div>
 
 
-<script>
+<script type="module">
+import { signup, getGuDong } from "./lib/api.js";
+
 /* =========================================================
    설문 답변 → persona 칸
 
@@ -363,6 +447,92 @@ const form = document.getElementById("surveyForm");
 const skipConfirm = document.getElementById("skipConfirm");
 
 
+/* =========================================================
+   회원가입 계정 정보 + 지역 드롭다운
+
+   아이디/비번은 menu.js 의 회원가입 폼이 sessionStorage 에 담아 넘겨준다.
+   여기가 없으면 계정을 만들 수 없으므로 처음부터 다시 시작하게 한다.
+   ========================================================= */
+const PENDING_KEY = "lifefit-pending-signup";
+const pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+if (!pending) {
+  alert("회원가입 정보가 없어요. 처음부터 다시 시작해 주세요.");
+  location.href = "/";
+}
+
+const cityGuSel = document.getElementById("basicCityGu");
+const cityDongSel = document.getElementById("basicCityDong");
+const workGuSel = document.getElementById("basicWorkGu");
+const workDongSel = document.getElementById("basicWorkDong");
+
+function fillDongOptions(dongSel, dongs) {
+  dongSel.innerHTML = '<option value="">동 선택</option>'
+    + dongs.map((d) => `<option value="${d}">${d}</option>`).join("");
+}
+
+getGuDong().then((gudong) => {
+  const guOptionsHtml = Object.keys(gudong)
+    .map((gu) => `<option value="${gu}">${gu}</option>`).join("");
+  cityGuSel.insertAdjacentHTML("beforeend", guOptionsHtml);
+  workGuSel.insertAdjacentHTML("beforeend", guOptionsHtml);
+
+  cityGuSel.addEventListener("change", () => fillDongOptions(cityDongSel, gudong[cityGuSel.value] || []));
+  workGuSel.addEventListener("change", () => fillDongOptions(workDongSel, gudong[workGuSel.value] || []));
+}).catch(() => {});   // 실패해도 수동으로 진행할 정도는 아니라 조용히 둔다
+
+
+/** 기본정보 필수 칸 중 비어 있는 첫 번째. 없으면 null */
+function firstMissingBasicInfo() {
+  const required = [
+    document.getElementById("basicName"),
+    document.getElementById("basicGender"),
+    document.getElementById("basicAge"),
+    cityGuSel, cityDongSel,
+  ];
+  return required.find((el) => !el.value) || null;
+}
+
+function collectBasicInfo() {
+  return {
+    name: document.getElementById("basicName").value.trim(),
+    gender: document.getElementById("basicGender").value,
+    age: Number(document.getElementById("basicAge").value),
+    city: cityGuSel.value,
+    cityDong: cityDongSel.value,
+    workCity: workGuSel.value || null,
+    workDong: workDongSel.value || null,
+    email: document.getElementById("basicEmail").value.trim() || null,
+    phone: document.getElementById("basicPhone").value.trim() || null,
+  };
+}
+
+/** 설문 15문항 원본 답변. persona 칸 매핑은 서버(services/persona_type.py)가 한다 */
+function collectAnswers() {
+  const ids = ["p1", "p2", "s1", "s2", "a1", "a2", "h1", "t1", "t2", "c1", "c2", "f1", "f2", "g1", "g2"];
+  const answers = {};
+  for (const id of ids) {
+    const value = (document.getElementById(id).value || "").trim();
+    if (value) answers[id] = value;
+  }
+  return answers;
+}
+
+/** 실제 계정 생성. 성공하면 그 자리에서 로그인 상태가 된다(state.js 가 보는 lf-anon) */
+async function completeSignup(answers) {
+  const { customerId } = await signup(pending.loginId, pending.password, collectBasicInfo(), answers);
+  localStorage.setItem("lf-anon", customerId);
+  sessionStorage.removeItem(PENDING_KEY);
+}
+
+function handleSignupError(err) {
+  sessionStorage.removeItem(PENDING_KEY);
+  alert(err.status === 409
+    ? "이미 사용 중인 아이디예요. 처음부터 다시 시도해 주세요."
+    : "회원가입에 실패했어요. 잠시 후 다시 시도해 주세요.");
+  location.href = "/";
+}
+
+
 /** 특수문자를 뺀 실제 글자 수. "ㅋㅋㅋ..." 같은 입력을 걸러내려는 것 */
 function meaningfulLength(value) {
   return value.replace(/[^가-힣a-zA-Z0-9]/g, "").length;
@@ -390,13 +560,20 @@ function toPersona() {
 }
 
 
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  // ① 모든 칸이 최소 글자 수를 넘겼는지
+  const badBasic = firstMissingBasicInfo();
+  if (badBasic) {
+    alert("기본정보를 먼저 채워 주세요.");
+    badBasic.focus();
+    return;
+  }
+
+  // ① 모든 칸이 최소 글자 수를 넘겼는지 (기본정보 카드는 뺀다 — 저건 이미 위에서 봤다)
   let firstBad = null;
 
-  form.querySelectorAll(".sq-item input").forEach((input) => {
+  form.querySelectorAll(".card:not(#basicInfoCard) .sq-item input").forEach((input) => {
     const ok = meaningfulLength(input.value) >= MIN_CHARS;
     input.classList.toggle("error", !ok);
     if (!ok && !firstBad) firstBad = input;
@@ -408,10 +585,15 @@ form.addEventListener("submit", (e) => {
     return;
   }
 
-  // ② 첫 화면이 꺼내 갈 수 있도록 넘겨 두고 돌아간다.
-  //    아직 서버에 저장하지 않는다 — 회원가입 백엔드가 생기면 그때 붙인다
+  // ② 검색 화면이 LLM 질의문을 만들 때 꺼내 쓸 수 있게 남겨 둔다(/api/predict 우회 경로).
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toPersona()));
-  location.href = "/";
+
+  try {
+    await completeSignup(collectAnswers());
+    location.href = "/";
+  } catch (err) {
+    handleSignupError(err);
+  }
 });
 
 
@@ -430,10 +612,24 @@ document.getElementById("btnSkipNo").addEventListener("click", () => {
   skipConfirm.classList.remove("is-open");
 });
 
-document.getElementById("btnSkipYes").addEventListener("click", () => {
+document.getElementById("btnSkipYes").addEventListener("click", async () => {
+  const badBasic = firstMissingBasicInfo();
+  if (badBasic) {
+    skipConfirm.classList.remove("is-open");
+    alert("건너뛰더라도 계정을 만들려면 기본정보는 입력해야 해요.");
+    badBasic.focus();
+    return;
+  }
+
   sessionStorage.removeItem(STORAGE_KEY);   // 이전에 쓰다 만 답이 남아 있을 수 있다
   sessionStorage.setItem(SKIP_TO_MAP_KEY, "1");
-  location.href = "/";
+
+  try {
+    await completeSignup({});   // 설문은 건너뛰므로 persona 없이 기본정보만으로 가입
+    location.href = "/";
+  } catch (err) {
+    handleSignupError(err);
+  }
 });
 
 // 바깥을 눌러도 닫힌다

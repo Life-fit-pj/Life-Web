@@ -14,7 +14,7 @@
 import { postPredict, postLifeType, getLifeTypeKeywords } from "../lib/api.js";
 import { nextSeq, isLatest, getAnonId } from "../lib/state.js";
 import { renderResult } from "./result.js";
-import { openMenu, openAuthModal } from "./menu.js";
+import { openMenu, handleLoginToggleClick, syncLoginToggle } from "./menu.js";
 import { showTypeCard, firstPayload } from "./lifetype.js";
 
 
@@ -590,7 +590,8 @@ function bindEvents() {
 
   document.getElementById("skipSearch").addEventListener("click", closeSearch);
   document.getElementById("menuToggle").addEventListener("click", openMenu);
-  document.getElementById("loginToggle").addEventListener("click", openAuthModal);
+  document.getElementById("loginToggle").addEventListener("click", handleLoginToggleClick);
+  syncLoginToggle();
 }
 
 

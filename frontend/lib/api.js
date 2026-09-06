@@ -123,9 +123,11 @@ export function checkLoginId(loginId) {
   return getJSON(`/api/check-id?loginId=${encodeURIComponent(loginId)}`);
 }
 
-/** 아이디+비밀번호 회원가입. 이미 있는 아이디면 409 로 실패한다(postJSON 이 err.status 로 담아 던진다) */
-export function signup(loginId, password) {
-  return postJSON("/api/signup", { loginId, password });
+/** 회원가입. 아이디+비번+기본정보+설문 답변을 한 번에 보낸다 — 성공하면 그 자리에서
+ *  customer 가 새로 만들어진다. 이미 있는 아이디면 409 로 실패한다
+ *  (postJSON 이 err.status 로 담아 던진다) */
+export function signup(loginId, password, basicInfo, answers) {
+  return postJSON("/api/signup", { loginId, password, ...basicInfo, answers });
 }
 
 /** 마이페이지 — 로그인한 회원의 기본정보 */
