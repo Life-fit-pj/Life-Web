@@ -122,15 +122,33 @@ def recommend_by_weights(weights, top_k=5, housing=None):
 지도 좌표를 찾기 때문입니다. `"노원구 중계1동"`은 되지만
 `"노원구중계1동"`이나 `"서울특별시 노원구 중계1동"`은 좌표를 못 찾습니다.
 
-### 5. services/engine.py 의 import 두 줄을 고칩니다
+### 5. services/engine.py 의 import 를 고칩니다
 
 엔진 저장소를 아는 파일은 `main.py`가 아니라 `services/engine.py` 하나뿐입니다.
+
+> **최소 계약은 함수 둘(`search` · `recommend_by_weights`)이지만, 지금 `engine.py`가
+> 실제로 가져오는 줄은 그보다 많습니다.** 추천 말고도 좋아요·검색기록·로그인·관리자
+> 화면이 엔진의 DB를 같이 쓰기 때문입니다. 추천만 갈아 끼울 거면 아래 두 줄만 고치고,
+> 나머지 줄은 기본 엔진(`Life-Embed-jh`)을 계속 가리키게 두면 됩니다.
+>
+> ```python
+> from app.tables.history import add_like, ...      # 좋아요·기록
+> from app.tables.regions  import facilities, ...   # 시설 정보
+> from app.tables.members  import customer_one      # 회원 조회
+> from app.features.search import search, ...       # ← 추천. 여기를 바꾼다
+> from app.features.admin  import ...               # 관리자 화면
+> from app.features.auth   import ...               # 로그인
+> ```
+>
+> 엔진의 SQL은 2026-09-07부터 `app/tables/` 네 파일에 모여 있습니다
+> (예전엔 `app/core/db.py` 한 파일이었습니다). 자세한 계층은 엔진 저장소의
+> `README.md` "폴더 구조" 참고.
 
 ```python
 # 기본 엔진
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
-from app.features.pipeline_api import search, recommend_by_weights
+from app.features.search import search, recommend_by_weights
 
 # 내 엔진으로 바꾸려면
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'my-engine'))
@@ -169,7 +187,7 @@ ENGINES = {}
 
 try:
     sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh')))
-    from app.features.pipeline_api import search as search_default
+    from app.features.search import search as search_default
     ENGINES["default"] = search_default
 except ImportError:
     pass
@@ -222,7 +240,7 @@ py -m pip install fastapi uvicorn pydantic pandas numpy
 | 파일 | 설명 |
 |---|---|
 | `.env` | `ANTHROPIC_API_KEY=sk-ant-...` — 팀에서 따로 전달 |
-| `data/life.db` | 216MB. 깃에 없으므로 따로 전달받거나 직접 생성 |
+| `data/life.db` | 약 42MB. Git LFS 로 관리 — 체크아웃 직후 133바이트면 `git lfs pull` 먼저 |
 
 직접 만들려면 `Life-Embed-jh`에서:
 
@@ -428,6 +446,9 @@ Life-Web/
 │   ├── recommend.py     /api/predict · /api/region · /api/region/explain
 │   │                     /api/chat · /api/regions/gudong
 │   ├── lifetype.py      /api/lifetype · /api/lifetype/keywords  (1차 유형 판정)
+│   ├── survey.py        /api/survey/*   회원가입 설문 채점
+│   ├── auth.py          /api/auth/*     로그인 · 아이디 중복확인 · 가입
+│   ├── likes.py         /api/likes/*    좋아요 · 검색기록 · 채팅기록
 │   └── admin.py         /api/admin/*  (대시보드 집계 · 회원·행정동 조회/수정
 │                         · 상태 · 이력 · 캐시. 토큰 필요)
 ├── services/          기능별 분리
@@ -435,6 +456,7 @@ Life-Web/
 │   ├── engine.py        엔진 호출 + 한↔영 키 변환 + 시설 정보 조회
 │   ├── floorplan.py     LH 평면도 선택
 │   ├── lifetype.py      1차 유형 판정 (키워드 → 축 점수 → 유형·가중치). LLM 안 씀
+│   ├── persona_type.py  설문 15문항 → persona 9칸 + 유형 판정
 │   └── typespot.py      1차 유형에 어울리는 동네 2곳 고르기
 ├── frontend/           빌드 단계 없음. index.html이 main.js 하나만 불러오고
 │   │                    나머지는 ES 모듈 import로 연결됨
@@ -493,7 +515,7 @@ Life-Web/
 → 카카오 개발자 콘솔에 `http://127.0.0.1:5000`을 등록했는지 확인하세요.
 
 **`file is not a database`**
-→ `Life-Embed-jh/data/life.db`가 216MB인지 확인하세요.
+→ `Life-Embed-jh/data/life.db`가 수십 MB(2026-09-07 기준 약 42MB)인지 확인하세요.
    133바이트 정도로 작으면 Git LFS 포인터 텍스트 파일만 받아진 상태입니다.
    `Life-Embed-jh` 폴더에서 `git lfs checkout data/life.db`(이미 받아둔 LFS
    객체를 파일로 풀어쓰기만 함, 네트워크 불필요)나 `git lfs pull`(새로 내려받기)로
