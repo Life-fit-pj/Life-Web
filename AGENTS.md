@@ -7,8 +7,10 @@
 
 LIFE,FIT 웹 — 서울 행정동(427개 중 하나)을 라이프스타일 선호도에 맞춰 추천하는 서비스의
 FastAPI 서버 + 정적 프론트엔드. 이 저장소는 UI/HTTP 레이어만 담당한다. 추천 로직과 LLM 호출은
-형제 저장소 `Life-Embed-jh`가 맡고, 이 저장소는 `sys.path`로 그 코드를 직접 임포트한다(pip
-설치 방식이 아님). 두 저장소는 반드시 같은 상위 폴더 아래 나란히 있어야 한다.
+형제 저장소 `Life-Embed-jh`가 맡고, 이 저장소는 그 저장소가 띄우는 자체 FastAPI 서버를
+`httpx`로 호출한다(`EMBED_API_BASE`, 기본 `http://127.0.0.1:8000`) — 예전엔 `sys.path`로
+코드를 직접 임포트했으나 2026-09-08에 HTTP 호출로 바꿨다(`Life-Embed-jh/docs/adr/0001-*`).
+두 저장소는 반드시 같은 상위 폴더 아래 나란히 있어야 하고, 실행 시 두 uvicorn을 각각 띄운다.
 
 ## Reference projects
 

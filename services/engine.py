@@ -1,42 +1,66 @@
 """
-추천 엔진(life-fit-embed) 호출부.
+추천 엔진(Life-Embed-jh) 호출부.
 
 이 파일만 엔진 저장소를 안다. 다른 파일은 몰라도 된다.
-엔진을 바꾸더라도 여기만 고치면 된다 —
-조원이 만든 다른 엔진을 붙일 때도 이 파일의 import 두 줄만 바꾸면 된다..
+엔진을 바꾸더라도 여기만 고치면 된다.
+
+REFACTOR.md 결정 이후로는 sys.path 로 코드를 직접 불러오지 않고, Life-Embed-jh가
+자체적으로 띄운 FastAPI 서버(app.main:app)를 httpx 로 호출한다 — 무거운 임베딩
+의존성(sentence-transformers 등)을 이 프로세스에 같이 싣지 않고, 동기 임베딩
+추론이 이 서버의 이벤트 루프를 막지 않게 하려는 것이다(자세한 배경은
+Life-Embed-jh/docs/REFACTOR.md ADR-0001).
+
+바뀐 건 "함수를 어떻게 부르나"뿐이다. 함수 이름·인자·반환값·예외(InvalidPatch,
+없으면 None)는 예전 sys.path 직접 호출 때와 그대로다 — routers/*.py 는 한 줄도
+안 고쳐도 된다.
 """
 
 import os
-import sys
+from urllib.parse import quote
 
-# 추천 엔진은 형제 폴더에 있다.
-#   Life-fit-main/
-#   ├── Life-Embed-jh/    ← 두뇌
-#   └── Life-Web/      ← 여기
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
-sys.path.insert(0, EMBED_DIR)
+import httpx
+from dotenv import load_dotenv
+from pathlib import Path
 
-from app.tables.history import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
-from app.tables.regions import facilities, facility_counts, region_extras
-from app.tables.members import customer_one
-from app.features.search import search, recommend_by_weights, recommend_by_weights_explained
-from app.features.region_explain import region_explain_cached
-from app.features.chat import chat as chat_engine
-from app.features.survey import score_survey 
-from app.features import analysis as analysis_engine
-from app.features.admin import (
-    get_member, list_members, get_region, list_regions,
-    update_member, update_region, preview_member, similar_members, InvalidPatch, health,
-    clear_caches, privacy_preview, dashboard, recent_logs, create_member,   # ← 추가
-)
-from app.features.auth import (
-    login as auth_login, backfill_logins,
-    id_exists as auth_id_exists, signup as auth_signup,
-)
+# Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+EMBED_API_BASE = os.environ.get("EMBED_API_BASE", "http://127.0.0.1:8000")
+
+# 커넥션 재사용 — 요청마다 새로 만들지 않는다 (ADR-0001 부정적 영향 항목 참고)
+_client = httpx.Client(base_url=EMBED_API_BASE, timeout=30.0)
 
 
-print("✅ LLM 파이프라인 연결 성공!")
+class InvalidPatch(Exception):
+    """값이 규칙에 안 맞을 때. Life-Embed-jh 가 422 + {"detail": {칸: 이유}} 로 응답하면 여기로 바꾼다.
+
+    admin.py 라우터가 예전부터 잡던 예외라 이름·필드(.errors)를 그대로 유지한다.
+    """
+    def __init__(self, errors: dict):
+        self.errors = errors
+        super().__init__(str(errors))
+
+
+def _call(method: str, path: str, *, json=None, params=None, none_on=(), patch_error_on=()):
+    """엔진 API 공통 호출.
+
+    none_on: 이 상태코드들은 예외 대신 None 을 돌려준다("없다"는 뜻이었던 기존 계약).
+    patch_error_on: 이 상태코드들은 InvalidPatch(detail) 를 던진다.
+    그 외 4xx/5xx 는 httpx.HTTPStatusError 그대로 올라간다 — 엔진 서버가 죽었다는 뜻이라
+    조용히 삼키면 더 위험하다.
+    """
+    resp = _client.request(method, path, json=json, params=params)
+    if resp.status_code in none_on:
+        return None
+    if resp.status_code in patch_error_on:
+        raise InvalidPatch(resp.json()["detail"])
+    resp.raise_for_status()
+    if resp.status_code == 204:
+        return None
+    return resp.json()
+
+
+print(f"✅ 엔진 API 연결 대상: {EMBED_API_BASE}")
 
 
 # 프론트는 영문 키, 엔진은 한국어 지표명을 쓴다.
@@ -91,6 +115,31 @@ def to_housing(prefs):
     return {"건물유형": bldg, "거래유형": deal, "targets": targets}
 
 
+# ── 추천 ─────────────────────────────────────────
+
+def search(query, top_k=5, housing_override=None, weights_override=None):
+    """검색어 → 가중치 + TOP 5 + 설명문."""
+    return _call("POST", "/search", json={
+        "query": query, "top_k": top_k,
+        "housing_override": housing_override, "weights_override": weights_override,
+    })
+
+
+def recommend_by_weights(weights, top_k=5, housing=None):
+    """가중치 → TOP 5."""
+    return _call("POST", "/recommend", json={
+        "weights": weights, "top_k": top_k, "housing": housing,
+    })
+
+
+def recommend_by_weights_explained(weights, persona_query, top_k=5, housing=None):
+    """가중치 + 사람 묘사 문장 → TOP 5 + 설명문."""
+    return _call("POST", "/recommend/explained", json={
+        "weights": weights, "persona_query": persona_query,
+        "top_k": top_k, "housing": housing,
+    })
+
+
 def get_regions(user_prefs, weights_override=None):
     """추천 TOP 5 를 만든다.
 
@@ -142,32 +191,11 @@ def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5)
                                            top_k=top_k, housing=housing)
 
 
-def get_customer(customer_id):
-    """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
-    return customer_one(customer_id)
-
-
-def check_login_id(login_id: str) -> bool:
-    """아이디 중복확인. 이미 쓰이고 있으면 True."""
-    return auth_id_exists(login_id)
-
-
-def signup(login_id: str, password: str, payload: dict):
-    """아이디+비밀번호+회원정보로 새 계정을 만든다. 이미 있는 아이디면 None.
-
-    payload 는 기본정보(name/gender/age/city/city_dong/work_city/work_dong/
-    phone/email) + 희망조건 7지표(한국어 키) + persona 9칸을 한데 담은 딕셔너리다.
-    """
-    return auth_signup(login_id, password, payload)
-
+# ── 동네 설명/대화 ────────────────────────────────
 
 def get_facilities(gu, dong, limit=5):
     """행정동 하나의 시설 정보를 돌려준다. 지도 핀을 눌렀을 때 쓴다."""
-    return {
-        "counts": facility_counts(gu, dong),
-        "items": facilities(gu, dong, limit=limit),
-        "extras": region_extras(gu, dong),
-    }
+    return _call("GET", f"/regions/{quote(gu)}/{quote(dong)}/facilities", params={"limit": limit})
 
 
 def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=None):
@@ -177,38 +205,187 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
     같은 문장을 넣는다. None 이면 프롬프트에 "가격 이야기를 꺼내지 마라"가
     들어가므로, 가격 조건이 없을 때 억지로 기본값을 만들어 넣지 말 것
     """
-    return region_explain_cached(gu, dong, query, weights, scores, housing)
+    out = _call("POST", f"/regions/{quote(gu)}/{quote(dong)}/explain", json={
+        "query": query, "weights": weights, "scores": scores, "housing": housing,
+    })
+    return out["explanation"]
+
 
 def get_chat_answer(question, regions=None, weights=None, history=None):
     """추천 결과에 대한 후속 질문에 답한다."""
-    return chat_engine(question, regions=regions, weights=weights, history=history)
+    out = _call("POST", "/chat", json={
+        "question": question, "regions": regions, "weights": weights, "history": history,
+    })
+    return out["answer"]
 
-# => 좋아요
+
+# ── 회원/설문 ─────────────────────────────────────
+
+def get_customer(customer_id):
+    """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
+    return _call("GET", f"/customers/{quote(customer_id)}", none_on=(404,))
+
+
+def score_survey(prompt):
+    """설문 프롬프트를 Claude 에게 채점시킨다."""
+    return _call("POST", "/survey/score", json={"prompt": prompt})["result"]
+
+
+# ── 인증 ─────────────────────────────────────────
+
+def auth_login(login_id: str, password: str):
+    """아이디+비번으로 로그인한다. 성공하면 customer_id, 실패(비번 불일치)하면 None."""
+    out = _call("POST", "/auth/login", json={"login_id": login_id, "password": password},
+                none_on=(401,))
+    return out["customer_id"] if out else None
+
+
+def check_login_id(login_id: str) -> bool:
+    """아이디 중복확인. 이미 쓰이고 있으면 True."""
+    return _call("GET", f"/auth/id-exists/{quote(login_id)}")["exists"]
+
+
+def signup(login_id: str, password: str, payload: dict):
+    """아이디+비밀번호+회원정보로 새 계정을 만든다. 이미 있는 아이디면 None.
+
+    payload 는 기본정보(name/gender/age/city/city_dong/work_city/work_dong/
+    phone/email) + 희망조건 7지표(한국어 키) + persona 9칸을 한데 담은 딕셔너리다.
+    """
+    out = _call("POST", "/auth/signup",
+                json={"login_id": login_id, "password": password, "payload": payload},
+                none_on=(409,))
+    return out["customer_id"] if out else None
+
+
+# ── 좋아요/기록 ────────────────────────────────────
+
 def like_region(anon_id, gu, dong):
     """지도 핀에서 좋아요 클릭시 호출한다."""
-    add_like(anon_id, gu, dong)
+    _call("POST", "/likes", json={"anon_id": anon_id, "gu": gu, "dong": dong})
+
 
 def unlike_region(anon_id, gu, dong):
     """좋아요를 취소하면 호출한다."""
-    remove_like(anon_id, gu, dong)
+    _call("DELETE", "/likes", json={"anon_id": anon_id, "gu": gu, "dong": dong})
 
-# => 검색
+
 def save_search(anon_id, query):
     """검색어를 기록한다. 검색창에 입력한 문장이 있을 때만 부른다."""
-    add_search_history(anon_id, query)
+    _call("POST", "/history", json={"anon_id": anon_id, "kind": "search", "query": query})
+
 
 def save_chat(anon_id, question, answer):
     """후속 질문/답변을 기록한다."""
-    add_chat_history(anon_id, question, answer)
+    _call("POST", "/history", json={
+        "anon_id": anon_id, "kind": "chat", "question": question, "answer": answer,
+    })
+
 
 def get_history(anon_id):
     """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
-    return {
-        "searches": list_search_history(anon_id),
-        "chats": list_chat_history(anon_id),
-    }
+    return _call("GET", f"/history/{quote(anon_id)}")
+
+
+# ── 관리자 ────────────────────────────────────────
+
+def get_member(customer_id):
+    return _call("GET", f"/admin/members/{quote(customer_id)}", none_on=(404,))
+
+
+def list_members():
+    return _call("GET", "/admin/members")
+
+
+def create_member(payload: dict):
+    return _call("POST", "/admin/members", json=payload, patch_error_on=(422,))
+
+
+def update_member(customer_id, patch):
+    return _call("PATCH", f"/admin/members/{quote(customer_id)}", json=patch,
+                 none_on=(404,), patch_error_on=(422,))
+
+
+def get_region(gu, dong):
+    return _call("GET", f"/admin/regions/{quote(gu)}/{quote(dong)}", none_on=(404,))
+
+
+def list_regions():
+    return _call("GET", "/admin/regions")
+
+
+def update_region(gu, dong, patch):
+    return _call("PATCH", f"/admin/regions/{quote(gu)}/{quote(dong)}", json=patch,
+                 none_on=(404,), patch_error_on=(422,))
+
+
+def preview_member(customer_id):
+    """이 회원의 희망조건으로 추천 TOP 5를 뽑아본다. 아무것도 안 고친다."""
+    return _call("GET", f"/admin/members/{quote(customer_id)}/preview", none_on=(404,))
+
+
+def similar_members(customer_id, top_k=5):
+    """이 회원과 페르소나가 비슷한 회원들."""
+    return _call("GET", f"/admin/members/{quote(customer_id)}/similar",
+                 params={"top_k": top_k}, none_on=(404,))
+
+
+def privacy_preview(customer_id):
+    """이 회원의 페르소나 9칸을 원본과 가린 것으로 나란히 준다."""
+    return _call("GET", f"/admin/members/{quote(customer_id)}/privacy-preview", none_on=(404,))
+
+
+def health():
+    return _call("GET", "/admin/health")
+
+
+def clear_caches():
+    return _call("POST", "/admin/clear-caches")
+
+
+def dashboard():
+    return _call("GET", "/admin/dashboard")
+
+
+def recent_logs(limit=8):
+    return _call("GET", "/admin/recent-logs", params={"limit": limit})
+
+
+def backfill_logins():
+    return _call("POST", "/admin/backfill-logins")
+
+
+class _AnalysisEngine:
+    """예전엔 `from app.features import analysis as analysis_engine` 로 모듈 자체를
+    이름표만 바꿔 썼다. HTTP 로는 모듈을 못 받아오므로 같은 4개 메서드를 낸
+    자리표시자 객체로 대신한다 — admin.py 라우터의 `analysis_engine.ask(...)`
+    호출부는 그대로 둔다."""
+
+    def ask(self, question: str) -> dict:
+        """빈 질문이면 422 대신 {"error": ...} 를 돌려준다 — 예전 app.features.analysis.ask()
+        의 계약(예외가 아니라 dict)을 그대로 지킨다. admin.py 라우터가 이 dict 를 본다."""
+        resp = _client.post("/admin/analysis/ask", json={"question": question})
+        if resp.status_code == 422:
+            return {"error": resp.json()["detail"]}
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_chats(self, limit: int = 50) -> list:
+        return _call("GET", "/admin/analysis/chats", params={"limit": limit})
+
+    def get_chat(self, chat_id: int):
+        return _call("GET", f"/admin/analysis/chats/{chat_id}", none_on=(404,))
+
+    def delete_chat(self, chat_id: int) -> int:
+        out = _call("DELETE", f"/admin/analysis/chats/{chat_id}", none_on=(404,))
+        return out["deleted"] if out else 0
+
+
+analysis_engine = _AnalysisEngine()
+
 
 if __name__ == "__main__":
+    # 스모크 체크 — Life-Embed-jh 가 이 주소에 떠 있어야 한다:
+    #   (Life-Embed-jh 저장소에서) uvicorn app.main:app --port 8000
     w, r, e, h = get_regions({"query": "애들 학원 보내기 좋은 곳"})
     print(w)
     for x in r:
