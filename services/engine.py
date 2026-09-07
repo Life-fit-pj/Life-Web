@@ -17,13 +17,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
-from app.core.db import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
-from app.core.db import facilities, facility_counts, region_extras
-from app.core.db import customer_one
-from app.features.pipeline_api import search, recommend_by_weights, recommend_by_weights_explained
+from app.tables.history import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
+from app.tables.regions import facilities, facility_counts, region_extras
+from app.tables.members import customer_one
+from app.features.search import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
-from app.features.scoring import score_survey 
+from app.features.survey import score_survey 
 from app.features import analysis as analysis_engine
 from app.features.admin import (
     get_member, list_members, get_region, list_regions,
