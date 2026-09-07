@@ -8,8 +8,10 @@
 
 LIFE,FIT web — 사용자의 라이프스타일 선호도를 바탕으로 서울의 행정동(427개 중 하나)을
 추천해주는 FastAPI 서버 + 정적 프론트엔드입니다(예전에는 Flask였으나 전환됨). 이 저장소는
-UI와 HTTP 레이어**만** 담당합니다. 모든 추천 로직과 LLM 호출은 형제 저장소인 `Life-Embed-jh`에
-있으며, 이 저장소는 `sys.path`를 통해 이를 직접 임포트합니다(pip 설치 방식이 아님).
+UI와 HTTP 레이어**만** 담당합니다. 모든 추천 로직과 LLM 호출은 형제 저장소인 `Life-Embed-jh`가
+자체 FastAPI 서버(8000번 포트)로 맡고, 이 저장소는 `httpx`로 그 서버를 호출합니다
+(`EMBED_API_BASE`, 기본 `http://127.0.0.1:8000`) — 2026-09-08 이전엔 `sys.path` 직접
+임포트였습니다(`Life-Embed-jh/docs/adr/0001-move-fastapi-to-embed.md` 참고).
 
 ## 필수 폴더 구조
 
@@ -21,21 +23,26 @@ Life-fit-main/
 └── Life-Web/         # 이 저장소
 ```
 
-`services/engine.py`는 `../Life-Embed-jh`를 `sys.path`에 추가하고 여기서
-`app.features.pipeline_api`, `app.core.db`, `app.features.region_explain`,
-`app.features.chat`, `app.features.admin`을 임포트합니다. `Life-Embed-jh`가 없거나 이름이
-잘못되면 서버는 임포트 시점에 `ModuleNotFoundError: No module named 'app'` 오류로 실패합니다.
+`services/engine.py`는 `httpx.Client`로 `Life-Embed-jh`가 띄운 FastAPI 서버를 호출합니다.
+그 서버가 안 떠 있으면 요청마다 `httpx.ConnectError`로 실패합니다(임포트 시점 오류가
+아니라 요청 시점 오류입니다 — `Life-Embed-jh`도 함께 실행하세요, 아래 "실행 방법" 참고).
 `Life-Embed-jh`는 자체 `.env`에 `ANTHROPIC_API_KEY`와 `data/life.db`(약 216MB, git에 포함되지
 않음)가 필요합니다 — 해당 저장소의 README를 참고하세요.
 
 ## 실행 방법
 
 ```bash
-py -m pip install fastapi uvicorn pydantic pandas numpy python-dotenv
+py -m pip install fastapi uvicorn pydantic pandas numpy python-dotenv httpx
+
+# 1) Life-Embed-jh 저장소에서 먼저 엔진 서버를 띄웁니다
+py -m uvicorn app.main:app --reload --port 8000
+
+# 2) 이 저장소(Life-Web)에서 웹 서버를 띄웁니다
 py -m uvicorn main:app --reload --port 5000
 ```
 
-`http://127.0.0.1:5000`에서 서비스됩니다. 이 저장소에는 테스트 스위트, 린터, 빌드 단계가
+`http://127.0.0.1:5000`에서 서비스됩니다. `services/engine.py`가 `EMBED_API_BASE`로 1)을
+호출하므로 두 uvicorn을 **둘 다** 띄워야 합니다. 이 저장소에는 테스트 스위트, 린터, 빌드 단계가
 없습니다 — 대신 각 `services/*.py` 파일에 `if __name__ == "__main__":` 스모크 체크가 있으며,
 해당 모듈을 단독으로 점검하려면 직접 실행하면 됩니다(예: `py services/coords.py`,
 `py services/engine.py`, `py services/floorplan.py`).
@@ -47,8 +54,9 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
 ## 아키텍처
 
 **요청 흐름:** `frontend/main.js` → `frontend/ui/*.js` → FastAPI 앱의 API 라우트
-(요청 본문은 pydantic 모델로 검증됨) → `services/engine.py`가 형제 패키지인 `Life-Embed-jh`를
-호출 → 응답을 재구성해 JSON으로 반환 → 프론트엔드가 지도 핀/카드를 렌더링.
+(요청 본문은 pydantic 모델로 검증됨) → `services/engine.py`가 `httpx`로 `Life-Embed-jh`의
+FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 반환 → 프론트엔드가 지도
+핀/카드를 렌더링.
 
 - `main.py` — FastAPI 앱 설정과 정적 파일 서빙(`StaticFiles` 마운트로 프론트엔드 +
   `data/LH평면도` 이미지)**만** 합니다. 라우트는 전부 `routers/`에 있고 여기서는
@@ -69,8 +77,10 @@ Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao D
   `frontend/signup.html`은 지금도 답변을 문장으로 이어 붙여 `/api/predict`의 `query`(LLM 경로)로
   보냅니다(`ui/search.js`의 `SURVEY_KEY` 처리부). 프론트를 이 엔드포인트로 옮길 때는 이 차이를
   먼저 확인하세요.
-- `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. 다른 추천 엔진으로
-  교체하려면 여기 있는 import 줄만 바꾸면 됩니다(README의 "다른 엔진 붙이기" 참고).
+- `services/engine.py` — **`Life-Embed-jh`를 알고 있는 유일한 파일**입니다. `httpx.Client`로
+  `EMBED_API_BASE`(기본 `http://127.0.0.1:8000`)를 호출합니다(2026-09-08 이전엔 `sys.path`
+  직접 임포트 — `Life-Embed-jh/docs/adr/0001-move-fastapi-to-embed.md` 참고). 다른 추천
+  엔진으로 교체하려면 여기만 고치면 됩니다(README의 "다른 엔진 붙이기" 참고).
   7개 라이프스타일 지표의 한국어⇄영어 매핑(`KEY_MAP`)도 여기 하나만 있습니다 — 다른 파일에서
   다시 적지 말고 import 하세요.
 - `services/coords.py` — `data/동_좌표.csv`(427행)를 임포트 시점에 메모리 내
