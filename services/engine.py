@@ -17,9 +17,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
 sys.path.insert(0, EMBED_DIR)
 
-from app.tables.history import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
-from app.tables.regions import facilities, facility_counts, region_extras
-from app.tables.members import customer_one
+from app.repositories.history import add_like, remove_like, add_search_history, list_search_history, add_chat_history, list_chat_history
+from app.repositories.regions import facilities, facility_counts, region_extras
+from app.repositories.members import customer_one
 from app.features.search import search, recommend_by_weights, recommend_by_weights_explained
 from app.features.region_explain import region_explain_cached
 from app.features.chat import chat as chat_engine
@@ -30,10 +30,12 @@ from app.features.admin import (
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs, create_member,   # ← 추가
 )
-from app.features.auth import (
-    login as auth_login, backfill_logins,
-    id_exists as auth_id_exists, signup as auth_signup,
-)
+# ⚠ 엔진이 Supabase Auth 로 넘어가면서 login()·id_exists() 가 없어졌다
+#   (login_with_supabase·signed_up 으로 대체됐고 signup 은 인자가 바뀌었다).
+#   프론트가 아직 Supabase 토큰을 받아 오지 않아 지금은 이어 붙일 수 없다.
+#   여기서 이름을 그대로 import 하면 서버가 뜨지도 못하므로, 살아 있는 것만
+#   가져오고 없어진 셋은 아래에서 "부르면 알 수 있게" 막아 둔다.
+from app.features.auth import backfill_logins
 
 
 print("✅ LLM 파이프라인 연결 성공!")
@@ -147,18 +149,40 @@ def get_customer(customer_id):
     return customer_one(customer_id)
 
 
+# ── 옛 아이디/비밀번호 로그인 — 엔진에서 없어졌다 ─────────────────
+# 엔진이 Supabase Auth 로 갈아탔다. 그쪽 auth_service 에는 이제
+# login_with_supabase(uid) · signed_up(uid) · signup(uid, payload) 만 있다.
+#
+# 브라우저가 Supabase 토큰을 받아 오게 만드는 것이 먼저라, 그 전까지는
+# 이 셋을 이을 수 없다. 조용히 None 을 돌려주면 "로그인이 실패했다"로 보여
+# 원인을 못 찾으므로, 부르는 순간 이유가 보이게 막아 둔다.
+# 서버는 정상으로 뜨고 지도·추천·검색·채팅·좋아요는 그대로 동작한다.
+#
+# 잇는 절차는 studyall.md 3절의 1~3단계(교안 study2.md).
+
+_LOGIN_GONE = (
+    "옛 아이디/비밀번호 로그인은 엔진에서 제거됐다. "
+    "Supabase Auth 로 갈아끼우는 중이다 — study2.md 1~3단계 참고"
+)
+
+
+def auth_login(login_id: str, password: str):
+    """(중단) 옛 로그인. Supabase Auth 로 대체되는 중이다."""
+    raise NotImplementedError(_LOGIN_GONE)
+
+
 def check_login_id(login_id: str) -> bool:
-    """아이디 중복확인. 이미 쓰이고 있으면 True."""
-    return auth_id_exists(login_id)
+    """(중단) 아이디 중복확인. Supabase 가 계정을 관리하므로 이 개념이 사라진다."""
+    raise NotImplementedError(_LOGIN_GONE)
 
 
 def signup(login_id: str, password: str, payload: dict):
-    """아이디+비밀번호+회원정보로 새 계정을 만든다. 이미 있는 아이디면 None.
+    """(중단) 옛 회원가입.
 
-    payload 는 기본정보(name/gender/age/city/city_dong/work_city/work_dong/
-    phone/email) + 희망조건 7지표(한국어 키) + persona 9칸을 한데 담은 딕셔너리다.
+    엔진 쪽 signup 은 이제 signup(supabase_user_id, payload) 다 —
+    비밀번호를 안 받는다. 인자 모양부터 다르므로 그냥 넘기면 TypeError 가 난다.
     """
-    return auth_signup(login_id, password, payload)
+    raise NotImplementedError(_LOGIN_GONE)
 
 
 def get_facilities(gu, dong, limit=5):
