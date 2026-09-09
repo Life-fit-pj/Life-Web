@@ -1,11 +1,39 @@
 import { openHistory } from "./history.js";
 import { openMypage } from "./mypage.js";
-import { login, checkLoginId } from "../lib/api.js";
+import { authLogin, getSignedUp } from "../lib/api.js";
 import { getAnonId, isLoggedIn } from "../lib/state.js";
+import { supabase } from "../lib/supabaseClient.js";
 
 let menuModalEl = null;
 let comingSoonEl = null;
 let authModalEl = null;
+
+// Supabase 로그인 직후(이메일/비번, 구글 리디렉션 복귀 포함)마다 한 번씩 불린다.
+// 페이지를 새로 열었을 때의 세션 복원("INITIAL_SESSION")은 여기서 다시 안 돈다 —
+// 이미 로그인 상태(state.js 의 lf-anon)가 새로고침에도 그대로 남아 있어 할 일이 없다.
+supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session) resolveBackendAccount(session.access_token);
+});
+
+// Supabase 인증은 끝났지만 이 서비스의 customer 인지는 아직 모르는 상태 — 여기서 가른다.
+// 이미 가입돼 있으면 그대로 로그인, 처음 보는 사용자면 회원가입 뎁스(signup.html)로 보낸다
+// ("계정이 없다면 바로 회원가입 뎁스로" — 구글/이메일 로그인 모두 같은 규칙을 탄다).
+async function resolveBackendAccount(token) {
+    try {
+        const { signedUp } = await getSignedUp(token);
+        if (!signedUp) {
+            sessionStorage.setItem("lifefit-pending-token", token);
+            location.href = "signup.html";
+            return;
+        }
+        const { customerId } = await authLogin(token);
+        localStorage.setItem("lf-anon", customerId);
+        syncLoginToggle();
+        if (authModalEl?.classList.contains("is-open")) closeAuthModal();
+    } catch (err) {
+        console.error("로그인 처리 실패", err);
+    }
+}
 
 // 메뉴 패널 DOM을 처음 열릴 때 한 번만 만든다.
 function ensureMenu() {
@@ -79,16 +107,11 @@ function closeMenu() {
 }
 
 // 헤더 "로그인" 버튼을 누르면 뜨는 모달.
-// 임시 로그인이라 별도 인증 프레임워크 없이, 처음 보는 아이디/비번을 입력하면
-// 서버(auth.login)가 그 자리에서 계정을 발급하고 바로 로그인시킨다 —
-// 발급과 로그인이 폼 하나로 합쳐져 있다. 로그인 성공 시 localStorage
-// "lf-anon"을 customer_id로 덮어쓴다 —
+// 실제 인증(비밀번호 확인, 구글 OAuth)은 Supabase SDK 가 처리한다 — 이 모달은
+// 그 UI만 띄우고, 로그인 성공 뒤처리(resolveBackendAccount)는 위쪽
+// onAuthStateChange 리스너가 로그인 방법과 무관하게 한 곳에서 담당한다.
 // 좋아요/검색/채팅 기록이 전부 getAnonId() 하나만 보고 동작하므로(state.js),
-// 새로고침 없이도 이거 하나로 그 기록들이 로그인한 사람에게 연결된다.
-// 회원가입은 로그인 화면의 "회원가입" 버튼을 눌러야 나오는 별도 화면이다
-// (renderSignupAuthModal) — 아이디 중복확인 + 비밀번호 확인만 보는 최소 폼이고,
-// 아이디/비번을 임시로 들고 그대로 기본정보·설문(signup.html)으로 넘어간다.
-// 계정은 거기서 모든 정보를 다 받은 뒤 한 번에 만들어진다.
+// customerId 로 localStorage "lf-anon"을 덮어쓰면 그 기록들이 그대로 이어진다.
 function ensureAuthModal() {
     if (authModalEl) return authModalEl;
 
@@ -116,24 +139,20 @@ function renderLoggedInAuthModal(el) {
     `;
     el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
     el.querySelector("#logoutBtn").addEventListener("click", () => {
+        supabase.auth.signOut();
         localStorage.setItem("lf-anon", crypto.randomUUID());
         syncLoginToggle();
         renderGuestAuthModal(el);
     });
 }
 
-// 로그인 성공 직후 잠깐 보여주는 로딩 화면. 계정 정보 화면(renderLoggedInAuthModal)으로
-// 안 보내고 바로 닫는 이유는, 로그인의 목적이 "세션 연결"이지 계정 화면을 보여주는 게
-// 아니기 때문이다 — 확인차 잠깐 스피너만 보여주고 자동으로 닫는다.
-function renderLoginLoadingModal(el) {
-    el.innerHTML = `
-        <div class="auth-modal">
-            <div class="auth-section">
-                <div class="auth-spinner"></div>
-                <p class="auth-notice">로그인 중이에요...</p>
-            </div>
-        </div>
-    `;
+function startGoogleLogin() {
+    // 지금 페이지로 그대로 돌아온다 — 복귀하면 onAuthStateChange(SIGNED_IN)가
+    // resolveBackendAccount 를 불러 로그인/회원가입 뎁스 이동까지 알아서 한다.
+    supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + window.location.pathname },
+    });
 }
 
 function renderGuestAuthModal(el) {
@@ -142,12 +161,14 @@ function renderGuestAuthModal(el) {
             <button class="auth-close" aria-label="닫기">&times;</button>
             <div class="auth-section">
                 <h3 class="auth-title">로그인</h3>
+                <button type="button" id="googleLoginBtn" class="auth-cta auth-cta--google">Google로 로그인</button>
+                <div class="auth-divider"></div>
                 <form id="loginForm" class="auth-form">
-                    <input id="loginIdInput" type="text" placeholder="아이디" autocomplete="username" required>
+                    <input id="loginEmailInput" type="email" placeholder="이메일" autocomplete="username" required>
                     <input id="loginPwInput" type="password" placeholder="비밀번호" autocomplete="current-password" required>
                     <button type="submit" class="auth-cta">로그인</button>
                 </form>
-                <p class="auth-notice">처음 쓰는 아이디·비밀번호를 입력하면 그 자리에서 계정이 만들어집니다.</p>
+                <button type="button" id="forgotPwBtn" class="auth-back">비밀번호를 잊으셨나요?</button>
                 <p id="loginError" class="auth-error"></p>
             </div>
             <div class="auth-divider"></div>
@@ -158,22 +179,27 @@ function renderGuestAuthModal(el) {
         </div>
     `;
     el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
+    el.querySelector("#googleLoginBtn").addEventListener("click", startGoogleLogin);
 
     el.querySelector("#loginForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const loginId = el.querySelector("#loginIdInput").value.trim();
-        const password = el.querySelector("#loginPwInput").value.trim();
+        const email = el.querySelector("#loginEmailInput").value.trim();
+        const password = el.querySelector("#loginPwInput").value;
         const errorEl = el.querySelector("#loginError");
         errorEl.textContent = "";
-        try {
-            const { customerId } = await login(loginId, password);
-            localStorage.setItem("lf-anon", customerId);
-            syncLoginToggle();
-            renderLoginLoadingModal(el);
-            setTimeout(closeAuthModal, 700);
-        } catch (err) {
-            errorEl.textContent = "아이디 또는 비밀번호가 맞지 않아요.";
-        }
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // 성공하면 onAuthStateChange(SIGNED_IN)가 이어서 처리한다(모달 닫기까지 포함) —
+        // 여기서는 실패만 보여주면 된다.
+        if (error) errorEl.textContent = "이메일 또는 비밀번호가 맞지 않아요.";
+    });
+
+    el.querySelector("#forgotPwBtn").addEventListener("click", async () => {
+        const email = prompt("가입한 이메일을 입력해 주세요.");
+        if (!email) return;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password.html`,
+        });
+        alert(error ? "메일 전송에 실패했어요." : "비밀번호 재설정 메일을 보냈어요. 메일함을 확인해 주세요.");
     });
 
     el.querySelector("#gotoSignup").addEventListener("click", () => renderSignupAuthModal(el));
@@ -181,26 +207,21 @@ function renderGuestAuthModal(el) {
 
 // 로그인 화면의 "회원가입" 버튼을 눌러야 나오는 회원가입 폼.
 // 로그인 폼과 한 화면에 같이 두면 "지금 어디에 입력하고 있는지" 헷갈리기 쉬워
-// 화면을 통째로 바꿔 끼운다 — 로그인/구글 로그인 쪽으로는 아래 "로그인으로 돌아가기"로 되돌아간다.
+// 화면을 통째로 바꿔 끼운다. 여기서는 Supabase 계정만 만들고(이메일+비번, 또는 구글),
+// 이름·나이·거주지 같은 기본정보/설문은 signup.html 이 이어받아 /api/signup 을 부른다
+// (onAuthStateChange 가 "가입 안 된 계정"으로 판단해 자동으로 그리로 보낸다).
 function renderSignupAuthModal(el) {
     el.innerHTML = `
         <div class="auth-modal">
             <button class="auth-close" aria-label="닫기">&times;</button>
             <div class="auth-section">
                 <h3 class="auth-title">회원가입</h3>
+                <button type="button" id="googleSignupBtn" class="auth-cta auth-cta--google">Google로 시작하기</button>
+                <div class="auth-divider"></div>
                 <form id="signupForm" class="auth-form">
-                    <p id="signupIdError" class="auth-error auth-error--above"></p>
-                    <div class="auth-id-row">
-                        <input id="signupIdInput" type="text" placeholder="아이디" autocomplete="username" required>
-                        <button type="button" id="checkIdBtn" class="auth-check-btn">중복확인</button>
-                    </div>
-                    <p id="signupIdStatus" class="auth-hint"></p>
-
-                    <input id="signupPwInput" type="password" placeholder="비밀번호" autocomplete="new-password" required>
-
-                    <p id="signupPwError" class="auth-error auth-error--above"></p>
-                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>
-
+                    <input id="signupEmailInput" type="email" placeholder="이메일" autocomplete="username" required>
+                    <input id="signupPwInput" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="new-password" required>
+                    <p id="signupError" class="auth-error"></p>
                     <button type="submit" class="auth-cta">다음: 정보 입력하기</button>
                 </form>
                 <button type="button" id="backToLogin" class="auth-back">← 로그인으로 돌아가기</button>
@@ -208,90 +229,28 @@ function renderSignupAuthModal(el) {
         </div>
     `;
     el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
+    el.querySelector("#googleSignupBtn").addEventListener("click", startGoogleLogin);
     el.querySelector("#backToLogin").addEventListener("click", () => renderGuestAuthModal(el));
 
-    setupSignupForm(el);
-}
-
-// 회원가입 폼. 아이디 중복확인 + 비밀번호/비밀번호 확인 일치만 보는 최소 구성이다.
-function setupSignupForm(el) {
-    const form = el.querySelector("#signupForm");
-    const idInput = el.querySelector("#signupIdInput");
-    const idError = el.querySelector("#signupIdError");
-    const idStatus = el.querySelector("#signupIdStatus");
-    const checkBtn = el.querySelector("#checkIdBtn");
-    const pwInput = el.querySelector("#signupPwInput");
-    const pwConfirmInput = el.querySelector("#signupPwConfirmInput");
-    const pwError = el.querySelector("#signupPwError");
-
-    // 중복확인을 통과한 아이디만 가입을 허용한다. 확인 후 아이디를 다시 고치면
-    // 그 확인은 무효가 된다 — 확인 안 한 다른 아이디로 가입되는 것을 막는다
-    let idConfirmed = false;
-
-    idInput.addEventListener("input", () => {
-        idConfirmed = false;
-        idStatus.textContent = "";
-        idStatus.classList.remove("auth-hint--ok");
-        idError.textContent = "";
-    });
-
-    checkBtn.addEventListener("click", async () => {
-        const loginId = idInput.value.trim();
-        idError.textContent = "";
-        idStatus.textContent = "";
-        idStatus.classList.remove("auth-hint--ok");
-
-        if (!loginId) {
-            idError.textContent = "아이디를 먼저 입력해 주세요.";
-            return;
-        }
-
-        checkBtn.disabled = true;
-        try {
-            const { available } = await checkLoginId(loginId);
-            idConfirmed = available;
-            if (available) {
-                idStatus.textContent = "사용할 수 있는 아이디예요.";
-                idStatus.classList.add("auth-hint--ok");
-            } else {
-                idError.textContent = "이미 사용 중인 아이디예요.";
-            }
-        } catch (err) {
-            idError.textContent = "중복확인에 실패했어요. 다시 시도해 주세요.";
-        } finally {
-            checkBtn.disabled = false;
-        }
-    });
-
-    // 비밀번호 확인 칸 위 빨간 오류 문자. 다시 쓰기 시작하면 지운다
-    // (signup.html 설문 칸이 에러 표시를 지우는 방식과 같다)
-    pwConfirmInput.addEventListener("input", () => { pwError.textContent = ""; });
-    pwInput.addEventListener("input", () => { pwError.textContent = ""; });
-
-    form.addEventListener("submit", async (e) => {
+    el.querySelector("#signupForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+        const email = el.querySelector("#signupEmailInput").value.trim();
+        const password = el.querySelector("#signupPwInput").value;
+        const errorEl = el.querySelector("#signupError");
+        errorEl.textContent = "";
 
-        const loginId = idInput.value.trim();
-        const password = pwInput.value;
-        const passwordConfirm = pwConfirmInput.value;
-
-        if (!idConfirmed) {
-            idError.textContent = "아이디 중복확인을 먼저 해 주세요.";
-            idInput.focus();
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+            errorEl.textContent = "회원가입에 실패했어요: " + error.message;
             return;
         }
-
-        if (password !== passwordConfirm) {
-            pwError.textContent = "비밀번호가 서로 달라요. 다시 입력해 주세요.";
-            pwConfirmInput.focus();
+        if (!data.session) {
+            // 프로젝트에 이메일 확인이 켜져 있으면 세션이 바로 안 생긴다 — 메일의 링크를
+            // 눌러 돌아오면 그때 onAuthStateChange(SIGNED_IN)가 이어서 처리한다.
+            alert("가입 확인 메일을 보냈어요. 메일의 링크를 눌러 인증을 마치면 계속할 수 있어요.");
             return;
         }
-
-        // 계정 생성은 여기서 하지 않는다 — 기본정보·설문까지 한 번에 모아
-        // signup.html 이 실제 /api/signup 을 부른다(회원가입은 그 화면에서 끝난다).
-        // 아이디/비번만 다음 화면이 쓸 수 있게 임시로 들고 넘어간다.
-        sessionStorage.setItem("lifefit-pending-signup", JSON.stringify({ loginId, password }));
-        location.href = "signup.html";
+        // 세션이 바로 생기면 onAuthStateChange(SIGNED_IN)가 signup.html 로 자동으로 넘긴다.
     });
 }
 
@@ -305,6 +264,7 @@ export function syncLoginToggle() {
 
 export function handleLoginToggleClick() {
     if (isLoggedIn()) {
+        supabase.auth.signOut();
         localStorage.setItem("lf-anon", crypto.randomUUID());
         syncLoginToggle();
     } else {

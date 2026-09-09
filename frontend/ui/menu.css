@@ -217,6 +217,16 @@
 }
 .auth-cta--ghost:hover { background: var(--primary); color: var(--bg); }
 
+/* 구글 로그인/회원가입 버튼 — 색을 강요하지 않는 구글 브랜드 관례를 따라
+   흰 배경 + 테두리로 다른 버튼과 구분한다 */
+.auth-cta--google {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.auth-cta--google:hover { background: var(--surface-2); color: var(--text); }
+
 /* 회원가입 화면 하단의 "로그인으로 돌아가기" */
 .auth-back {
   display: block;

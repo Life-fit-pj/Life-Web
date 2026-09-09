@@ -1,3 +1,4 @@
+# Last updated: 2026-09-09
 """
 추천 엔진(Life-Embed-jh) 호출부.
 
@@ -41,7 +42,7 @@ class InvalidPatch(Exception):
         super().__init__(str(errors))
 
 
-def _call(method: str, path: str, *, json=None, params=None, none_on=(), patch_error_on=()):
+def _call(method: str, path: str, *, json=None, params=None, headers=None, none_on=(), patch_error_on=()):
     """엔진 API 공통 호출.
 
     none_on: 이 상태코드들은 예외 대신 None 을 돌려준다("없다"는 뜻이었던 기존 계약).
@@ -49,7 +50,7 @@ def _call(method: str, path: str, *, json=None, params=None, none_on=(), patch_e
     그 외 4xx/5xx 는 httpx.HTTPStatusError 그대로 올라간다 — 엔진 서버가 죽었다는 뜻이라
     조용히 삼키면 더 위험하다.
     """
-    resp = _client.request(method, path, json=json, params=params)
+    resp = _client.request(method, path, json=json, params=params, headers=headers)
     if resp.status_code in none_on:
         return None
     if resp.status_code in patch_error_on:
@@ -232,28 +233,33 @@ def score_survey(prompt):
 
 
 # ── 인증 ─────────────────────────────────────────
+# Life-Embed-jh 의 /auth/* 는 id/password 가 아니라 Supabase access token(Bearer)을
+# 받는다(2026-09-09 계약 변경) — 검증은 그쪽 supabase_auth.verify_token() 이 한다.
 
-def auth_login(login_id: str, password: str):
-    """아이디+비번으로 로그인한다. 성공하면 customer_id, 실패(비번 불일치)하면 None."""
-    out = _call("POST", "/auth/login", json={"login_id": login_id, "password": password},
-                none_on=(401,))
+def _bearer(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def auth_login(token: str):
+    """Supabase 로 로그인한 사용자를 customer_id 에 연결한다. 가입 전이면 None."""
+    out = _call("POST", "/auth/login", headers=_bearer(token), none_on=(404,))
     return out["customer_id"] if out else None
 
 
-def check_login_id(login_id: str) -> bool:
-    """아이디 중복확인. 이미 쓰이고 있으면 True."""
-    return _call("GET", f"/auth/id-exists/{quote(login_id)}")["exists"]
+def signed_up(token: str) -> bool:
+    """이 Supabase 사용자가 이미 customer 로 가입돼 있나. 회원가입 화면에서 로그인으로
+    돌릴지 판단하는 데 쓴다."""
+    return _call("GET", "/auth/signed-up", headers=_bearer(token))["signed_up"]
 
 
-def signup(login_id: str, password: str, payload: dict):
-    """아이디+비밀번호+회원정보로 새 계정을 만든다. 이미 있는 아이디면 None.
+def signup(token: str, payload: dict):
+    """Supabase 인증 + 회원정보로 새 계정을 만든다. 이미 가입돼 있으면 None.
 
     payload 는 기본정보(name/gender/age/city/city_dong/work_city/work_dong/
     phone/email) + 희망조건 7지표(한국어 키) + persona 9칸을 한데 담은 딕셔너리다.
     """
-    out = _call("POST", "/auth/signup",
-                json={"login_id": login_id, "password": password, "payload": payload},
-                none_on=(409,))
+    out = _call("POST", "/auth/signup", json={"payload": payload},
+                headers=_bearer(token), none_on=(409,))
     return out["customer_id"] if out else None
 
 

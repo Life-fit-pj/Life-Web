@@ -6,11 +6,11 @@
  * 나중에 주소가 바뀌거나 로그인 토큰이 붙을 때 여기만 고치면 된다.
  */
 
-/** POST + JSON 을 보내고 JSON 을 받는 공통 부분 */
-async function postJSON(url, body) {
+/** POST + JSON 을 보내고 JSON 을 받는 공통 부분. extraHeaders 는 로그인 토큰 등에 쓴다 */
+async function postJSON(url, body, extraHeaders) {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
     body: JSON.stringify(body),
   });
 
@@ -24,8 +24,8 @@ async function postJSON(url, body) {
 }
 
 /** 보낼 것이 없는 조회용 */
-async function getJSON(url) {
-  const res = await fetch(url);
+async function getJSON(url, extraHeaders) {
+  const res = await fetch(url, { headers: extraHeaders });
 
   if (!res.ok) {
     const err = new Error(`${url} 응답 오류 ${res.status}`);
@@ -113,21 +113,26 @@ export function deleteLike(anonId, gu, dong) {
   return deleteJSON("/api/likes", { anonId, gu, dong });
 }
 
-/** 로그인 (처음 보는 아이디면 서버가 그 자리에서 발급도 겸한다) */
-export function login(loginId, password) {
-  return postJSON("/api/login", { loginId, password });
+/** Authorization 헤더 조립. Supabase 세션의 access_token 을 그대로 싣는다 */
+function authHeader(token) {
+  return { Authorization: `Bearer ${token}` };
 }
 
-/** 회원가입 화면의 "중복확인" 버튼. 이미 쓰이는 아이디면 available:false */
-export function checkLoginId(loginId) {
-  return getJSON(`/api/check-id?loginId=${encodeURIComponent(loginId)}`);
+/** Supabase 로그인 직후 부른다. 이미 가입된 계정이면 customerId, 아니면 404
+ *  (postJSON 이 err.status 로 담아 던진다 — 호출한 쪽이 회원가입 뎁스로 보낸다) */
+export function authLogin(token) {
+  return postJSON("/api/auth/login", {}, authHeader(token));
 }
 
-/** 회원가입. 아이디+비번+기본정보+설문 답변을 한 번에 보낸다 — 성공하면 그 자리에서
- *  customer 가 새로 만들어진다. 이미 있는 아이디면 409 로 실패한다
- *  (postJSON 이 err.status 로 담아 던진다) */
-export function signup(loginId, password, basicInfo, answers) {
-  return postJSON("/api/signup", { loginId, password, ...basicInfo, answers });
+/** 이 Supabase 사용자가 이미 customer 로 가입돼 있나. 회원가입 뎁스로 보낼지 판단할 때 쓴다 */
+export function getSignedUp(token) {
+  return getJSON("/api/auth/signed-up", authHeader(token));
+}
+
+/** 회원가입. Supabase 인증 토큰 + 기본정보 + 설문 답변을 한 번에 보낸다 — 성공하면
+ *  그 자리에서 customer 가 새로 만들어진다. 이미 가입돼 있으면 409 로 실패한다 */
+export function signup(token, basicInfo, answers) {
+  return postJSON("/api/signup", { ...basicInfo, answers }, authHeader(token));
 }
 
 /** 마이페이지 — 로그인한 회원의 기본정보 */
