@@ -103,6 +103,11 @@ export function getHistory(anonId) {
   return getJSON(`/api/history?anonId=${encodeURIComponent(anonId)}`);
 }
 
+/** 좋아요한 동네 목록 조회 */
+export function getLikes(anonId) {
+  return getJSON(`/api/likes?anonId=${encodeURIComponent(anonId)}`);
+}
+
 /** 좋아요 추가 */
 export function postLike(anonId, gu, dong) {
   return postJSON("/api/likes", { anonId, gu, dong });

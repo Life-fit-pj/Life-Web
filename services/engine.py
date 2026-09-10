@@ -292,6 +292,11 @@ def get_history(anon_id):
     return _call("GET", f"/history/{quote(anon_id)}")
 
 
+def get_likes(anon_id):
+    """메뉴 > 좋아요 한 거주지에서 부른다."""
+    return _call("GET", f"/likes/{quote(anon_id)}")
+
+
 # ── 관리자 ────────────────────────────────────────
 
 def get_member(customer_id):

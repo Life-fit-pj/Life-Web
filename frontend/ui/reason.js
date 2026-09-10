@@ -1,6 +1,7 @@
 import { postRegion, postRegionExplain, postLike, deleteLike } from "../lib/api.js";
-import { state, getAnonId } from "../lib/state.js";
+import { state, getAnonId, isLoggedIn } from "../lib/state.js";
 import { escapeAndFormat, splitRegionName } from "../lib/format.js";
+import { openAuthModal } from "./menu.js";
 
 // ===== 추천 사유 패널 =====
 
@@ -124,6 +125,10 @@ function bindLikeButton(el, item) {
   btn.textContent = "❤";
 
   btn.addEventListener("click", async () => {
+    if (!isLoggedIn()) {
+      openAuthModal();
+      return;
+    }
     try {
       if (liked) {
         await deleteLike(getAnonId(), gu, dong);
