@@ -1,9 +1,12 @@
 """1차 유형에 어울리는 동네 고르기.
 
 [어디서 오나]
-  엔진(:8000)이다. 순위는 POST /recommend, 카드 문구의 원본 개수는 GET /regions/{구}/{동}/facilities.
+  엔진(:8000)의 POST /recommend 하나다. 순위도 카드 문구의 원본 개수(counts)도 거기서 온다.
   예전에는 life.db 나 CSV 사본을 직접 읽고 여기서 백분위를 다시 계산했다 —
-  같은 규칙이 두 곳에 있으면 반드시 갈린다(교안 study3.md 0-5). 이제 채점은 엔진 한 곳에서만 한다.
+  같은 규칙이 두 곳에 있으면 반드시 갈린다. 이제 채점은 엔진 한 곳에서만 한다.
+
+  ★ 동네마다 /facilities 를 부르지 않는다. 그 경로는 지도 핀용이라 시설 5표를 읽어
+    한 번에 1.6초다 — 1차는 "즉시 나오는 맛보기"(routers/lifetype.py 주석)라 안 맞는다.
 
 [가격]
   예산을 아직 안 받으므로 housing 없이 부른다. 그러면 엔진이 시세를 8번째 신호로
@@ -21,8 +24,10 @@ from services import engine
 SHOW = 2      # 상위 몇 곳을 보여줄지
 
 # 화면에 붙일 한 줄 설명. 정규화 점수보다 실제 개수가 와닿는다.
-# 여기 적힌 칸은 엔진 region_repository.EXTRA_COLUMNS 에 있어야 한다 — 없으면 문구가 빈다
+# ★ 여기 적힌 칸은 엔진 app/engine/recommend.py 의 COUNT_COLUMNS 와 짝이다.
+#   한쪽만 고치면 문구가 조용히 빈다
 BLURB_COLS = {
+
     "녹지": [("공원_수", "공원 {n}개")],
     "안전": [("CCTV_수", "CCTV {n}대"), ("경찰관서_수", "경찰관서 {n}개")],
     "교통": [("지하철역_수", "지하철역 {n}개"), ("버스정류장_수", "버스정류장 {n}개")],
@@ -60,18 +65,19 @@ def _blurb(d, weights):
 
 
 def _to_card(r, weights):
-    """엔진의 한 줄(name·total·scores·price)을 화면 카드 모양으로. 5-3 의 대조표 그대로다."""
+    """엔진의 한 줄(name·total·scores·counts·price)을 화면 카드 모양으로.
+
+    counts 는 /recommend 응답에 같이 실려 온다 — 동네마다 따로 물어보지 않는다.
+    예전에는 /facilities 를 동네마다 불렀는데, 그 경로는 지도 핀용이라 시설 5표를
+    통째로 읽어 한 번에 1.6초였다(교안 study3.md 0-3). 1차는 연달아 누르는 화면이다
+    """
     gu, dong = r["name"].split(" ", 1)
-    try:
-        extras = engine.get_facilities(gu, dong).get("extras", {})
-    except Exception:                            # 문구 하나 때문에 카드 전체를 버리지 않는다
-        extras = {}                              # _blurb 가 "생활 여건이 고른 편" 을 낸다
     return {
         "gu": gu,
         "dong": dong,
         "name": f"서울특별시 {gu} {dong}",
         "score": r["total"],
-        "blurb": _blurb(extras, weights),
+        "blurb": _blurb(r.get("counts", {}), weights),
         "price": None,          # 예산을 아직 안 받았다 — 파일 머리 [가격] 참고
     }
 
