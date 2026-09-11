@@ -248,6 +248,7 @@ function renderSignupAuthModal(el) {
                 <form id="signupForm" class="auth-form">
                     <input id="signupEmailInput" type="email" placeholder="이메일" autocomplete="username" required>
                     <input id="signupPwInput" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="new-password" required>
+                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>
                     <p id="signupError" class="auth-error"></p>
                     <button type="submit" class="auth-cta">다음: 정보 입력하기</button>
                 </form>
@@ -263,8 +264,14 @@ function renderSignupAuthModal(el) {
         e.preventDefault();
         const email = el.querySelector("#signupEmailInput").value.trim();
         const password = el.querySelector("#signupPwInput").value;
+        const passwordConfirm = el.querySelector("#signupPwConfirmInput").value;
         const errorEl = el.querySelector("#signupError");
         errorEl.textContent = "";
+
+        if (password !== passwordConfirm) {
+            errorEl.textContent = "비밀번호가 서로 달라요.";
+            return;
+        }
 
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) {

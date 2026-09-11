@@ -371,7 +371,7 @@ async function runLifeType(query) {
         if (ok) closeSearch();
         return ok;
       },
-      onSkip: () => runPredict(query),
+      onSkip: () => {},
     });
 
   } catch (err) {
