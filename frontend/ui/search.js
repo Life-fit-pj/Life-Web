@@ -12,9 +12,9 @@
    ========================================================= */
 
 import { postPredict, postLifeType, getLifeTypeKeywords } from "../lib/api.js";
-import { nextSeq, isLatest, getAnonId } from "../lib/state.js";
+import { nextSeq, isLatest, getAnonId, isLoggedIn } from "../lib/state.js";
 import { renderResult } from "./result.js";
-import { openMenu, handleLoginToggleClick, syncLoginToggle } from "./menu.js";
+import { openMenu, handleLoginToggleClick, syncLoginToggle, openAuthModal } from "./menu.js";
 import { showTypeCard, firstPayload } from "./lifetype.js";
 
 
@@ -402,6 +402,11 @@ async function runLifeType(query) {
  * 성공하면 true 를 돌려준다 — 유형 카드가 이 값을 보고 닫을지 정한다
  */
 async function runPredict(query, { from = "screen", autoClose = true } = {}) {
+  if (!isLoggedIn()) {
+    openAuthModal();
+    return false;
+  }
+
   const isTop = from === "top";
   const btn = document.getElementById(isTop ? "topSearchBtn" : "searchBtn");
   const status = document.getElementById(isTop ? "topSearchStatus" : "searchStatus");
