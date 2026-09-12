@@ -570,8 +570,13 @@ function skipToMapIfPending() {
 
 function bindEvents() {
   const input = document.getElementById("searchInput");
+  const btn = document.getElementById("searchBtn");
 
   const submit = () => {
+    // 버튼 클릭은 disabled 로 막히지만, 이 함수는 Enter 키로도 불려서
+    // 그쪽은 disabled 를 안 본다 — 여기서 직접 막는다
+    if (btn.disabled) return;
+
     // 태그로 고른 단어와 직접 쓴 글자를 하나로 묶는다
     const combined = [...selectedKeywords, input.value.trim()]
       .filter(Boolean)
@@ -581,7 +586,7 @@ function bindEvents() {
     runLifeType(combined);
   };
 
-  document.getElementById("searchBtn").addEventListener("click", submit);
+  btn.addEventListener("click", submit);
 
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") submit();
@@ -648,6 +653,10 @@ function bindTopSearch() {
   if (!input || !btn) return;
 
   const submit = () => {
+    // 버튼 클릭은 disabled 로 막히지만, 이 함수는 Enter 키로도 불려서
+    // 그쪽은 disabled 를 안 본다 — 여기서 직접 막는다
+    if (btn.disabled) return;
+
     const q = input.value.trim();
     if (!q) { input.focus(); return; }
     runPredict(q, { from: "top" });        // "top" 은 어느 창에서 왔는지 알리는 표시
