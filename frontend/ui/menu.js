@@ -10,10 +10,29 @@ let comingSoonEl = null;
 let authModalEl = null;
 
 // Supabase 로그인 직후(이메일/비번, 구글 리디렉션 복귀 포함)마다 한 번씩 불린다.
-// 페이지를 새로 열었을 때의 세션 복원("INITIAL_SESSION")은 여기서 다시 안 돈다 —
-// 이미 로그인 상태(state.js 의 lf-anon)가 새로고침에도 그대로 남아 있어 할 일이 없다.
+//
+// 원래는 "새로 열었을 때의 세션 복원은 SIGNED_IN 으로 안 온다"고 가정했지만,
+// esm.sh 가 받아오는 supabase-js 버전에 따라 그 가정이 깨진다 — 예전에 로그인한
+// 적 있는 브라우저는 새로고침/재방문마다 세션 복원이 SIGNED_IN 으로 와서, DB에
+// 없는 계정이면 매번 회원가입으로 강제 이동해 버렸다(회원가입 첫 화면조차 못 봄).
+// 그래서 "이 페이지에서 실제로 로그인 동작을 했는가"를 직접 표시해서 가른다 —
+// 첫 이벤트는 구글 리디렉션 복귀(OAUTH_PENDING_KEY 표시가 있을 때)일 때만 처리한다.
+const OAUTH_PENDING_KEY = "lifefit-oauth-pending";
+let sawFirstAuthEvent = false;
+
 supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_IN" && session) resolveBackendAccount(session.access_token);
+    const isFirst = !sawFirstAuthEvent;
+    sawFirstAuthEvent = true;
+    if (event !== "SIGNED_IN" || !session) return;
+
+    if (isFirst) {
+        let cameFromOAuth = false;
+        try { cameFromOAuth = sessionStorage.getItem(OAUTH_PENDING_KEY) === "1"; } catch { /* 무시 */ }
+        if (!cameFromOAuth) return;              // 새로고침 등으로 복원된 옛 세션 — 넘어간다
+        try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 무시 */ }
+    }
+
+    resolveBackendAccount(session.access_token);
 });
 
 // Supabase 인증은 끝났지만 이 서비스의 customer 인지는 아직 모르는 상태 — 여기서 가른다.
@@ -155,6 +174,8 @@ function renderLoggedInAuthModal(el) {
 function startGoogleLogin() {
     // 지금 페이지로 그대로 돌아온다 — 복귀하면 onAuthStateChange(SIGNED_IN)가
     // resolveBackendAccount 를 불러 로그인/회원가입 뎁스 이동까지 알아서 한다.
+    // 복귀 후 첫 이벤트를 "진짜 로그인"으로 인식시키는 표시.
+    try { sessionStorage.setItem(OAUTH_PENDING_KEY, "1"); } catch { /* 무시 */ }
     supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: window.location.origin + window.location.pathname },
@@ -227,6 +248,7 @@ function renderSignupAuthModal(el) {
                 <form id="signupForm" class="auth-form">
                     <input id="signupEmailInput" type="email" placeholder="이메일" autocomplete="username" required>
                     <input id="signupPwInput" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="new-password" required>
+                    <input id="signupPwConfirmInput" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>
                     <p id="signupError" class="auth-error"></p>
                     <button type="submit" class="auth-cta">다음: 정보 입력하기</button>
                 </form>
@@ -242,8 +264,14 @@ function renderSignupAuthModal(el) {
         e.preventDefault();
         const email = el.querySelector("#signupEmailInput").value.trim();
         const password = el.querySelector("#signupPwInput").value;
+        const passwordConfirm = el.querySelector("#signupPwConfirmInput").value;
         const errorEl = el.querySelector("#signupError");
         errorEl.textContent = "";
+
+        if (password !== passwordConfirm) {
+            errorEl.textContent = "비밀번호가 서로 달라요.";
+            return;
+        }
 
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) {

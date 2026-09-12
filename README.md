@@ -2,8 +2,11 @@
 
 서울 427개 행정동 중 라이프스타일에 맞는 동네를 추천하는 서비스의 화면·서버입니다.
 
-추천 계산과 LLM 호출은 형제 저장소 `Life-Embed-jh`가 담당합니다.
-이 저장소는 요청을 받아 그쪽에 넘기고, 결과를 지도와 카드로 보여주는 역할만 합니다.
+추천 계산과 LLM 호출은 형제 저장소 `Life-Embed-jh`가 담당합니다. 이 저장소는 요청을 받아
+`httpx`로 `Life-Embed-jh`가 띄운 자체 FastAPI 서버(`EMBED_API_BASE`, 기본
+`http://127.0.0.1:8000`)를 호출하고, 결과를 지도와 카드로 보여주는 역할만 합니다
+(2026-09-08 전까지는 `sys.path`로 코드를 직접 import했습니다 — 지금은 프로세스가 분리돼
+있어 두 서버를 각각 띄워야 합니다).
 
 서버는 FastAPI + uvicorn으로 돌아갑니다 (예전에는 Flask였습니다).
 
@@ -11,54 +14,39 @@
 
 ## 폴더 배치
 
-두 저장소를 **나란히** 두어야 합니다. 웹이 `../Life-Embed-jh`를 찾아 쓰기 때문입니다.
+로컬 개발은 두 저장소를 **나란히** 두는 걸 전제로 합니다. 추천 계산 자체는 HTTP 호출이라
+import 관계는 아니지만, `services/typespot.py`가 `../Life-Embed-jh/data/`를 직접 읽고
+두 uvicorn을 각각 띄워야 하기 때문입니다.
 
 ```
 Life-fit-main/
-├── Life-Embed-jh/      추천 엔진 (DB, LLM, 파이프라인)
-└── Life-Web/           이 저장소 (화면, FastAPI 서버)
+├── Life-Embed-jh/      추천 엔진 (DB, LLM, 파이프라인, 자체 FastAPI 서버 :8000)
+└── Life-Web/           이 저장소 (화면, FastAPI 서버 :5000)
 ```
-
-다음과 같이 파일을 구성한 것은 조원들이 스스로 만든 엔진을 유용하게 탈부착 하기 위한 목적입니다.
-해당 리포지토리의 main.py에 엔진의 파이프라인이 어떤 형식으로 연결되어있는지를 확인한 후 규칙에 맞추어 각자의 엔진 파이프라인을 구성하신다면 쉽게 접목이 가능합니다. 
 
 ---
 
 ## 다른 엔진 붙이기
 
-이 웹은 엔진이 무엇으로 만들어졌는지 모릅니다.
-아래 **함수 두 개**만 약속대로 만들면 어떤 엔진이든 붙습니다.
-LangChain을 쓰든 OpenAI를 쓰든, 안에서 무엇을 하든 상관없습니다.
+이 웹은 엔진이 무엇으로 만들어졌는지 모릅니다. `services/engine.py`가
+`EMBED_API_BASE` 환경변수가 가리키는 서버를 `httpx`로 호출할 뿐이라, 같은 API 계약을
+구현한 서버를 아무거나 그 자리에 붙일 수 있습니다. LangChain을 쓰든 OpenAI를 쓰든,
+서버 안에서 무엇을 하든 상관없습니다.
 
-### 1. 폴더를 나란히 둡니다
+### 1. 서버를 하나 띄우고 `EMBED_API_BASE`를 그쪽으로 돌립니다
 
-```
-Life-fit-main/
-├── Life-Embed-jh/      기본 엔진
-├── my-engine/          내가 만든 엔진
-└── Life-Web/           이 저장소
-```
+`Life-Embed-jh`가 참고 구현입니다(`app/api/`, `py -m uvicorn app.main:app --port 8000`).
+내 엔진 서버를 다른 포트(예: 8001)에 띄우고 `EMBED_API_BASE=http://127.0.0.1:8001`로
+바꾸면 이 웹은 그쪽을 부릅니다. 폴더를 나란히 둘 필요도, import할 필요도 없습니다.
 
-### 2. 함수 두 개를 만듭니다
+### 2. 최소 계약 — 엔드포인트 둘
 
-엔진 폴더 안에 진입점 파일을 하나 두고, 아래 두 함수를 만듭니다.
-파일 위치와 이름은 자유입니다 (예: `my-engine/api.py`).
+| 메서드 | 경로 | 요청 |
+|---|---|---|
+| POST | `/search` | `{"query": str, "top_k": int, "housing_override": {...} \| null}` |
+| POST | `/recommend` | `{"weights": {...}, "top_k": int, "housing": {...} \| null}` |
 
-```python
-def search(query, top_k=5, housing_override=None):
-    """검색어 하나로 전체 추천을 만든다.
-
-    housing_override 가 오면 검색어에서 읽어낸 가격 조건 대신 그것을 쓴다
-    (사용자가 슬라이더로 예산을 직접 정한 경우).
-    """
-    ...
-
-def recommend_by_weights(weights, top_k=5, housing=None):
-    """가중치만 받아 추천한다. 검색어 없이 슬라이더로 왔을 때 쓴다."""
-    ...
-```
-
-`housing` 의 모양은 아래와 같습니다. 가격 조건이 없으면 `None` 입니다.
+`housing`(`housing_override`)의 모양은 아래와 같습니다. 가격 조건이 없으면 `None`입니다.
 
 ```python
 {"건물유형": "아파트", "거래유형": "월세",
@@ -68,9 +56,9 @@ def recommend_by_weights(weights, top_k=5, housing=None):
 **예산 감점은 엔진의 몫입니다.** 웹은 조건을 넘겨줄 뿐 점수를 다시 깎지
 않습니다. 양쪽에서 처리하면 예산이 두 번 반영되어 조용히 틀어집니다.
 
-### 3. 돌려주는 모양을 맞춥니다
+### 3. 응답 모양
 
-#### `search(query)` 의 반환값
+#### `/search` 응답
 
 ```python
 {
@@ -97,9 +85,9 @@ def recommend_by_weights(weights, top_k=5, housing=None):
 `regions` 의 각 항목에 `price` 를 함께 담아 주면 결과 화면의 시세 탭이 채워집니다.
 없으면 `None` 이고, 프론트가 알아서 탭을 숨깁니다.
 
-#### `recommend_by_weights(weights)` 의 반환값
+#### `/recommend` 응답
 
-`search`의 `regions` 부분과 같은 목록입니다.
+`/search`의 `regions` 부분과 같은 목록입니다.
 
 ```python
 [
@@ -122,92 +110,26 @@ def recommend_by_weights(weights, top_k=5, housing=None):
 지도 좌표를 찾기 때문입니다. `"노원구 중계1동"`은 되지만
 `"노원구중계1동"`이나 `"서울특별시 노원구 중계1동"`은 좌표를 못 찾습니다.
 
-### 5. services/engine.py 의 import 를 고칩니다
+### 5. 추천 말고 다른 기능도 옮기려면
 
-엔진 저장소를 아는 파일은 `main.py`가 아니라 `services/engine.py` 하나뿐입니다.
-
-> **최소 계약은 함수 둘(`search` · `recommend_by_weights`)이지만, 지금 `engine.py`가
-> 실제로 가져오는 줄은 그보다 많습니다.** 추천 말고도 좋아요·검색기록·로그인·관리자
-> 화면이 엔진의 DB를 같이 쓰기 때문입니다. 추천만 갈아 끼울 거면 아래 두 줄만 고치고,
-> 나머지 줄은 기본 엔진(`Life-Embed-jh`)을 계속 가리키게 두면 됩니다.
->
-> ```python
-> from app.tables.history import add_like, ...      # 좋아요·기록
-> from app.tables.regions  import facilities, ...   # 시설 정보
-> from app.tables.members  import customer_one      # 회원 조회
-> from app.features.search import search, ...       # ← 추천. 여기를 바꾼다
-> from app.features.admin  import ...               # 관리자 화면
-> from app.features.auth   import ...               # 로그인
-> ```
->
-> 엔진의 SQL은 2026-09-07부터 `app/tables/` 네 파일에 모여 있습니다
-> (예전엔 `app/core/db.py` 한 파일이었습니다). 자세한 계층은 엔진 저장소의
-> `README.md` "폴더 구조" 참고.
-
-```python
-# 기본 엔진
-EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh'))
-sys.path.insert(0, EMBED_DIR)
-from app.features.search import search, recommend_by_weights
-
-# 내 엔진으로 바꾸려면
-EMBED_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'my-engine'))
-sys.path.insert(0, EMBED_DIR)
-from api import search, recommend_by_weights
-```
+`services/engine.py`가 아는 건 `EMBED_API_BASE` 하나뿐입니다. 추천(`/search`·`/recommend`)만
+갈아 끼울 거면 위 계약만 지키면 되지만, 좋아요·검색기록·로그인·회원가입·관리자 화면까지
+옮기려면 `Life-Embed-jh/app/api/`의 나머지 라우터(`auth.py`·`customers.py`·`admin.py`·
+`history.py`·`regions.py`·`chat.py`·`survey.py`)가 쓰는 경로도 같이 구현해야 합니다 —
+전체 목록은 `services/engine.py`의 `_call()` 호출부를 보세요.
 
 ### 6. 붙이기 전에 확인하기
 
-웹에 붙이기 전에 엔진 단독으로 돌려 보세요.
-모양이 틀리면 화면에서 원인을 찾기 어렵습니다.
+새 서버를 웹에 붙이기 전에 단독으로 두드려 보세요. 모양이 틀리면 화면에서
+원인을 찾기 어렵습니다.
 
-```python
-if __name__ == "__main__":
-    r = search("애들 학원 보내기 좋은 곳")
-
-    assert set(r["weights"]) == {"녹지","안전","교통","상권","의료","교육","문화"}
-    assert len(r["regions"]) == 5
-    assert " " in r["regions"][0]["name"]
-    assert isinstance(r["explanation"], str)
-
-    print(r["weights"])
-    for x in r["regions"]:
-        print(x["rank"] if "rank" in x else "", x["name"], x["total"])
-    print(r["explanation"])
+```bash
+curl -X POST http://127.0.0.1:8001/search -d '{"query":"애들 학원 보내기 좋은 곳"}'
 ```
 
-전부 통과하면 웹에 붙여도 됩니다.
-
-### 7. 두 엔진을 비교하고 싶다면
-
-`services/engine.py`에서 둘 다 불러 두고 요청마다 고를 수 있습니다.
-
-```python
-ENGINES = {}
-
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '..', 'Life-Embed-jh')))
-    from app.features.search import search as search_default
-    ENGINES["default"] = search_default
-except ImportError:
-    pass
-
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '..', 'my-engine')))
-    from api import search as search_mine
-    ENGINES["mine"] = search_mine
-except ImportError:
-    pass
-```
-
-```python
-    # predict() 안에서
-    engine = body.get('engine') or 'default'
-    result = ENGINES[engine](query, top_k=5)
-```
-
-프론트에 선택 버튼을 하나 두면 같은 검색어로 두 엔진의 결과를
-나란히 비교할 수 있습니다.
+`weights`가 한국어 7개 키를 갖고, `regions`가 `top_k`개고, `name`에 공백이 있고,
+`explanation`이 문자열이면 통과입니다. 그 다음 이 저장소의 `EMBED_API_BASE`를
+새 서버 주소로 바꾸면 됩니다.
 
 ### 자주 나는 문제
 
@@ -261,6 +183,12 @@ py -m pipeline.embed_member    # 회원 임베딩 (약 30초)
 ## 실행
 
 ```bash
+# 1) Life-Embed-jh 저장소에서 엔진 서버를 먼저 띄웁니다
+cd ../Life-Embed-jh
+py -m uvicorn app.main:app --reload --port 8000
+
+# 2) 이 저장소에서 웹 서버를 띄웁니다
+cd ../Life-Web
 py -m uvicorn main:app --reload --port 5000
 ```
 
@@ -395,6 +323,12 @@ TOP 5를 뽑아 봅니다), **비슷한 회원**(페르소나 벡터로 이웃�
 | POST | `/api/region/explain` | 행정동 하나의 설명 | ✓ |
 | POST | `/api/chat` | 결과에 대한 후속 질문 | ✓ |
 | GET | `/api/regions/gudong` | 구 → 동 목록 (25개 구 / 427개 동) | ✗ |
+| POST | `/api/survey` | 서술형 설문 15문항 → 규칙 기반 추천 (아직 프론트 미연결) | ✗ |
+| POST | `/api/auth/login` | Supabase 로그인 → customer_id 연결 | ✗ |
+| GET | `/api/auth/signed-up` | 이 Supabase 계정이 이미 가입돼 있나 | ✗ |
+| POST | `/api/signup` | Supabase 인증 + 기본정보/설문 → 신규 계정 생성 | ✗ |
+| GET | `/api/auth/me` | 로그인한 회원 기본정보 | ✗ |
+| GET·POST·DELETE | `/api/likes` | 좋아요 조회/추가/삭제 | ✗ |
 | GET | `/api/admin/summary` | 대시보드 집계 한 덩어리 (카운트 + 차트 + 최근 수정) | ✗ |
 | GET | `/api/admin/ready` | DB·캐시·쓰기 스위치 상태 | ✗ |
 | GET | `/api/admin/logs` | 관리자 수정 이력 (`admin_log` 표) | ✗ |
@@ -501,8 +435,9 @@ Life-Web/
 
 ## 자주 나는 문제
 
-**`ModuleNotFoundError: No module named 'app'`**
-→ `Life-Embed-jh`가 형제 폴더에 있는지, 폴더 이름이 정확한지 확인하세요.
+**`httpx.ConnectError` / API 호출이 전부 500으로 실패함**
+→ `Life-Embed-jh`의 엔진 서버(포트 8000)를 안 띄웠거나 `EMBED_API_BASE`가 잘못된
+주소를 가리키고 있습니다. 이 저장소만 띄워서는 동작하지 않습니다.
 
 **`RuntimeError: API 키가 없다`**
 → `Life-Embed-jh/.env` 파일이 있는지 확인하세요. 웹 쪽이 아니라 엔진 쪽입니다.
@@ -527,51 +462,16 @@ Life-Web/
 
 - LH 평면도를 가구원수 기준으로 추천 (지금은 면적만 기준)
 - 폴백 표시 (`fallback`이 지금은 항상 `False`로 고정 — 실제 폴백 감지 미구현)
-- 실제 로그인/회원가입 API (마이페이지·검색 기록 저장·좋아요 등은 전부
-  "준비 중" 안내만 뜸)
+- 마이페이지 화면 (`GET /api/auth/me`는 있으나 프론트에 아직 안 붙음)
+- `POST /api/survey`(규칙 기반 축·가중치 계산) — 엔드포인트는 있지만
+  `signup.html`은 아직 이걸 안 부르고 답변을 문장으로 이어 붙여
+  `/api/predict`의 `query`(LLM 경로)로 우회합니다
 
-### 회원가입 설문 → 고객 DB 적재 (다음 큰 작업)
-
-`signup.html` 이 받은 답은 지금 **추천에만 쓰이고 저장되지 않습니다.**
-저장까지 붙이려면 아래가 필요합니다.
-
-**1. 회원가입 폼** — 이름·성별·나이·연락처·거주지/직장 구·동.
-`Life-Embed-jh/data/customers_v2.csv` 의 칸과 1:1로 맞습니다.
-구·동 드롭다운은 `GET /api/regions/gudong` 을 쓰세요 (프론트에 427개를
-하드코딩하면 `data/동_좌표.csv` 와 두 벌이 되어 어긋납니다).
-카카오 로그인을 붙이더라도 `city`/`city_dong`/`work_city`/`work_dong` 은
-카카오가 주지 않으므로 이 부분은 그대로 필요합니다.
-
-**2. `POST /api/signup`** — 저장은 `services/engine.py` 를 통해서만 합니다
-(엔진을 아는 파일은 그 하나뿐이라는 규칙).
-
-**3. 엔진 쪽 적재** — persona 9칸 → `resync_member()` 로 벡터 생성 →
-`find_similar_members()` + `blend()` 로 7지표 도출 → `user_preferences.csv`
-형태로 저장. `update_member()` 가 이미 이 3계층을 다룹니다.
-
-### 그 전에 확인해야 할 것
-
-**설문 답변 최소 길이.** 지금은 문항당 5자입니다. 그런데 엔진의
-`MIN_LENGTH = 20`(`app/core/config.py`)보다 짧은 청크는 **버려집니다.**
-지금 경로(설문 → 자연어 → `/api/predict`)는 청킹을 안 거쳐서 문제가 없지만,
-persona 로 **저장**하는 순간 걸립니다.
-
-기존 회원 900개 청크(100명 × 9칸)의 실측 분포는 **최소 55자 / 중앙 138자 /
-최대 237자, 20자 미만 0개** 입니다. 짧은 persona 가 통과하면
-`find_similar_members()` 가 엉뚱한 이웃을 뽑고 **그들의 7지표를 신규 회원이
-물려받습니다** — 오류 없이 조용히 틀립니다.
-
-- `MIN_LENGTH` 를 낮추지 마세요. `make_chunks()` 는 지식베이스(`chunk_kb.py`)와
-  공유되므로 설문뿐 아니라 427개 동 청킹까지 바뀝니다.
-- 대신 입력 최소 길이를 올리고, 칸 합산 후에도 20자 미만이면 그 칸을 비웁니다
-  (나머지 칸으로 추천이 돌아갑니다 — 안전한 실패).
-- LLM 정제를 넣는다면 **"짧은 답을 늘리는" 용도가 아니라 "충분한 답을 기존
-  데이터 문체에 맞추는"** 용도여야 합니다. 5자를 정보 추가 없이 20자로 만들 수
-  없고, 억지로 늘리면 환각이 그대로 DB에 남습니다.
-
-**착수 전 실험** — 기존 100명이 정답지입니다. 기존 persona 를 5/10/15자로
-요약 → LLM 복원 → 복원본에서 도출한 7지표를 원래 `user_preferences.csv` 와
-비교하면 최소 길이를 추측이 아니라 숫자로 정할 수 있습니다.
+로그인·회원가입 자체는 이제 구현돼 있습니다. Supabase Auth(이메일/비번, 구글)로
+로그인하고, `signup.html`의 15문항 설문이 `POST /api/signup`으로 실제 계정과
+persona 9칸을 저장합니다(`routers/auth.py`). 비밀번호는 이 서버를 거치지 않고
+Supabase가 직접 처리하며, 서버는 발급된 access token만 `Life-Embed-jh`의
+`/auth/*`에 그대로 넘깁니다.
 
 ### 설문이 아직 못 채우는 persona 칸
 
