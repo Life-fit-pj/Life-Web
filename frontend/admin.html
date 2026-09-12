@@ -1118,7 +1118,14 @@ async function openMember(id) {
 async function deleteMember(id) {
   if (!confirm(`${id} 회원을 탈퇴시킵니다. 되돌릴 수 없습니다. 계속할까요?`)) return;
 
-  await api('/members/' + id, { method: 'DELETE' });
+  const btn = $('.acts [data-act="delete"]');
+  if (btn) btn.disabled = true;   /* 두 번 눌러 요청이 겹치는 것을 막는다 */
+  try {
+    await api('/members/' + id, { method: 'DELETE' });
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    return showErrors(e);          /* 실패했으면 화면을 지우면 안 된다 */
+  }
 
   currentMember = null;
   $('#member-detail').innerHTML = '<div class="empty">회원을 골라주세요</div>';
