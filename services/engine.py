@@ -316,6 +316,11 @@ def update_member(customer_id, patch):
                  none_on=(404,), patch_error_on=(422,))
 
 
+def delete_member(customer_id):
+    """회원 탈퇴. 이미 없으면 False."""
+    return _call("DELETE", f"/admin/members/{quote(customer_id)}", none_on=(404,)) is not None
+
+
 def get_region(gu, dong):
     return _call("GET", f"/admin/regions/{quote(gu)}/{quote(dong)}", none_on=(404,))
 

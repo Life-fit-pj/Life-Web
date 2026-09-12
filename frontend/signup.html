@@ -176,6 +176,8 @@
       transition: background 0.2s;
     }
     .btn-submit:hover { background: var(--accent-fill); color: var(--accent-ink); }
+    .btn-submit:disabled,
+    .confirm-actions button:disabled { opacity: 0.55; cursor: not-allowed; }
 
     .btn-skip {
       padding: 10px;
@@ -561,8 +563,12 @@ function toPersona() {
 }
 
 
+const submitBtn = form.querySelector(".btn-submit");
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  if (submitBtn.disabled) return;   // 응답 오는 동안 중복 클릭 방지
 
   const badBasic = firstMissingBasicInfo();
   if (badBasic) {
@@ -589,10 +595,16 @@ form.addEventListener("submit", async (e) => {
   // ② 검색 화면이 LLM 질의문을 만들 때 꺼내 쓸 수 있게 남겨 둔다(/api/predict 우회 경로).
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(toPersona()));
 
+  submitBtn.disabled = true;
+  const originalLabel = submitBtn.textContent;
+  submitBtn.textContent = "가입 처리 중...";
+
   try {
     await completeSignup(collectAnswers());
     location.href = "/";
   } catch (err) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel;
     handleSignupError(err);
   }
 });
@@ -613,7 +625,12 @@ document.getElementById("btnSkipNo").addEventListener("click", () => {
   skipConfirm.classList.remove("is-open");
 });
 
-document.getElementById("btnSkipYes").addEventListener("click", async () => {
+const btnSkipYes = document.getElementById("btnSkipYes");
+const btnSkipNo = document.getElementById("btnSkipNo");
+
+btnSkipYes.addEventListener("click", async () => {
+  if (btnSkipYes.disabled) return;   // 응답 오는 동안 중복 클릭 방지
+
   const badBasic = firstMissingBasicInfo();
   if (badBasic) {
     skipConfirm.classList.remove("is-open");
@@ -625,17 +642,25 @@ document.getElementById("btnSkipYes").addEventListener("click", async () => {
   sessionStorage.removeItem(STORAGE_KEY);   // 이전에 쓰다 만 답이 남아 있을 수 있다
   sessionStorage.setItem(SKIP_TO_MAP_KEY, "1");
 
+  btnSkipYes.disabled = true;
+  btnSkipNo.disabled = true;
+  const originalLabel = btnSkipYes.textContent;
+  btnSkipYes.textContent = "처리 중...";
+
   try {
     await completeSignup({});   // 설문은 건너뛰므로 persona 없이 기본정보만으로 가입
     location.href = "/";
   } catch (err) {
+    btnSkipYes.disabled = false;
+    btnSkipNo.disabled = false;
+    btnSkipYes.textContent = originalLabel;
     handleSignupError(err);
   }
 });
 
-// 바깥을 눌러도 닫힌다
+// 바깥을 눌러도 닫힌다 — 가입 요청이 도는 동안은 실수로 닫히지 않게 막는다
 skipConfirm.addEventListener("click", (e) => {
-  if (e.target === skipConfirm) skipConfirm.classList.remove("is-open");
+  if (e.target === skipConfirm && !btnSkipYes.disabled) skipConfirm.classList.remove("is-open");
 });
 </script>
 
