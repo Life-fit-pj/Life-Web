@@ -267,10 +267,9 @@ label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom:
 .empty { display: grid; place-items: center; min-height: 100%; color: var(--muted); font-size: 13.5px; text-align: center; padding: 24px; }
 .empty .big { font-size: 15px; color: var(--ink-2); font-weight: 600; margin-bottom: 6px; }
 
-/* 저장 중 크게 띄우는 스피너 — board 는 저장 끝나면 통째로 다시 그려지므로 body 에 붙여 그 영향을 안 받는다 */
-.save-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,.4); z-index: 999; }
-.save-overlay .spinner { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
-.save-overlay .save-overlay-label { color: #fff; font-size: 14px; font-weight: 600; }
+/* api() 로 나가는 모든 요청 공용 로딩 스피너 — 화면 어디서 불러오든 body 에 붙여 그 화면의 재렌더링과 무관하게 뜬다 */
+.loading-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,.4); z-index: 999; }
+.loading-overlay .spinner { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .detail-head {
@@ -545,15 +544,37 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
 ));
 
+/* 전역 로딩 스피너 — 떠 있는 요청이 몇 개인지 세어, 0 으로 돌아올 때만 스피너를 지운다
+   (동시에 여러 요청이 나갈 때 하나 끝났다고 먼저 지우면 안 되므로) */
+let pendingRequests = 0;
+function showLoading() {
+  pendingRequests++;
+  if (document.getElementById('global-spinner')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'global-spinner';
+  overlay.className = 'loading-overlay';
+  overlay.innerHTML = '<div class="spinner"></div>';
+  document.body.appendChild(overlay);
+}
+function hideLoading() {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  if (pendingRequests === 0) document.getElementById('global-spinner')?.remove();
+}
+
 /* 모든 요청이 이 함수를 지난다. 401 이면 토큰이 틀린 것이므로 입력 화면으로 되돌린다 */
 async function api(path, options = {}) {
-  const res = await fetch(API + path, {
-    ...options,
-    headers: { Authorization: 'Bearer ' + TOKEN, ...options.headers },
-  });
-  if (res.status === 401) { lock('토큰이 맞지 않습니다'); throw new Error('unauthorized'); }
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  showLoading();
+  try {
+    const res = await fetch(API + path, {
+      ...options,
+      headers: { Authorization: 'Bearer ' + TOKEN, ...options.headers },
+    });
+    if (res.status === 401) { lock('토큰이 맞지 않습니다'); throw new Error('unauthorized'); }
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } finally {
+    hideLoading();
+  }
 }
 
 let toastTimer = null;
@@ -1216,14 +1237,10 @@ async function saveMember(id) {
   const changed = Object.keys(patch);
   if (!changed.length) return toast('바뀐 값이 없습니다');
 
-  /* 저장 중에는 버튼을 잠그고 화면 전체에 스피너를 띄운다 — 몇 번 왕복하는 동안 화면이 그대로라 안 눌렸다고 오해한다 */
+  /* 저장 중에는 버튼을 잠가 중복 클릭을 막는다 — 로딩 표시는 api() 가 전역으로 띄운다 */
   const btn = $('.acts [data-act="save"]');
   const label = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
-  const overlay = document.createElement('div');
-  overlay.className = 'save-overlay';
-  overlay.innerHTML = '<div class="spinner"></div><div class="save-overlay-label">저장 중…</div>';
-  document.body.appendChild(overlay);
 
   try {
     /* 가중치를 건드렸을 때만 순위 비교가 의미 있다 — 아니면 두 번 계산할 이유가 없다 */
@@ -1253,7 +1270,6 @@ async function saveMember(id) {
     toast(`저장했습니다 · ${changed.length}칸`);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = label; }   /* 성공 시엔 board 가 통째로 새로 그려져 무해하다 */
-    overlay.remove();
   }
 }
 
