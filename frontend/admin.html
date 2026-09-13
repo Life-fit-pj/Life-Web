@@ -267,6 +267,12 @@ label.lab { display: block; font-size: 12px; color: var(--muted); margin-bottom:
 .empty { display: grid; place-items: center; min-height: 100%; color: var(--muted); font-size: 13.5px; text-align: center; padding: 24px; }
 .empty .big { font-size: 15px; color: var(--ink-2); font-weight: 600; margin-bottom: 6px; }
 
+/* 저장 중 크게 띄우는 스피너 — board 는 저장 끝나면 통째로 다시 그려지므로 body 에 붙여 그 영향을 안 받는다 */
+.save-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,.4); z-index: 999; }
+.save-overlay .spinner { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.35); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+.save-overlay .save-overlay-label { color: #fff; font-size: 14px; font-weight: 600; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .detail-head {
   position: sticky; top: 0; z-index: 10; background: var(--surface);
   border-bottom: 1px solid var(--line); padding: 14px 22px;
@@ -1210,10 +1216,14 @@ async function saveMember(id) {
   const changed = Object.keys(patch);
   if (!changed.length) return toast('바뀐 값이 없습니다');
 
-  /* 저장 중에는 버튼을 잠그고 문구로 알린다 — 몇 번 왕복하는 동안 화면이 그대로라 안 눌렸다고 오해한다 */
+  /* 저장 중에는 버튼을 잠그고 화면 전체에 스피너를 띄운다 — 몇 번 왕복하는 동안 화면이 그대로라 안 눌렸다고 오해한다 */
   const btn = $('.acts [data-act="save"]');
   const label = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+  const overlay = document.createElement('div');
+  overlay.className = 'save-overlay';
+  overlay.innerHTML = '<div class="spinner"></div><div class="save-overlay-label">저장 중…</div>';
+  document.body.appendChild(overlay);
 
   try {
     /* 가중치를 건드렸을 때만 순위 비교가 의미 있다 — 아니면 두 번 계산할 이유가 없다 */
@@ -1243,6 +1253,7 @@ async function saveMember(id) {
     toast(`저장했습니다 · ${changed.length}칸`);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = label; }   /* 성공 시엔 board 가 통째로 새로 그려져 무해하다 */
+    overlay.remove();
   }
 }
 
