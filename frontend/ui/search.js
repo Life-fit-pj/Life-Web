@@ -460,13 +460,17 @@ function showSteps(status) {
 
   let i = 0;
   status.textContent = STEPS[0];
+  status.classList.add("is-loading");   // 문구 옆에 로딩 원을 띄운다
 
   const timer = setInterval(() => {
     i = Math.min(i + 1, STEPS.length - 1);   // 마지막에서 멈춘다
     status.textContent = STEPS[i];
   }, 1800);
 
-  return () => clearInterval(timer);
+  return () => {
+    clearInterval(timer);
+    status.classList.remove("is-loading");
+  };
 }
 
 

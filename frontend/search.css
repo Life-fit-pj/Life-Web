@@ -250,10 +250,30 @@
 /* ### 진행 문구와 건너뛰기 ###*/
 
 .search-status {
-  min-height: 20px;             /* 문구가 없어도 자리를 지켜 화면이 안 흔들리게 */
+  min-height: 28px;             /* 문구가 없어도 자리를 지켜 화면이 안 흔들리게 */
   margin: 18px 0 0;
-  font-size: 14px;
-  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 진행 중일 때만 문구 앞에 도는 원을 붙인다 (showSteps() 가 클래스를 켠다) */
+.search-status.is-loading::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: search-status-spin 0.7s linear infinite;
+}
+
+@keyframes search-status-spin {
+  to { transform: rotate(360deg); }
 }
 
 .search-skip {
@@ -342,11 +362,25 @@
 
 .ts-status {
   margin: 7px 0 0;
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
   /* 문구가 없어도 자리를 지켜 화면이 흔들리지 않게 한다 */
-  min-height: 16px;
+  min-height: 18px;
+}
+
+.ts-status.is-loading::before {
+  content: "";
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--line);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: search-status-spin 0.7s linear infinite;
 }
 
 /* 화면이 좁으면 좌우 패널과 겹치므로 숨긴다.
