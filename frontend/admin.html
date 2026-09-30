@@ -415,6 +415,18 @@ pre.safe { background: rgba(12,163,12,.10); }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
 .skel { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+
+/* AI 사용량 */
+.ai-kpi { display: flex; flex-wrap: wrap; gap: 28px; margin: 4px 0 18px; }
+.ai-kpi div { display: grid; gap: 2px; }
+.ai-kpi b { font-size: 26px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ai-kpi span { font-size: 12px; color: var(--muted); }
+.ai-table-wrap { max-height: 360px; overflow: auto; }
+.ai-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ai-table th { text-align: left; font-weight: 600; color: var(--muted); padding: 6px 8px; position: sticky; top: 0; background: var(--card, var(--bg)); }
+.ai-table td { padding: 7px 8px; border-top: 1px solid var(--line); }
+.ai-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ai-table .muted { color: var(--muted); }
 #system-pane { max-width: 1080px; }
 .log .l-val { margin-left: auto; color: var(--ink-2); }
 
@@ -719,8 +731,11 @@ async function refreshStatus() {
    ═══════════════════════════════════════════════════════════ */
 async function loadDashboard() {
   $('#dash').innerHTML = '<div class="skel">불러오는 중…</div>';
-  let d;
-  try { d = await api('/summary'); }
+  let d, u = null;
+  try {
+    /* AI 사용량이 실패해도 나머지 대시보드는 보여 준다 */
+    [d, u] = await Promise.all([api('/summary'), api('/ai-usage').catch(() => null)]);
+  }
   catch (e) { $('#dash').innerHTML = '<div class="card">집계를 불러오지 못했습니다.</div>'; return; }
 
   loaded.dash = true;
@@ -750,6 +765,7 @@ async function loadDashboard() {
   const top10 = ch.memberGu.slice(0, 10);
   $('#dash').innerHTML = `
     ${analysisBar()}
+    ${aiUsageCards(u)}
     ${card('희망 조건 평균 <span class="hint">1~5</span>', bars(ch.weights, { max: 5, fmt: v => v.toFixed(2) }),
            `회원들이 무엇을 더 중요하게 꼽았는지 · 7개 지표 평균 ${avgWeight}`)}
     ${card('연령대', cols(ch.ages), '10살 단위')}
@@ -761,6 +777,36 @@ async function loadDashboard() {
   /* 그리기(위)와 동작 붙이기(아래)는 순서를 지켜야 한다 —
      innerHTML 로 넣기 전에는 $('#an-send') 가 아직 없어서 못 찾는다 */
   wireAnalysis($('#dash'));
+}
+
+/* AI 사용량 — 검색어 추천·후속 질문은 Claude 를 부르고, 부를 때마다 기록이 한 줄 쌓인다.
+   그 기록을 사람별·날짜별로 센 것이다. 로그인 회원은 이름으로, 손님은 기기 id 앞 8글자로 보인다 */
+function aiUsageCards(u) {
+  if (!u) return card('AI 사용량', '<div class="skel">불러오지 못했습니다</div>', '', 'wide');
+  const t = u.totals;
+  const daily = u.daily.map(d => ({ label: d.date.slice(5), value: d.searches + d.chats }));
+  const rows = u.users.map(x => `
+    <tr>
+      <td>${x.member ? `<b>${esc(x.who)}</b> <span class="hint">${esc(x.id)}</span>` : `<span class="muted">${esc(x.who)}</span>`}</td>
+      <td class="num">${num(x.searches)}</td>
+      <td class="num">${num(x.chats)}</td>
+      <td class="num"><b>${num(x.total)}</b></td>
+      <td class="muted">${esc(x.last)}</td>
+    </tr>`).join('');
+  return `
+    ${card(`AI 사용량 <span class="hint">최근 ${u.days}일</span>`,
+      `<div class="ai-kpi">
+         <div><b>${num(t.today)}</b><span>오늘</span></div>
+         <div><b>${num(t.searches)}</b><span>검색어 추천</span></div>
+         <div><b>${num(t.chats)}</b><span>후속 질문</span></div>
+         <div><b>${num(t.users)}</b><span>사용자 (회원 ${num(t.members)} · 손님 ${num(t.guests)})</span></div>
+       </div>${cols(daily)}`,
+      '날짜별 AI 호출 수 (검색어 추천 + 후속 질문)', 'wide')}
+    ${card('누가 얼마나 썼나 <span class="hint">많이 쓴 순</span>',
+      u.users.length ? `<div class="ai-table-wrap"><table class="ai-table">
+        <thead><tr><th>사용자</th><th class="num">검색</th><th class="num">질문</th><th class="num">합계</th><th>마지막 사용</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>` : '<div class="skel">기록 없음</div>',
+      '한도: 회원 하루 20회 · 손님 IP당 5회', 'wide')}`;
 }
 
 /* 분석 막대
