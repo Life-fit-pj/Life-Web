@@ -66,9 +66,10 @@ app.include_router(auth.router)
 # ==========================================
 # 3. 프론트엔드 정적 서빙 라우트
 # ==========================================
+# 첫 방문은 랜딩. 앱은 /index.html 에 그대로 있다
 @app.get("/")
-def serve_index():
-    return FileResponse(os.path.join(FRONTEND_DIR, 'index.html'))
+def serve_landing():
+    return FileResponse(os.path.join(FRONTEND_DIR, 'landing.html'))
 
 
 # 평면도는 data/ 안에 있어 따로 길을 열어 준다

@@ -460,7 +460,7 @@ const PENDING_KEY = "lifefit-pending-token";
 const token = sessionStorage.getItem(PENDING_KEY);
 if (!token) {
   alert("회원가입 정보가 없어요. 처음부터 다시 시작해 주세요.");
-  location.href = "/";
+  location.href = "/index.html";
 }
 
 const cityGuSel = document.getElementById("basicCityGu");
@@ -532,7 +532,7 @@ function handleSignupError(err) {
   alert(err.status === 409
     ? "이미 가입된 계정이에요. 처음부터 다시 시도해 주세요."
     : "회원가입에 실패했어요. 잠시 후 다시 시도해 주세요.");
-  location.href = "/";
+  location.href = "/index.html";
 }
 
 
@@ -601,7 +601,7 @@ form.addEventListener("submit", async (e) => {
 
   try {
     await completeSignup(collectAnswers());
-    location.href = "/";
+    location.href = "/index.html";
   } catch (err) {
     submitBtn.disabled = false;
     submitBtn.textContent = originalLabel;
@@ -649,7 +649,7 @@ btnSkipYes.addEventListener("click", async () => {
 
   try {
     await completeSignup({});   // 설문은 건너뛰므로 persona 없이 기본정보만으로 가입
-    location.href = "/";
+    location.href = "/index.html";
   } catch (err) {
     btnSkipYes.disabled = false;
     btnSkipNo.disabled = false;
