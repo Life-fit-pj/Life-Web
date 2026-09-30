@@ -6,6 +6,15 @@
  * 나중에 주소가 바뀌거나 로그인 토큰이 붙을 때 여기만 고치면 된다.
  */
 
+import { supabase } from "./supabaseClient.js";
+
+/** 로그인돼 있으면 Supabase 토큰을 붙인다. 서버가 AI 질문 한도를 회원 기준으로 센다 */
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /** POST + JSON 을 보내고 JSON 을 받는 공통 부분. extraHeaders 는 로그인 토큰 등에 쓴다 */
 async function postJSON(url, body, extraHeaders) {
   const res = await fetch(url, {
@@ -16,7 +25,7 @@ async function postJSON(url, body, extraHeaders) {
 
   if (!res.ok) {
     const err = new Error(`${url} 응답 오류 ${res.status}`);
-    err.status = res.status;   // 409(중복) 처럼 상태코드로 갈라 보여줄 때 쓴다
+    err.status = res.status;   // 409(중복)·429(질문 한도) 처럼 상태코드로 갈라 보여줄 때 쓴다
     throw err;
   }
 
@@ -51,8 +60,8 @@ async function deleteJSON(url, body) {
 
 
 /** 추천 요청. 검색어만 보내도 되고, 슬라이더 값을 다 보내도 된다 */
-export function postPredict(payload) {
-  return postJSON("/api/predict", payload);
+export async function postPredict(payload) {
+  return postJSON("/api/predict", payload, await authHeaders());
 }
 
 /** 1차 라이프스타일 유형 판정. LLM 을 안 타서 즉시 돌아온다 */
@@ -89,13 +98,19 @@ export function postRegionExplain(gu, dong, query, weights, scores, housing) {
 }
 
 /** 결과 화면 후속 질문 */
-export function postChat(question, regions, weights, anonId) {
+export async function postChat(question, regions, weights, anonId, history) {
   return postJSON("/api/chat", {
     question,
     regions: regions || null,
     weights: weights || null,
+    history: history || null,
     anonId,
-  });
+  }, await authHeaders());
+}
+
+/** 오늘 남은 AI 질문 횟수 {limit, remaining, member} */
+export async function getQuota() {
+  return getJSON("/api/quota", await authHeaders());
 }
 
 /** 검색·대화 기록 조회 */
