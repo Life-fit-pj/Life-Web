@@ -64,7 +64,6 @@ function ensureMenu() {
         <nav class="menu-panel">
             <button class="menu-close" aria-label="닫기">&times;</button>
             <div class="menu-items" id="menuItems"></div>
-            <a class="menu-admin-link" href="admin.html">관리자 페이지 (개발용)</a>
         </nav>
     `;
     document.body.appendChild(menuModalEl);
@@ -81,9 +80,7 @@ function ensureMenu() {
 
 // 로그인/회원가입은 헤더의 별도 버튼(#loginToggle)으로 옮겼기 때문에,
 // 이 메뉴에는 실제 로그인 여부와 무관하게 로그인 이후 항목만 상시로 보여준다.
-// 관리자 페이지는 로그인만으로는 부족하고 "이 사람이 관리자인가"까지 확인해야 하니,
-// 나중에 `isAdmin()` 같은 별도 체크를 추가해서 일반 사용자에게는 이 항목 자체를 안 보여주는 게 맞다
-// (지금은 뼈대만 잡아두는 단계라 menu-admin-link를 우선 그대로 둠).
+// 관리자 페이지는 메뉴에 두지 않는다 — 관리자는 /admin.html 로 직접 들어가고 ADMIN_TOKEN 으로 막는다.
 function renderMenuItems() {
     const box = document.getElementById("menuItems");
 
