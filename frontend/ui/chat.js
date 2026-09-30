@@ -1,18 +1,35 @@
-import { postChat } from "../lib/api.js";
+import { postChat, getQuota } from "../lib/api.js";
 import { state, getAnonId } from "../lib/state.js";
 import { escapeAndFormat } from "../lib/format.js";
 
 
 // ===== 채팅 패널 =====
 
+// 지금 추천 결과를 두고 주고받은 말. "거기", "두 번째 동네는?" 을 알아듣게 매 질문에 같이 보낸다.
+// 새로 검색하면 비운다 — 다른 동네 목록에 대한 대화가 섞이면 안 된다. 길이는 엔진이 자른다
+let chatHistory = [];
+
 function openChat() {
   document.getElementById("chatPanel").classList.add("open");
+  getQuota().then(renderQuota).catch(() => {});
   setTimeout(() => document.getElementById("chatInput").focus(), 300);
 }
 
 
 function closeChat() {
   document.getElementById("chatPanel").classList.remove("open");
+}
+
+
+/** "오늘 남은 질문 N/20" 을 채팅창 머리에 보여 준다. 다 쓰면 입력을 막는다 */
+function renderQuota({ limit, remaining, member }) {
+  document.getElementById("chatQuota").textContent = `오늘 남은 질문 ${remaining}/${limit}`;
+  const empty = remaining <= 0;
+  document.getElementById("chatInput").disabled = empty;
+  document.getElementById("chatSend").disabled = empty;
+  document.getElementById("chatInput").placeholder = empty
+    ? (member ? "오늘 질문을 다 썼어요. 내일 다시 물어봐 주세요" : "로그인하면 하루 20번까지 물어볼 수 있어요")
+    : "궁금한 점을 입력하세요";
 }
 
 
@@ -39,6 +56,7 @@ function addChatMsg(text, kind) {
 export function initChatWithResult(data) {
   const body = document.getElementById("chatBody");
   if (!body) return;
+  chatHistory = [];
 
   if (data.query) {
     addChatMsg(data.query, "user");
@@ -89,18 +107,29 @@ async function sendChat() {
   const loading = addChatMsg("생각하는 중...", "loading");
 
   try {
-    const data = await postChat(question, state.lastResult?.topRegions, state.lastResult?.weights, getAnonId());
+    const data = await postChat(question, state.lastResult?.topRegions, state.lastResult?.weights, getAnonId(), chatHistory);
     loading.remove();
     addChatMsg(data.answer || "답을 만들지 못했어요.", "bot");
+    if (data.answer) {
+      chatHistory.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
+    }
+    getQuota().then(renderQuota).catch(() => {});
 
   } catch (err) {
     console.error(err);
     loading.remove();
+    if (err.status === 429) {
+      addChatMsg("오늘 물어볼 수 있는 횟수를 다 썼어요. 내일 다시 이용해 주세요.", "bot");
+      getQuota().then(renderQuota).catch(() => {});
+      return;   // 입력창은 renderQuota 가 잠근다
+    }
     addChatMsg("답변을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.", "bot");
 
   } finally {
-    btn.disabled = false;
-    input.focus();
+    if (!document.getElementById("chatInput").disabled) {
+      btn.disabled = false;
+      input.focus();
+    }
   }
 }
 

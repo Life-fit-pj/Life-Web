@@ -7,6 +7,7 @@ GET   /api/admin/regions                  행정동 427개 목록
 GET   /api/admin/regions/{gu}/{dong}      행정동 하나의 지표 12개
 GET   /api/admin/members/{customer_id}/preview   이 회원 조건으로 추천 TOP 5
 PATCH /api/admin/members/{customer_id}    회원 수정
+DELETE /api/admin/members/{customer_id}   회원 탈퇴
 PATCH /api/admin/regions/{gu}/{dong}      행정동 수정
 POST  /api/admin/logins/backfill          기존 회원에게 로그인 계정 일괄 발급
 
@@ -25,7 +26,7 @@ from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins, analysis_engine,
-    create_member,                                                        # ← 추가
+    create_member, delete_member,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -114,6 +115,14 @@ def admin_update_region(gu: str, dong: str, patch: dict):
     if updated is None:
         raise HTTPException(status_code=404, detail="그런 행정동이 없다")
     return updated
+
+
+@router.delete("/members/{customer_id}", dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_delete_member(customer_id: str):
+    """회원 탈퇴. 없으면 404."""
+    if not delete_member(customer_id):
+        raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    return {"ok": True}
 
 
 @router.get("/members/{customer_id}/preview", dependencies=[Depends(check_admin)])
