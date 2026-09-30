@@ -24,12 +24,9 @@ _members: dict[str, str | None] = {}  # 토큰 -> customer_id. 같은 토큰으�
 
 
 def _client_ip(request: Request) -> str:
-    """Railway 프록시 뒤에서는 request.client 가 프록시 주소다.
-    X-Forwarded-For 의 맨 오른쪽 값은 프록시가 직접 붙인 것이라 사용자가 위조할 수 없다."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[-1].strip()
-    return request.client.host if request.client else "unknown"
+    """Railway 엣지가 X-Real-IP 에 실제 접속 IP 를 넣는다(사용자가 보낸 값은 덮어쓴다).
+    X-Forwarded-For 는 사용자가 보낸 값이 그대로 남아 위조된다 — 배포에서 확인했다(2026-09-30)."""
+    return request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
 
 
 def _who(request: Request) -> tuple[str, int]:
@@ -73,7 +70,7 @@ if __name__ == "__main__":
     # 손님 한도를 다 쓰면 429 가 나는지만 본다 (엔진 없이 돈다 — 토큰을 안 보낸다)
     from starlette.requests import Request as _Req
 
-    req = _Req({"type": "http", "headers": [(b"x-forwarded-for", b"1.1.1.1, 9.9.9.9")], "client": ("10.0.0.1", 1)})
+    req = _Req({"type": "http", "headers": [(b"x-real-ip", b"1.1.1.1")], "client": ("10.0.0.1", 1)})
     for i in range(GUEST_DAILY_LIMIT):
         assert consume(req)["remaining"] == GUEST_DAILY_LIMIT - i - 1
     try:
