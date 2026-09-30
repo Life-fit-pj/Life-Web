@@ -69,7 +69,8 @@ app.include_router(auth.router)
 # 첫 방문은 랜딩. 앱은 /index.html 에 그대로 있다
 @app.get("/")
 def serve_landing():
-    return FileResponse(os.path.join(FRONTEND_DIR, 'landing.html'))
+    # NoCacheStaticFiles 와 같은 이유로 no-store — 안 붙이면 브라우저가 예전 첫 화면(앱)을 계속 보여 준다
+    return FileResponse(os.path.join(FRONTEND_DIR, 'landing.html'), headers={"Cache-Control": "no-store"})
 
 
 # 평면도는 data/ 안에 있어 따로 길을 열어 준다
