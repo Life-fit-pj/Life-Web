@@ -1484,6 +1484,17 @@ async function openRegion(gu, dong) {
     </div>`;
   }).join('');
 
+  const derived = Object.keys(data.percentiles).filter(k => !(k in data.values)).map(k => {
+    const pct = data.percentiles[k];
+    return `<div class="metric">
+      <div class="m-top">
+        <span class="m-name">${esc(k)} · 계산값</span>
+        <span class="m-rank">상위 ${100 - pct}%</span>
+      </div>
+      <div class="meter"><i style="width:${pct}%"></i></div>
+    </div>`;
+  }).join('');
+
   box.innerHTML = `
     <div class="detail-head">
       <h3>${esc(data['행정동명'])}</h3>
@@ -1494,7 +1505,7 @@ async function openRegion(gu, dong) {
       </div>
     </div>
     <div class="detail-body" id="region-form">
-      ${card('지표 <span class="hint">12개</span>', `<div class="grid2">${metrics}</div>`,
+      ${card(`지표 <span class="hint">${Object.keys(data.percentiles).length}개</span>`, `<div class="grid2">${metrics}${derived}</div>`,
              '막대는 427개 동 중 이 동의 위치다 · 값은 소수점 4자리까지 보여 준다')}
     </div>`;
 
