@@ -1,6 +1,7 @@
 """
 GET   /api/admin/summary                  대시보드 집계 (첫 화면)
 GET   /api/admin/logs                     관리자 수정 이력
+GET   /api/admin/ai-usage                 AI 사용량 (사람별·날짜별)
 GET   /api/admin/members                  회원 100명 목록
 GET   /api/admin/members/{customer_id}    회원 한 명 (기본정보+조건+페르소나)
 GET   /api/admin/regions                  행정동 427개 목록
@@ -26,7 +27,7 @@ from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins, analysis_engine,
-    create_member, delete_member,
+    create_member, delete_member, ai_usage,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -176,6 +177,12 @@ def admin_privacy_preview(customer_id: str):
 def admin_summary():
     """첫 화면(대시보드)이 쓰는 집계 한 덩어리. 아무것도 안 고친다."""
     return {**dashboard(), "write_enabled": ADMIN_WRITE_ENABLED}
+
+
+@router.get("/ai-usage", dependencies=[Depends(check_admin)])
+def admin_ai_usage(days: int = 14):
+    """AI 사용량 — 누가 검색어 추천·후속 질문을 몇 번 썼나. 아무것도 안 고친다."""
+    return ai_usage(min(max(days, 1), 90))
 
 
 @router.get("/logs", dependencies=[Depends(check_admin)])

@@ -307,6 +307,11 @@ def list_members():
     return _call("GET", "/admin/members")
 
 
+def ai_usage(days=14):
+    """AI 사용량 — 누가 검색어 추천·후속 질문을 몇 번 썼나(관리자 대시보드)."""
+    return _call("GET", "/admin/ai-usage", params={"days": days})
+
+
 def create_member(payload: dict):
     return _call("POST", "/admin/members", json=payload, patch_error_on=(422,))
 
