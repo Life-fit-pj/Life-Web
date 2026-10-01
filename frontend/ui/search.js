@@ -439,7 +439,9 @@ async function runPredict(query, { from = "screen", autoClose = true } = {}) {
     // 검색 화면에 갇히는 것보다 낫다
     console.error(err);
     stopSteps();
-    status.textContent = "검색어 분석에 실패했어요. 슬라이더로 조절해 주세요.";
+    status.textContent = err.status === 429
+      ? "오늘 AI 검색 횟수를 다 썼어요. 슬라이더로 찾아보시거나 로그인해 주세요."
+      : "검색어 분석에 실패했어요. 슬라이더로 조절해 주세요.";
     if (autoClose) setTimeout(closeSearch, 1600);
     return false;
 

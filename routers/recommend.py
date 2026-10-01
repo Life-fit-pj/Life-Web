@@ -5,11 +5,12 @@ POST /api/region/explain   행정동 하나의 LLM 설명
 POST /api/chat             추천 결과 후속 질문
 GET  /api/regions/gudong   구 → 동 목록 (회원가입 2단 드롭다운용)
 GET  /api/history          검색·대화 기록 조회 (anonId 기준)
+GET  /api/quota            오늘 남은 AI 질문 횟수
 """
 
 from collections import defaultdict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from services.coords import COORDS, lookup_coords
@@ -17,6 +18,7 @@ from services.engine import (
     KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer,
     save_search, save_chat, get_history,
 )
+from services import quota
 from services.floorplan import find_floorplan
 
 router = APIRouter(prefix="/api", tags=["추천"])
@@ -86,7 +88,7 @@ class ChatRequest(BaseModel):
 # ==========================================
 
 @router.post("/predict")      # @app.post("/api/predict") 였던 것
-def predict(body: PredictRequest):
+def predict(body: PredictRequest, request: Request):
     """추천 요청을 처리한다.
 
     query 가 있으면 LLM 을, 없으면 슬라이더 값을 쓴다.
@@ -94,6 +96,10 @@ def predict(body: PredictRequest):
     """
     # services 는 사전을 기대하므로 모델을 사전으로 바꿔 넘긴다
     prefs = body.model_dump()
+
+    # 검색어가 있을 때만 Claude 를 부르므로 그때만 한도를 쓴다
+    if body.query:
+        quota.consume(request)
 
     # 검색어로 찾아본 요청만 기록한다 — 슬라이더만 만진 요청은 "검색"이 아니다
     if body.query and body.anonId:
@@ -202,8 +208,9 @@ def region_explain_api(body: RegionRequest):
 
 
 @router.post("/chat")
-def chat_api(body: ChatRequest):
+def chat_api(body: ChatRequest, request: Request):
     """추천 결과에 대한 후속 질문에 답한다."""
+    remaining = quota.consume(request)["remaining"]
     answer = get_chat_answer(
         body.question,
         regions=body.regions,
@@ -214,7 +221,13 @@ def chat_api(body: ChatRequest):
     if body.anonId:
         save_chat(body.anonId, body.question, answer)
 
-    return {"answer": answer}
+    return {"answer": answer, "remaining": remaining}
+
+
+@router.get("/quota")
+def quota_api(request: Request):
+    """오늘 남은 AI 질문 횟수. 채팅창이 열릴 때 부른다."""
+    return quota.status(request)
 
 
 @router.get("/history")
