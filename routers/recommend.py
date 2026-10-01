@@ -216,6 +216,7 @@ def chat_api(body: ChatRequest, request: Request):
         regions=body.regions,
         weights=body.weights,
         history=body.history,
+        anon_id=body.anonId,
     )
 
     if body.anonId:

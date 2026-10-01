@@ -212,10 +212,11 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
     return out["explanation"]
 
 
-def get_chat_answer(question, regions=None, weights=None, history=None):
-    """추천 결과에 대한 후속 질문에 답한다."""
+def get_chat_answer(question, regions=None, weights=None, history=None, anon_id=None):
+    """추천 결과에 대한 후속 질문에 답한다. anon_id 는 엔진의 좋아요·닮은 회원 도구가 읽는다 — 로그인하면 회원 번호다."""
     out = _call("POST", "/chat", json={
         "question": question, "regions": regions, "weights": weights, "history": history,
+        "anon_id": anon_id,
     })
     return out["answer"]
 
