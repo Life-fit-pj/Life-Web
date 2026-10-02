@@ -73,6 +73,12 @@ def serve_landing():
     return FileResponse(os.path.join(FRONTEND_DIR, 'landing.html'), headers={"Cache-Control": "no-store"})
 
 
+# html=True 마운트는 /admin 을 admin/index.html 로 찾으니 따로 길을 연다
+@app.get("/admin")
+def serve_admin():
+    return FileResponse(os.path.join(FRONTEND_DIR, 'admin.html'), headers={"Cache-Control": "no-store"})
+
+
 # 평면도는 data/ 안에 있어 따로 길을 열어 준다
 app.mount("/LH평면도", StaticFiles(directory=os.path.join(DATA_DIR, 'LH평면도')))
 
