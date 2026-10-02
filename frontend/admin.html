@@ -435,6 +435,25 @@ pre.safe { background: rgba(12,163,12,.10); }
   .nav button span, .nav .note { display: none; }
   .side { width: 200px; }
 }
+/* 폰 — 칸을 세로로 쌓고 페이지 전체를 스크롤한다. 고정 높이 안의 스크롤은 폰에서 갇힌다 */
+@media (max-width: 600px) {
+  .topbar { height: auto; flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; }
+  .brand small { display: none; }
+  .layout { flex-direction: column; height: auto; }
+  .nav { width: 100%; flex-direction: row; padding: 6px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .nav button { justify-content: center; padding: 8px 4px; font-size: 12.5px; gap: 6px; }
+  .nav button span { display: inline; }
+  .nav .gap { display: none; }
+  .view, .detail { overflow: visible; }
+  .pane { padding: 16px 14px 32px; }
+  .split { flex-direction: column; height: auto; }
+  .side { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); }
+  .side-list { max-height: 40vh; }
+  .empty { min-height: 0; padding: 32px 16px; }
+  .detail-head { padding: 12px 14px; }
+  .detail-body { padding: 14px 14px 32px; }
+  .detail-head .acts { margin-left: 0; }
+}
 </style>
 </head>
 <body>
