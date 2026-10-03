@@ -955,7 +955,7 @@ function logList(list) {
   if (!list || !list.length) return '<div class="skel">아직 수정 기록이 없습니다</div>';
   return '<div class="logs">' + list.map(l => `
     <div class="log">
-      <span class="tag">${l.target === 'member' ? '회원' : '행정동'}</span>
+      <span class="tag">${({ member: '회원', suggestion: 'LLM 제안' })[l.target] || '행정동'}</span>
       <b>${esc(l.target_id)}</b>
       <span class="l-fields">${esc(l.fields.join(', '))}${l.field_count > l.fields.length ? ` 외 ${l.field_count - l.fields.length}칸` : ''}</span>
       <span class="l-when">${when(l.changed_at)}</span>
@@ -978,6 +978,8 @@ const PERSONA_LABELS = {
   family_persona: '가족', cultural_background: '문화 배경',
   career_goals_and_ambitions: '커리어 목표',
 };
+/* 열 번째 칸 — 가입 설문이 아니라 활동(검색·좋아요)에서 정리한 성향. 엔진 config.ACTIVITY_COLUMN 과 같은 이름이다 */
+const ACTIVITY = 'activity_persona';
 /* 서버의 화이트리스트(CUSTOMER_FIELDS)에 없는 칸은 보내 봐야 조용히 버려진다.
    읽기 전용으로 그려서 "고칠 수 있는 것처럼" 보이지 않게 한다 */
 const READONLY = ['customer_id', 'joined_at'];
@@ -1055,7 +1057,7 @@ function openNewMemberForm() {
     <details class="persona" ${k === 'persona' ? 'open' : ''}>
       <summary>${esc(PERSONA_LABELS[k])}<span class="len">0자</span></summary>
       <div class="body">
-        <textarea name="${k}"
+        <textarea name="${k}" maxlength="700"
           oninput="this.closest('details').querySelector('.len').textContent = this.value.length + '자'"></textarea>
         <div class="err" data-err="${k}"></div>
       </div>
@@ -1075,7 +1077,7 @@ function openNewMemberForm() {
       ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
              '기본값 3 · 안 건드리면 그대로 저장된다')}
       ${card('페르소나 <span class="hint">서술형</span>', personas,
-             `20자 미만으로 쓰면 저장은 되지만 벡터는 안 만들어진다 (MIN_LENGTH=20)`)}
+             `칸마다 20자 이상 700자 이하. 벗어나면 저장이 거절된다`)}
     </div>`;
 
   $('#member-create').addEventListener('click', createMember);
@@ -1149,10 +1151,10 @@ function renderMember(id, data) {
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
 
-  const personas = Object.entries(persona).map(([k, v]) => `
+  const personas = Object.entries(persona).filter(([k]) => k !== ACTIVITY).map(([k, v]) => `
     <details class="persona">
       <summary>${esc(PERSONA_LABELS[k] || k)}<span class="len">${String(v ?? '').length}자</span></summary>
-      <div class="body"><textarea name="${k}">${esc(v)}</textarea>
+      <div class="body"><textarea name="${k}" maxlength="700">${esc(v)}</textarea>
         <div class="err" data-err="${k}"></div></div>
     </details>`).join('');
 
@@ -1177,13 +1179,22 @@ function renderMember(id, data) {
       ${card('현재 희망 조건 <span class="hint">1~5 · 조정 가능</span>', `<div class="sliders">${sliders}</div>`,
              '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다')}
       ${card('페르소나 <span class="hint">9칸</span>', personas,
-             '이 글을 고치면 벡터가 다시 만들어진다')}
+             '이 글을 고치면 벡터가 다시 만들어진다. 칸마다 20자 이상 700자 이하')}
+      ${card('활동에서 본 성향 <span class="hint">검색 · 좋아요에서 정리</span>', activityPersonaBody(persona[ACTIVITY] || ''),
+             '제안을 받아도 저장되지 않는다. 고른 뒤 저장을 눌러야 반영된다')}
       ${card('활동', activityBody(likes, searches, chats),
              '로그인한 뒤 쌓인 좋아요·검색·채팅만 보인다')}
       <div id="panel-preview"></div>
       <div id="panel-similar"></div>
       <div id="panel-privacy"></div>
     </div>`;
+
+  $('#suggest-btn').addEventListener('click', () => requestSuggestion(id));
+  $('#suggest-list').addEventListener('click', e => {
+    const pick = e.target.closest('[data-pick]');
+    if (pick) pickSuggestion(Number(pick.dataset.pick));
+  });
+  loadSuggestions(id);
 
   $('.acts', board).addEventListener('click', e => {
     const act = e.target.closest('button')?.dataset.act;
@@ -1193,6 +1204,78 @@ function renderMember(id, data) {
     if (act === 'privacy') showPrivacy(id);
     if (act === 'delete')  deleteMember(id);
   });
+}
+
+/* ── 활동에서 본 성향 ──────────────────────────────────────────
+   검색 · 좋아요에서 LLM 이 정리한 글과 가중치 수정안. 제안을 받아도 저장되지 않는다 —
+   고르면 글은 이 칸에, 가중치는 슬라이더에 채워질 뿐이고 평소의 저장 버튼이 저장한다(승인 버튼이 따로 없는 이유).
+   받은 제안은 엔진이 수정 기록에 원문으로 남긴다. 회원 한 명에 하루 다섯 번까지다 */
+let suggestions = [];
+
+function activityPersonaBody(text) {
+  return `
+    <textarea name="${ACTIVITY}" rows="5" maxlength="700" style="width:100%">${esc(text)}</textarea>
+    <div class="err" data-err="${ACTIVITY}"></div>
+    <div style="display:flex; align-items:center; gap:10px; margin-top:10px">
+      <button class="btn sm" id="suggest-btn" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>제안 받기</button>
+      <span class="hint" id="suggest-left"></span>
+    </div>
+    <div class="logs" id="suggest-list" style="margin-top:10px"></div>`;
+}
+
+/* 오늘 받은 제안을 나란히 놓는다 — 견주어 보고 하나를 고르게 한다 */
+function renderSuggestions(data) {
+  suggestions = data.suggestions || [];
+  $('#suggest-left').textContent = `오늘 남은 횟수 ${data.remaining}번`;
+  $('#suggest-btn').disabled = !WRITE_ENABLED || data.remaining <= 0;
+  $('#suggest-list').innerHTML = suggestions.map((s, i) => `
+    <div class="log" style="flex-direction:column; align-items:flex-start; gap:6px">
+      <div><b>제안 ${i + 1}</b> <span class="l-when">${when(s.created_at)}</span>
+        <button class="btn sm" data-pick="${i}" style="margin-left:8px">이 안 쓰기</button></div>
+      <div>${esc(s[ACTIVITY])}</div>
+      <div class="l-fields">${INDICATORS.map(k => `${k} ${round4(s.가중치[k])}`).join(' · ')}</div>
+    </div>`).join('');
+}
+
+/* 회원을 열 때 오늘 받은 제안을 다시 보여 준다. 그사이 다른 회원을 열었으면 버린다. 엔진이 옛 판이면 조용히 넘어간다 */
+function loadSuggestions(id) {
+  api(`/members/${id}/suggestions`)
+    .then(data => { if (currentMember === id) renderSuggestions(data); })
+    .catch(() => {});
+}
+
+async function requestSuggestion(id) {
+  const btn = $('#suggest-btn');
+  btn.disabled = true;
+  btn.textContent = '정리하는 중…';
+  try {
+    const data = await api(`/members/${id}/suggestions`, { method: 'POST' });
+    if (currentMember === id) renderSuggestions(data);
+  } catch (e) {
+    let message = e.message;
+    try { message = JSON.parse(e.message).detail; } catch { /* 글자 그대로 보여 준다 */ }
+    toast(message);
+    btn.disabled = false;
+  } finally {
+    btn.textContent = '제안 받기';
+  }
+}
+
+/* 고른 제안을 화면에만 채운다. 저장은 저장 버튼이 한다 — 채운 뒤 고쳐도 된다 */
+function pickSuggestion(i) {
+  const s = suggestions[i];
+  const form = $('#member-form');
+  $(`[name="${ACTIVITY}"]`, form).value = s[ACTIVITY];
+
+  let filled = 0;
+  for (const [k, v] of Object.entries(s.가중치)) {
+    const box = $(`.w-num[name="${k}"]`, form);
+    if (!box) continue;                       /* 선호도 행이 없는 회원은 슬라이더가 없다 */
+    box.value = v;
+    box.previousElementSibling.value = v;     /* 옆의 막대도 같이 옮긴다 */
+    filled += 1;
+  }
+  toast(`제안 ${i + 1}을 채웠습니다${filled ? '' : ' (가중치는 선호도 행이 없어 못 채웠습니다)'} — 저장을 눌러야 반영됩니다`);
 }
 
 /* 되돌릴 수 없다 — customers·preferences·member 청크·로그인·활동 기록이 한 번에 지워진다 */
@@ -1613,6 +1696,23 @@ function findIssues(s, sum) {
   return out;
 }
 
+/* 성향을 갱신할 회원 — 활동 칸을 마지막으로 저장한 뒤 검색이 5건 이상 늘어난 회원.
+   세는 것은 엔진이 한다(Claude 를 안 부른다). 누르면 회원 탭에서 그 회원을 연다 */
+function refreshList(list) {
+  if (!list.length) return '';
+  return `
+    <div class="card-title" style="margin:18px 0 8px">성향을 갱신할 회원
+      <span class="hint">${list.length}명 · 마지막 저장 뒤 검색 5건 이상</span></div>
+    <div>${list.map(c => `<button class="btn sm" data-open-member="${esc(c.customer_id)}"
+        style="margin:0 6px 6px 0">${esc(c.customer_id)} · 새 검색 ${c.new_searches}건</button>`).join('')}</div>`;
+}
+$('#system-pane').addEventListener('click', e => {
+  const btn = e.target.closest('[data-open-member]');
+  if (!btn) return;
+  showView('member');
+  openMember(btn.dataset.openMember);
+});
+
 function issueList(list, okNote) {
   if (!list.length) return `<div class="ok-note">${esc(okNote)}</div>`;
   return '<div class="logs">' + list.map(i => `
@@ -1636,8 +1736,9 @@ function fact(label, value, sub = '', level = '') {
   const pane = $('#system-pane');
   pane.innerHTML = '<div class="skel">불러오는 중…</div>';
 
-  const [s, logs, sum] = await Promise.all([
+  const [s, logs, sum, cands] = await Promise.all([
     api('/ready'), api('/logs?limit=50'), api('/summary'),
+    api('/refresh-candidates').catch(() => []),
   ]);
   paintStatus(s);
 
@@ -1711,6 +1812,7 @@ function fact(label, value, sub = '', level = '') {
 
     ${card(`이슈 <span class="hint">${issues.length ? issues.length + '건' : '없음'}</span>`, `
       ${issueList(issues, okNote)}
+      ${refreshList(cands)}
       <div class="card-title" style="margin:18px 0 8px">관리자 수정 이력
         <span class="hint">최근 ${logs.length}건</span></div>
       ${logList(logs)}`,

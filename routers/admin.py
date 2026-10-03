@@ -28,6 +28,7 @@ from services.engine import (
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
     clear_caches, privacy_preview, dashboard, recent_logs, backfill_logins, analysis_engine,
     create_member, delete_member, ai_usage,
+    refresh_candidates, member_suggestions, suggest_member,
 )
 
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
@@ -139,6 +140,32 @@ def admin_preview_member(customer_id: str):
 def admin_similar_members(customer_id: str):
     """이 회원과 페르소나가 비슷한 회원들."""
     result = similar_members(customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    return result
+
+
+# ── 활동에서 본 성향 ──
+# 제안은 저장하지 않는다. 저장은 위의 회원 수정(PATCH)이 한다 — 그래서 승인 경로가 따로 없다
+@router.get("/refresh-candidates", dependencies=[Depends(check_admin)])
+def admin_refresh_candidates():
+    """성향을 갱신할 회원 — 마지막 저장 뒤 검색이 5건 이상 늘어난 회원."""
+    return refresh_candidates()
+
+
+@router.get("/members/{customer_id}/suggestions", dependencies=[Depends(check_admin)])
+def admin_member_suggestions(customer_id: str):
+    """오늘 이 회원에게 준 성향 제안들과 남은 횟수."""
+    return member_suggestions(customer_id)
+
+
+@router.post("/members/{customer_id}/suggestions", dependencies=[Depends(check_admin), Depends(check_writable)])
+def admin_suggest_member(customer_id: str):
+    """성향 제안을 하나 더 만든다. 검색이 모자라거나 하루 횟수를 넘으면 422 와 이유 글."""
+    try:
+        result = suggest_member(customer_id)
+    except InvalidPatch as e:
+        raise HTTPException(status_code=422, detail=e.errors)
     if result is None:
         raise HTTPException(status_code=404, detail="그런 회원이 없다")
     return result
