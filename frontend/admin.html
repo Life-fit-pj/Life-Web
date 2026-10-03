@@ -402,6 +402,8 @@ pre.safe { background: rgba(12,163,12,.10); }
 .ok-note { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
 
 .logs { display: grid; gap: 8px; }
+/* 길어지는 목록을 가둔다 — 수정 이력 · 지난 분석 대화. 넘치면 안에서 굴린다 */
+.scroll { max-height: 290px; overflow-y: auto; padding-right: 4px; }
 .log { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 10px; font-size: 12.5px; flex-wrap: wrap; }
 .log .l-fields { color: var(--ink-2); font-size: 11.5px; }
 .log .l-when { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; font-size: 11.5px; }
@@ -542,6 +544,7 @@ pre.safe { background: rgba(12,163,12,.10); }
 
 <div id="toast" hidden></div>
 
+<script src="lib/counter.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════
    0. 공통 — 통신 · 토스트 · 문자열
@@ -833,7 +836,7 @@ function analysisBar() {
       <div class="hint" style="margin-top:8px">답변은 집계된 숫자만 보고 만들어집니다. 자료에 없는 건 없다고 답합니다.</div>
       <div id="an-out"></div>
       <div class="card-title" style="margin:18px 0 8px">지난 대화</div>
-      <div id="an-list"><div class="skel">펼치면 불러옵니다</div></div>
+      <div id="an-list" class="scroll"><div class="skel">펼치면 불러옵니다</div></div>
     </div>
   </details>`;
 }
@@ -1057,7 +1060,7 @@ function openNewMemberForm() {
     <details class="persona" ${k === 'persona' ? 'open' : ''}>
       <summary>${esc(PERSONA_LABELS[k])}<span class="len">0자</span></summary>
       <div class="body">
-        <textarea name="${k}" maxlength="700"
+        <textarea name="${k}" maxlength="800"
           oninput="this.closest('details').querySelector('.len').textContent = this.value.length + '자'"></textarea>
         <div class="err" data-err="${k}"></div>
       </div>
@@ -1077,9 +1080,10 @@ function openNewMemberForm() {
       ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
              '기본값 3 · 안 건드리면 그대로 저장된다')}
       ${card('페르소나 <span class="hint">서술형</span>', personas,
-             `칸마다 20자 이상 700자 이하. 벗어나면 저장이 거절된다`)}
+             `칸마다 20자 이상 800자 이하. 벗어나면 저장이 거절된다`)}
     </div>`;
 
+  $$('textarea[maxlength]', board).forEach(box => mountCounter(box, box.maxLength));
   $('#member-create').addEventListener('click', createMember);
 }
 
@@ -1154,7 +1158,7 @@ function renderMember(id, data) {
   const personas = Object.entries(persona).filter(([k]) => k !== ACTIVITY).map(([k, v]) => `
     <details class="persona">
       <summary>${esc(PERSONA_LABELS[k] || k)}<span class="len">${String(v ?? '').length}자</span></summary>
-      <div class="body"><textarea name="${k}" maxlength="700">${esc(v)}</textarea>
+      <div class="body"><textarea name="${k}" maxlength="800">${esc(v)}</textarea>
         <div class="err" data-err="${k}"></div></div>
     </details>`).join('');
 
@@ -1179,7 +1183,7 @@ function renderMember(id, data) {
       ${card('현재 희망 조건 <span class="hint">1~5 · 조정 가능</span>', `<div class="sliders">${sliders}</div>`,
              '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다')}
       ${card('페르소나 <span class="hint">9칸</span>', personas,
-             '이 글을 고치면 벡터가 다시 만들어진다. 칸마다 20자 이상 700자 이하')}
+             '이 글을 고치면 벡터가 다시 만들어진다. 칸마다 20자 이상 800자 이하')}
       ${card('활동에서 본 성향 <span class="hint">검색 · 좋아요에서 정리</span>', activityPersonaBody(persona[ACTIVITY] || ''),
              '제안을 받아도 저장되지 않는다. 고른 뒤 저장을 눌러야 반영된다')}
       ${card('활동', activityBody(likes, searches, chats),
@@ -1189,6 +1193,7 @@ function renderMember(id, data) {
       <div id="panel-privacy"></div>
     </div>`;
 
+  $$('textarea[maxlength]', board).forEach(box => mountCounter(box, box.maxLength));
   $('#suggest-btn').addEventListener('click', () => requestSuggestion(id));
   $('#suggest-list').addEventListener('click', e => {
     const pick = e.target.closest('[data-pick]');
@@ -1214,7 +1219,7 @@ let suggestions = [];
 
 function activityPersonaBody(text) {
   return `
-    <textarea name="${ACTIVITY}" rows="5" maxlength="700" style="width:100%">${esc(text)}</textarea>
+    <textarea name="${ACTIVITY}" rows="5" maxlength="800" style="width:100%">${esc(text)}</textarea>
     <div class="err" data-err="${ACTIVITY}"></div>
     <div style="display:flex; align-items:center; gap:10px; margin-top:10px">
       <button class="btn sm" id="suggest-btn" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>제안 받기</button>
@@ -1265,14 +1270,16 @@ async function requestSuggestion(id) {
 function pickSuggestion(i) {
   const s = suggestions[i];
   const form = $('#member-form');
-  $(`[name="${ACTIVITY}"]`, form).value = s[ACTIVITY];
+  const box = $(`[name="${ACTIVITY}"]`, form);
+  box.value = s[ACTIVITY];
+  box.dispatchEvent(new Event('input'));       /* 글자 수 표시가 따라오게 한다 */
 
   let filled = 0;
   for (const [k, v] of Object.entries(s.가중치)) {
-    const box = $(`.w-num[name="${k}"]`, form);
-    if (!box) continue;                       /* 선호도 행이 없는 회원은 슬라이더가 없다 */
-    box.value = v;
-    box.previousElementSibling.value = v;     /* 옆의 막대도 같이 옮긴다 */
+    const field = $(`.w-num[name="${k}"]`, form);
+    if (!field) continue;                     /* 선호도 행이 없는 회원은 슬라이더가 없다 */
+    field.value = v;
+    field.previousElementSibling.value = v;   /* 옆의 막대도 같이 옮긴다 */
     filled += 1;
   }
   toast(`제안 ${i + 1}을 채웠습니다${filled ? '' : ' (가중치는 선호도 행이 없어 못 채웠습니다)'} — 저장을 눌러야 반영됩니다`);
@@ -1647,7 +1654,7 @@ function findIssues(s, sum) {
   /* 세 방향에서 "비어 있는 회원 수"를 센다 */
   const noProfile = members - sumOf(ch.ages);            /* 나이가 빈 회원 */
   const noPrefs   = members - sumOf(ch.dealType);        /* 선호도 행이 없는 회원 */
-  const gap       = members * CHUNK_SLOTS - c.chunks;    /* 비어 있는 페르소나 칸 */
+  const gap       = members * CHUNK_SLOTS - c.slots;     /* 비어 있는 설문 칸. 조각이 둘인 칸도 한 칸으로 센 값이다 */
   const asMembers = gap / CHUNK_SLOTS;                   /* 그 칸을 사람 수로 환산 */
 
   /* 셋이 딱 맞으면 같은 계정들이다 — 세 번 말할 이유가 없다 */
@@ -1662,7 +1669,7 @@ function findIssues(s, sum) {
         .filter(k => !ch.persona.some(x => x.label === k))
         .map(k => PERSONA_LABELS[k]);
       add('bad', '페르소나 칸 유실',
-        `회원당 ${(c.chunks / members).toFixed(1)}칸 · `
+        `회원당 ${(c.slots / members).toFixed(1)}칸 · `
         + `${num(gap)}칸(회원 ${asMembers.toFixed(1)}명분)이 비었습니다`
         + (empty.length ? ` — 한 명도 없는 칸: ${empty.join(', ')}` : '')
         + '. 빈 칸은 벡터가 안 만들어져 이웃 찾기에서 빠집니다');
@@ -1765,27 +1772,31 @@ function fact(label, value, sub = '', level = '') {
   let chunkCard = '', weightCard = '';
   if (sum.ok) {
     const c = sum.counts, ch = sum.charts;
-    const per = c.members ? c.chunks / c.members : 0;
-    const gap = Math.max(0, c.members * CHUNK_SLOTS - c.chunks);
+    const per = c.members ? c.slots / c.members : 0;
+    const gap = Math.max(0, c.members * CHUNK_SLOTS - c.slots);
     const filled = ch.persona.length;
     const shortest = filled ? ch.persona.reduce((x, y) => (x.value <= y.value ? x : y)) : null;
 
+    /* 칸 = 회원 × 종류, 조각 = 벡터 하나. 350자를 넘는 글은 한 칸이 조각 둘이라 둘을 따로 센다.
+       설문 9칸은 필수(비면 빨강), 활동 칸은 선택이다 — 관리자가 승인해야 생긴다 */
     chunkCard = card('청킹 <span class="hint">페르소나 → 벡터</span>', `
       <div class="facts">
-        ${fact('총 청크', num(c.chunks) + '<small>개</small>', `회원 ${num(c.members)}명`)}
-        ${fact('회원당', per.toFixed(1) + '<small>칸</small>', `${CHUNK_SLOTS}칸이면 정상`,
+        ${fact('총 조각', num(c.chunks) + '<small>개</small>', `회원 ${num(c.members)}명 · 칸 ${num(c.slots + c.activity)}개`)}
+        ${fact('회원당', per.toFixed(1) + '<small>칸</small>', `설문 ${CHUNK_SLOTS}칸이면 정상 · 활동까지 ${CHUNK_SLOTS + 1}칸`,
                per < CHUNK_SLOTS ? 'bad' : '')}
         ${fact('빈 칸', num(gap) + '<small>칸</small>',
                gap ? `회원 ${(gap / CHUNK_SLOTS).toFixed(1)}명분` : '없다', gap ? 'bad' : '')}
         ${fact('채워진 칸', `${filled}<small>/${CHUNK_SLOTS}</small>`, '한 명도 없는 칸은 제외',
                filled < CHUNK_SLOTS ? 'warn' : '')}
+        ${fact('활동 칸', num(c.activity) + '<small>명</small>', '검색 · 좋아요에서 정리해 승인한 회원')}
+        ${fact('나뉜 칸', num(c.split) + '<small>칸</small>', c.split ? '350자를 넘어 조각이 둘 이상' : '350자를 넘는 글이 없다')}
         ${shortest ? fact('가장 짧은 칸', shortest.value + '<small>자</small>',
                PERSONA_LABELS[shortest.label] || shortest.label,
                shortest.value < CHUNK_WARN_LEN ? 'warn' : '') : ''}
       </div>
       ${bars(ch.persona.map(d => ({ ...d, label: PERSONA_LABELS[d.label] || d.label })),
              { color: 'var(--s3)', labelWidth: '110px' })}`,
-      `칸별 평균 길이 · ${CHUNK_MIN_LEN}자 미만은 청킹에서 버려진다`);
+      `설문 칸별 평균 길이 · ${CHUNK_MIN_LEN}자 미만은 저장이 거절된다`);
 
     const ws = ch.weights;
     const avg = ws.length ? (ws.reduce((t, w) => t + w.value, 0) / ws.length).toFixed(2) : '-';
@@ -1815,7 +1826,7 @@ function fact(label, value, sub = '', level = '') {
       ${refreshList(cands)}
       <div class="card-title" style="margin:18px 0 8px">관리자 수정 이력
         <span class="hint">최근 ${logs.length}건</span></div>
-      ${logList(logs)}`,
+      <div class="scroll">${logList(logs)}</div>`,
       'DB 특이사항과 손대던 기록을 한자리에 모은다')}
 
     ${chunkCard}

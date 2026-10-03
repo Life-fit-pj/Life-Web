@@ -411,6 +411,7 @@
 </div>
 
 
+<script src="lib/counter.js"></script>
 <script type="module">
 import { signup, getGuDong } from "./lib/api.js";
 
@@ -437,6 +438,13 @@ const PERSONA_MAP = {
   family_persona:       ["f1", "f2"],
   cultural_background:  ["g1", "g2"],
 };
+
+/* 설문 입력칸은 하나에 250자까지다. 서버가 답 둘~셋을 공백으로 이어 persona 한 칸으로 만드는데,
+   셋을 다 채워도 752자라 한 칸의 한도(엔진 config.MAX_PERSONA_LENGTH = 800)를 안 넘는다 */
+const ANSWER_LIMIT = 250;
+for (const ids of Object.values(PERSONA_MAP)) {
+  ids.forEach((id) => mountCounter(document.getElementById(id), ANSWER_LIMIT));
+}
 
 const STORAGE_KEY = "lifefit-survey";
 // search.js 가 같은 키를 읽어 "검색 화면(searchScreen) 대신 지도 화면을 바로 보여줄지" 정한다.
