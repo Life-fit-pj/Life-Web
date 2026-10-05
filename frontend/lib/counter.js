@@ -12,7 +12,7 @@ function mountCounter(box, max) {
   wrap.append(box);
 
   const count = document.createElement("span");
-  count.style.cssText = "position:absolute; right:10px; bottom:7px; font-size:11.5px; opacity:.6;"
+  count.style.cssText = "position:absolute; right:28px; bottom:7px; font-size:11.5px; opacity:.6;"
                       + " pointer-events:none; font-variant-numeric:tabular-nums";
   wrap.append(count);
 
