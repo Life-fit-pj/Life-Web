@@ -216,6 +216,9 @@ def chat_api(body: ChatRequest, request: Request):
         regions=body.regions,
         weights=body.weights,
         history=body.history,
+        # 회원 전용 도구(좋아요 · 닮은 회원)는 토큰으로 확인한 회원에게만 연다. body.anonId 를 그대로 넘기면
+        # 로그아웃한 사람이 남의 회원 번호를 적어 보내 그 회원 기준의 답을 받을 수 있다
+        anon_id=quota.member_id(request),
     )
 
     if body.anonId:

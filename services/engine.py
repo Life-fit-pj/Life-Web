@@ -212,10 +212,11 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
     return out["explanation"]
 
 
-def get_chat_answer(question, regions=None, weights=None, history=None):
-    """추천 결과에 대한 후속 질문에 답한다."""
+def get_chat_answer(question, regions=None, weights=None, history=None, anon_id=None):
+    """추천 결과에 대한 후속 질문에 답한다. anon_id 는 엔진의 좋아요·닮은 회원 도구가 읽는다 — 로그인하면 회원 번호다."""
     out = _call("POST", "/chat", json={
         "question": question, "regions": regions, "weights": weights, "history": history,
+        "anon_id": anon_id,
     })
     return out["answer"]
 
@@ -348,6 +349,25 @@ def similar_members(customer_id, top_k=5):
     """이 회원과 페르소나가 비슷한 회원들."""
     return _call("GET", f"/admin/members/{quote(customer_id)}/similar",
                  params={"top_k": top_k}, none_on=(404,))
+
+
+def refresh_candidates():
+    """활동에서 본 성향을 갱신할 회원 — 마지막 저장 뒤 검색이 5건 이상 늘어난 회원."""
+    return _call("GET", "/admin/refresh-candidates")
+
+
+def member_suggestions(customer_id):
+    """오늘 이 회원에게 준 성향 제안들과 남은 횟수."""
+    return _call("GET", f"/admin/members/{quote(customer_id)}/suggestions")
+
+
+def suggest_member(customer_id):
+    """성향 제안을 하나 더 만든다(엔진이 Claude 를 1번 부른다). 없는 회원이면 None.
+
+    검색이 모자라거나(422) 하루 횟수를 넘으면(429) InvalidPatch — errors 에 이유 글이 들어 있다
+    """
+    return _call("POST", f"/admin/members/{quote(customer_id)}/suggestions",
+                 none_on=(404,), patch_error_on=(422, 429))
 
 
 def privacy_preview(customer_id):
