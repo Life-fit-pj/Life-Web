@@ -1159,7 +1159,9 @@ function renderMember(id, data) {
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
 
-  const personas = Object.entries(persona).filter(([k]) => k !== ACTIVITY).map(([k, v]) => `
+  /* 아홉 칸을 늘 다 그린다. 글이 있는 칸만 그리면 설문을 건너뛴 회원은 채울 자리가 없고,
+     한 칸을 비워 저장하면 그 칸이 화면에서 사라져 다시 쓸 수 없다 */
+  const personas = Object.keys(PERSONA_LABELS).map(k => [k, persona[k] ?? '']).map(([k, v]) => `
     <details class="persona">
       <summary>${esc(PERSONA_LABELS[k] || k)}<span class="len">${String(v ?? '').length}자</span></summary>
       <div class="body"><textarea name="${k}" maxlength="800">${esc(v)}</textarea>
@@ -1273,6 +1275,7 @@ async function requestSuggestion(id) {
     try { message = JSON.parse(e.message).detail; } catch { /* 글자 그대로 보여 준다 */ }
     toast(message);
     btn.disabled = false;
+    loadSuggestions(id);     /* 남은 횟수와 버튼을 서버의 실제 값으로 맞춘다 — 한도를 다 썼으면 버튼이 꺼진다 */
   } finally {
     btn.textContent = '제안 받기';
   }

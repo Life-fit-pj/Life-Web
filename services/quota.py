@@ -44,6 +44,15 @@ def _who(request: Request) -> tuple[str, int]:
     return f"ip:{_client_ip(request)}", GUEST_DAILY_LIMIT
 
 
+def member_id(request: Request) -> str | None:
+    """토큰으로 확인한 회원 번호. 손님이면 None.
+
+    회원에게만 주는 것(채팅의 회원 전용 도구)은 이 값으로 가른다 — 브라우저가 보낸 anonId 는 누구나 바꿔 보낼 수 있다
+    """
+    who, _ = _who(request)
+    return who.removeprefix("member:") if who.startswith("member:") else None
+
+
 def status(request: Request) -> dict:
     """오늘 남은 횟수. 화면이 채팅창에 보여 준다."""
     who, limit = _who(request)
