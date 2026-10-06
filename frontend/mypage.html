@@ -16,15 +16,21 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="ui/sources.css">
-
   <!--
     signup.html 과 같은 일체형 페이지다. 색 변수 · 카드 · 입력칸 모양을 거기서 그대로 가져왔다 —
     두 화면은 같은 아홉 칸을 다룬다(가입 때 쓰고, 여기서 본다). 한쪽 모양을 바꾸면 다른 쪽도 본다.
+    지도 화면과 공유하는 것은 lib/ 뿐이다.
     탭 전환은 관리자 화면(admin.html)과 같은 방식 — data-view 가 같은 절만 켠다.
     지금은 읽기 전용이다(EDIT_ENABLED = false). 수정을 켜는 법은 Life-Fit-main/docs/교안-마이페이지.md 의 B
   -->
   <style>
+    @font-face {
+      font-family: 'Cafe24Ssurround';
+      src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }
+
     :root {
       --bg:          #FBF8F1;
       --surface:     #FFFFFF;
@@ -65,13 +71,13 @@
     .wrap { max-width: 640px; margin: 0 auto; }
 
     .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .brand { font-size: 19px; font-weight: 700; color: var(--primary); letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .brand { font-family: 'Cafe24Ssurround', 'Inter', sans-serif; font-weight: normal; font-size: 20px; color: var(--primary); letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; text-decoration: none; }
     .brand::before { content: ""; flex: none; width: 28px; height: 28px; background: var(--logo-mark) center / contain no-repeat; }
     .brand i { color: var(--accent); font-style: normal; }
     .back { font-size: 13px; color: var(--text-muted); text-decoration: none; }
     .back:hover { color: var(--text); text-decoration: underline; }
 
-    h1 { font-size: 24px; font-weight: 700; margin: 18px 0 14px; letter-spacing: -0.5px; }
+    h1 { font-family: 'Cafe24Ssurround', 'Inter', sans-serif; font-weight: normal; font-size: 26px; margin: 18px 0 14px; letter-spacing: -0.5px; }
 
     /* 탭 — 관리자 화면처럼 한 줄. 켜진 탭만 밑줄 */
     .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
@@ -99,8 +105,9 @@
     }
     .sq-item textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
     .sq-item input:focus, .sq-item select:focus, .sq-item textarea:focus { border-color: var(--accent); background: var(--surface); }
-    /* 읽기 전용일 때 — 잠긴 칸이 "고장난 입력칸"으로 안 보이게 글만 남긴다 */
-    .sq-item input:disabled, .sq-item select:disabled, .sq-item textarea:disabled { background: transparent; border-color: transparent; padding-left: 0; color: var(--text); opacity: 1; }
+    /* 읽기 전용일 때 — 상자 모양은 그대로 두고(글자만 떠 보이지 않게), 커서로 "입력 못 함"만 알린다 */
+    .sq-item input:disabled, .sq-item select:disabled, .sq-item textarea:disabled { color: var(--text); opacity: 1; cursor: default; }
+    .sq-item select:disabled { appearance: none; -webkit-appearance: none; }   /* 잠긴 드롭다운의 화살표를 뗀다 */
     .sq-item .error, .sq-item input.error, .sq-item textarea.error { border-color: var(--danger); }
     .sq-row { display: flex; gap: 8px; }
     .sq-row select { flex: 1; }
@@ -127,11 +134,12 @@
     .list-a { margin-top: 2px; color: var(--text-muted); }
     .list-when { flex: none; font-size: 12px; color: var(--text-muted); }
     .empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 14px 0; }
+    /* 기록 · 좋아요는 끝없이 길어진다 — 상자 높이를 고정하고 안에서 스크롤 */
+    .list-box { max-height: 320px; overflow-y: auto; padding-right: 6px; }
 
     .gate { text-align: center; padding: 48px 0; color: var(--text-muted); }
     .gate a { color: var(--primary); }
 
-    .foot { margin-top: 28px; text-align: center; }
     .note { margin-top: 18px; padding: 12px 16px; font-size: 12.5px; color: var(--text-muted); background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 6px; }
   </style>
 </head>
@@ -197,18 +205,15 @@
 
     <!-- ③ 기록 -->
     <section class="view" data-view="history">
-      <div class="card"><div class="sec">최근 검색어</div><div id="historySearches"></div></div>
-      <div class="card"><div class="sec">최근 대화</div><div id="historyChats"></div></div>
+      <div class="card"><div class="sec">최근 검색어</div><div id="historySearches" class="list-box"></div></div>
+      <div class="card"><div class="sec">최근 대화</div><div id="historyChats" class="list-box"></div></div>
     </section>
 
     <!-- ④ 좋아요 -->
     <section class="view" data-view="likes">
-      <div class="card"><div class="sec">좋아요 한 거주지</div><div id="likesItems"></div></div>
+      <div class="card"><div class="sec">좋아요 한 거주지</div><div id="likesItems" class="list-box"></div></div>
     </section>
 
-    <div class="foot">
-      <button type="button" id="sourcesLink" class="btn-text">ⓘ 데이터 출처</button>
-    </div>
   </div>
 </div>
 
@@ -218,7 +223,6 @@ import { getMe, getHistory, getLikes, deleteLike, getGuDong } from "./lib/api.js
 import { getAnonId, isLoggedIn } from "./lib/state.js";
 import { escapeAndFormat } from "./lib/format.js";
 import { supabase } from "./lib/supabaseClient.js";
-import { openSources } from "./ui/sources.js";
 
 // 지금은 보기만. 켜는 법은 Life-Fit-main/docs/교안-마이페이지.md 의 B — 서버 경로(PATCH /api/auth/me)가 같이 있어야 한다
 const EDIT_ENABLED = false;
@@ -355,8 +359,6 @@ async function loadLikes() {
 }
 
 /* ── 시작 ─────────────────────────────────────────── */
-$("sourcesLink").addEventListener("click", openSources);
-
 async function start() {
   if (!isLoggedIn()) {
     showGate(`로그인 후 볼 수 있어요. <a href="index.html">첫 화면</a>에서 로그인해 주세요.`);

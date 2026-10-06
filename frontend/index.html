@@ -89,7 +89,7 @@
     <div id="typeResult"></div>
   </div>
 
-  <!-- 결과 화면 우측 상단 로그인 + 메뉴 버튼 -->
+  <!-- 결과 화면 우측 상단 버튼 하나 — 로그아웃 상태면 "로그인", 로그인 상태면 "마이페이지"(menu.js 의 syncLoginToggle) -->
   <div id="topActions">
     <button id="loginToggle">로그인</button>
   </div>
@@ -145,12 +145,12 @@
   <!-- 좌측 조건 설정 패널 -->
   <div class="panel ctrl-panel">
 
-    <!-- 1. 건축 정보. 오른쪽 귀퉁이의 "데이터 출처"는 ui/sources.js 의 모달을 연다(search.js 가 연결) —
-         패널이 길어 아래에 두면 안 보이고, 글자를 붙여 둬야 닫기 버튼으로 오해하지 않는다 -->
-    <div class="panel-head">
-      <h2>🏠 건축 (Architecture)</h2>
-      <button type="button" id="sourcesLink" class="link-text">ⓘ 데이터 출처</button>
+    <!-- 1. 건축 정보. 오른쪽 귀퉁이의 둥근 i 는 ui/sources.js 의 출처 모달을 연다(search.js 가 연결) —
+         패널이 길어 아래에 두면 안 보인다. 글자가 없으니 title 로 뜻을 단다 -->
+    <div class="panel-top">
+      <button type="button" id="sourcesLink" class="link-icon" title="데이터 출처" aria-label="데이터 출처">i</button>
     </div>
+    <h2>🏠 건축 (Architecture)</h2>
     <div class="weight-row">
       <div class="weight-top">
         <span class="wlabel">건물 유형</span>
@@ -291,8 +291,8 @@
     
     <!-- AI 점수 박스 -->
     <div class="main-score-box">
-      <p>AI 예측 종합 주거 만족도</p>
-      <h3 id="resScore">77.3 <span style="font-size:16px; color:var(--muted);">/ 100</span></h3>
+      <p>추천 1위 종합 점수</p>
+      <h3 id="resScore">— <span style="font-size:16px; color:var(--muted);">/ 100</span></h3>
     </div>
 
     <!-- 추천 지역 TOP 5 -->
