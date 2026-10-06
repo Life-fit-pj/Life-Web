@@ -1,12 +1,12 @@
 import { openHistory } from "./history.js";
 import { openLikes } from "./likes.js";
 import { openMypage } from "./mypage.js";
+import { openSources } from "./sources.js";
 import { authLogin, getSignedUp } from "../lib/api.js";
 import { getAnonId, isLoggedIn } from "../lib/state.js";
 import { supabase } from "../lib/supabaseClient.js";
 
 let menuModalEl = null;
-let comingSoonEl = null;
 let authModalEl = null;
 
 // Supabase 로그인 직후(이메일/비번, 구글 리디렉션 복귀 포함)마다 한 번씩 불린다.
@@ -91,13 +91,12 @@ function renderMenuItems() {
         <a class="menu-item" id="menuMypage" href="#">마이페이지</a>
         <a class="menu-item" id="menuHistory" href="#">검색 및 대화 기록 저장소</a>
         <a class="menu-item" id="menuLikes" href="#">좋아요 한 거주지</a>
-        <a class="menu-item" href="#" data-feature="원본 데이터 및 출처 안내">원본 데이터 및 출처 안내</a>
+        <a class="menu-item" id="menuSources" href="#">원본 데이터 및 출처 안내</a>
     `;
-    box.querySelectorAll("a[data-feature]").forEach((link) => {
-        link.addEventListener("click", (e) => {
-            e.preventDefault();
-            openComingSoon(link.dataset.feature);
-        });
+    box.querySelector("#menuSources").addEventListener("click", (e) => {
+        e.preventDefault();
+        closeMenu();
+        openSources();
     });
     box.querySelector("#menuMypage").addEventListener("click", (e) => {
         e.preventDefault();
@@ -326,38 +325,4 @@ export function openAuthModal() {
 function closeAuthModal() {
     if (!authModalEl) return;
     authModalEl.classList.remove("is-open");
-}
-
-// 아직 안 만든 화면으로 이동하려 할 때 보여주는 공용 안내창.
-// 페이지가 완성되면 그 항목의 버튼을 <a href="...html"> 로 되돌리고 이 함수 호출은 지우면 된다
-function ensureComingSoon() {
-    if (comingSoonEl) return comingSoonEl;
-
-    comingSoonEl = document.createElement("div");
-    comingSoonEl.className = "coming-soon-backdrop";
-    comingSoonEl.innerHTML = `
-        <div class="coming-soon-panel">
-            <button class="coming-soon-close" aria-label="닫기">&times;</button>
-            <p id="comingSoonText"></p>
-        </div>
-    `;
-    document.body.appendChild(comingSoonEl);
-
-    comingSoonEl.addEventListener("click", (e) => {
-        if (e.target === comingSoonEl) closeComingSoon();
-    });
-    comingSoonEl.querySelector(".coming-soon-close").addEventListener("click", closeComingSoon);
-
-    return comingSoonEl;
-}
-
-function openComingSoon(featureName) {
-    const el = ensureComingSoon();
-    el.querySelector("#comingSoonText").textContent = `"${featureName}" ⚙️준비 중`;
-    el.classList.add("is-open");
-}
-
-function closeComingSoon() {
-    if (!comingSoonEl) return;
-    comingSoonEl.classList.remove("is-open");
 }

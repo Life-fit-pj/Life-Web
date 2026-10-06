@@ -1,0 +1,88 @@
+/*
+원본 데이터 및 출처 안내 모달
+틀은 ui/mypage.css 를 따르고, 글이 많아 너비만 넓다(760px). 글은 ui/sources.js 의 SOURCES 에 있다
+*/
+
+.sources-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(30, 26, 22, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.sources-backdrop.is-open { display: flex; }
+
+.sources-modal {
+  position: relative;
+  width: min(760px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 28px 30px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.sources-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sources-close:hover { color: var(--text); }
+
+.sources-title {
+  margin: 0 0 18px;
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
+  font-size: 19px;
+  color: var(--text);
+}
+
+.sources-group { margin-bottom: 18px; }
+.sources-group-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 한 줄 = 무엇에 썼나(왼쪽) · 제공처(오른쪽). 좁은 화면에서는 위아래로 */
+.sources-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 18px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  word-break: keep-all;
+}
+.sources-row:last-child { border-bottom: none; }
+.sources-what { color: var(--text); }
+.sources-org { color: var(--muted); }
+
+.sources-limits {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text);
+  word-break: keep-all;
+}
+.sources-limits li { padding: 2px 0; }
+
+.sources-footnote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 600px) {
+  .sources-row { grid-template-columns: 1fr; }
+}
