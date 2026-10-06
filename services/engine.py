@@ -31,6 +31,10 @@ EMBED_API_BASE = os.environ.get("EMBED_API_BASE", "http://127.0.0.1:8000")
 # 커넥션 재사용 — 요청마다 새로 만들지 않는다 (ADR-0001 부정적 영향 항목 참고)
 _client = httpx.Client(base_url=EMBED_API_BASE, timeout=30.0)
 
+# 엔진 주소에 들어가는 번호의 모양. 라우터가 이 모양이 아닌 값을 받지 않는다(Query · Field 의 pattern)
+ANON_ID = r"^[A-Za-z0-9_-]{1,64}$"
+CUSTOMER_ID =r"^C\d{1,9}$"
+
 
 class InvalidPatch(Exception):
     """값이 규칙에 안 맞을 때. Life-Embed-jh 가 422 + {"detail": {칸: 이유}} 로 응답하면 여기로 바꾼다.
@@ -40,6 +44,16 @@ class InvalidPatch(Exception):
     def __init__(self, errors: dict):
         self.errors = errors
         super().__init__(str(errors))
+
+
+def _seg(value) -> str:
+    """엔진 주소의 경로 한 칸에 넣을 값. '/' 까지 전부 인코딩한다.
+
+    quote() 는 기본으로 '/' 를 그대로 둔다. 그대로 두면 "../admin/members" 같은 값이 주소를 조립할 때
+    엔진의 다른 경로(/admin/members)로 풀린다 — 로그인도 관리자 토큰도 없이 회원 목록과 상세를 읽을 수 있었다(2026-10-05).
+    경로에 값을 끼울 때는 quote() 가 아니라 반드시 이 함수를 쓴다
+    """
+    return quote(str(value), safe="")
 
 
 def _call(method: str, path: str, *, json=None, params=None, headers=None, none_on=(), patch_error_on=()):
@@ -196,7 +210,7 @@ def get_survey_recommendation(weights_kor, persona_query, housing=None, top_k=5)
 
 def get_facilities(gu, dong, limit=5):
     """행정동 하나의 시설 정보를 돌려준다. 지도 핀을 눌렀을 때 쓴다."""
-    return _call("GET", f"/regions/{quote(gu)}/{quote(dong)}/facilities", params={"limit": limit})
+    return _call("GET", f"/regions/{_seg(gu)}/{_seg(dong)}/facilities", params={"limit": limit})
 
 
 def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=None):
@@ -206,7 +220,7 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
     같은 문장을 넣는다. None 이면 프롬프트에 "가격 이야기를 꺼내지 마라"가
     들어가므로, 가격 조건이 없을 때 억지로 기본값을 만들어 넣지 말 것
     """
-    out = _call("POST", f"/regions/{quote(gu)}/{quote(dong)}/explain", json={
+    out = _call("POST", f"/regions/{_seg(gu)}/{_seg(dong)}/explain", json={
         "query": query, "weights": weights, "scores": scores, "housing": housing,
     })
     return out["explanation"]
@@ -225,7 +239,7 @@ def get_chat_answer(question, regions=None, weights=None, history=None, anon_id=
 
 def get_customer(customer_id):
     """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
-    return _call("GET", f"/customers/{quote(customer_id)}", none_on=(404,))
+    return _call("GET", f"/customers/{_seg(customer_id)}", none_on=(404,))
 
 
 def score_survey(prompt):
@@ -290,18 +304,18 @@ def save_chat(anon_id, question, answer):
 
 def get_history(anon_id):
     """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
-    return _call("GET", f"/history/{quote(anon_id)}")
+    return _call("GET", f"/history/{_seg(anon_id)}")
 
 
 def get_likes(anon_id):
     """메뉴 > 좋아요 한 거주지에서 부른다."""
-    return _call("GET", f"/likes/{quote(anon_id)}")
+    return _call("GET", f"/likes/{_seg(anon_id)}")
 
 
 # ── 관리자 ────────────────────────────────────────
 
 def get_member(customer_id):
-    return _call("GET", f"/admin/members/{quote(customer_id)}", none_on=(404,))
+    return _call("GET", f"/admin/members/{_seg(customer_id)}", none_on=(404,))
 
 
 def list_members():
@@ -318,17 +332,17 @@ def create_member(payload: dict):
 
 
 def update_member(customer_id, patch):
-    return _call("PATCH", f"/admin/members/{quote(customer_id)}", json=patch,
+    return _call("PATCH", f"/admin/members/{_seg(customer_id)}", json=patch,
                  none_on=(404,), patch_error_on=(422,))
 
 
 def delete_member(customer_id):
     """회원 탈퇴. 이미 없으면 False."""
-    return _call("DELETE", f"/admin/members/{quote(customer_id)}", none_on=(404,)) is not None
+    return _call("DELETE", f"/admin/members/{_seg(customer_id)}", none_on=(404,)) is not None
 
 
 def get_region(gu, dong):
-    return _call("GET", f"/admin/regions/{quote(gu)}/{quote(dong)}", none_on=(404,))
+    return _call("GET", f"/admin/regions/{_seg(gu)}/{_seg(dong)}", none_on=(404,))
 
 
 def list_regions():
@@ -336,18 +350,18 @@ def list_regions():
 
 
 def update_region(gu, dong, patch):
-    return _call("PATCH", f"/admin/regions/{quote(gu)}/{quote(dong)}", json=patch,
+    return _call("PATCH", f"/admin/regions/{_seg(gu)}/{_seg(dong)}", json=patch,
                  none_on=(404,), patch_error_on=(422,))
 
 
 def preview_member(customer_id):
     """이 회원의 희망조건으로 추천 TOP 5를 뽑아본다. 아무것도 안 고친다."""
-    return _call("GET", f"/admin/members/{quote(customer_id)}/preview", none_on=(404,))
+    return _call("GET", f"/admin/members/{_seg(customer_id)}/preview", none_on=(404,))
 
 
 def similar_members(customer_id, top_k=5):
     """이 회원과 페르소나가 비슷한 회원들."""
-    return _call("GET", f"/admin/members/{quote(customer_id)}/similar",
+    return _call("GET", f"/admin/members/{_seg(customer_id)}/similar",
                  params={"top_k": top_k}, none_on=(404,))
 
 
@@ -358,7 +372,7 @@ def refresh_candidates():
 
 def member_suggestions(customer_id):
     """오늘 이 회원에게 준 성향 제안들과 남은 횟수."""
-    return _call("GET", f"/admin/members/{quote(customer_id)}/suggestions")
+    return _call("GET", f"/admin/members/{_seg(customer_id)}/suggestions")
 
 
 def suggest_member(customer_id):
@@ -366,13 +380,13 @@ def suggest_member(customer_id):
 
     검색이 모자라거나(422) 하루 횟수를 넘으면(429) InvalidPatch — errors 에 이유 글이 들어 있다
     """
-    return _call("POST", f"/admin/members/{quote(customer_id)}/suggestions",
+    return _call("POST", f"/admin/members/{_seg(customer_id)}/suggestions",
                  none_on=(404,), patch_error_on=(422, 429))
 
 
 def privacy_preview(customer_id):
     """이 회원의 페르소나 9칸을 원본과 가린 것으로 나란히 준다."""
-    return _call("GET", f"/admin/members/{quote(customer_id)}/privacy-preview", none_on=(404,))
+    return _call("GET", f"/admin/members/{_seg(customer_id)}/privacy-preview", none_on=(404,))
 
 
 def health():
