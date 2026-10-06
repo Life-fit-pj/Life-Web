@@ -10,10 +10,11 @@ GET  /api/auth/me          로그인한 회원의 기본정보 (마이페이지)
 넘기는 다리다 — 비밀번호는 이 서버를 거치지 않는다.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
-from services.engine import auth_login, get_customer, signed_up, signup as engine_signup
+from services.engine import CUSTOMER_ID, auth_login, get_customer, signed_up, signup as engine_signup
 from services.persona_type import profile as survey_profile, answers_to_persona
 
 router = APIRouter(prefix="/api", tags=["로그인"])
@@ -81,8 +82,18 @@ def do_signup(body: SignupRequest, token: str = Depends(_bearer_token)):
 
 
 @router.get("/auth/me")
-def me(customerId: str):
-    """마이페이지에서 부른다. customers 표 한 줄(이름/이메일/가입일 등)을 그대로 돌려준다."""
+def me(customerId: str = Query(pattern=CUSTOMER_ID), token: str = Depends(_bearer_token)):
+    """마이페이지에서 부른다. customers 표 한 줄(이름/이메일/가입일 등)을 그대로 돌려준다.
+
+    본인 것만 준다 — 토큰으로 확인한 회원 번호와 같아야 한다. 전에는 토큰 없이 번호만 넣으면
+    누구의 전화 · 이메일이든 읽을 수 있었다(2026-10-05)
+    """
+    try:
+        mine = auth_login(token)
+    except httpx.HTTPStatusError:
+        raise HTTPException(401, "로그인이 필요하다")       # 만료 · 위조 토큰이면 엔진이 401 을 준다
+    if mine != customerId:
+        raise HTTPException(403, "본인 정보만 볼 수 있다")
     found = get_customer(customerId)
     if found is None:
         raise HTTPException(404, "그런 회원이 없다")

@@ -28,8 +28,11 @@ supabase.auth.onAuthStateChange((event, session) => {
     if (isFirst) {
         let cameFromOAuth = false;
         try { cameFromOAuth = sessionStorage.getItem(OAUTH_PENDING_KEY) === "1"; } catch { /* 무시 */ }
-        if (!cameFromOAuth) return;              // 새로고침 등으로 복원된 옛 세션 — 넘어간다
+        // 가입 확인 메일의 링크로 돌아온 경우 — 새 탭이라 sessionStorage 표시가 없다. 주소의 ?confirmed=1 로 가른다
+        const cameFromEmailLink = new URLSearchParams(location.search).has("confirmed");
+        if (!cameFromOAuth && !cameFromEmailLink) return;    // 새로고침 등으로 복원된 옛 세션 — 넘어간다
         try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 무시 */ }
+        if (cameFromEmailLink) history.replaceState(null, "", location.pathname);   // 표시를 주소에서 지운다 — 새로고침해도 다시 안 탄다
     }
 
     resolveBackendAccount(session.access_token);
@@ -270,7 +273,12 @@ function renderSignupAuthModal(el) {
             return;
         }
 
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // 확인 메일의 링크가 이 주소로 돌아오게 한다. ?confirmed=1 은 onAuthStateChange 가
+        // "메일 링크로 돌아온 진짜 로그인"을 새로고침과 가르는 표시다(Supabase 의 Redirect URLs 에 이 주소가 있어야 먹는다)
+        const { data, error } = await supabase.auth.signUp({
+            email, password,
+            options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}?confirmed=1` },
+        });
         if (error) {
             errorEl.textContent = "회원가입에 실패했어요: " + error.message;
             return;
@@ -278,7 +286,9 @@ function renderSignupAuthModal(el) {
         if (!data.session) {
             // 프로젝트에 이메일 확인이 켜져 있으면 세션이 바로 안 생긴다 — 메일의 링크를
             // 눌러 돌아오면 그때 onAuthStateChange(SIGNED_IN)가 이어서 처리한다.
-            alert("가입 확인 메일을 보냈어요. 메일의 링크를 눌러 인증을 마치면 계속할 수 있어요.");
+            // 다른 기기에서 링크를 눌렀거나 돌아올 주소가 등록돼 있지 않으면 여기로 못 돌아오므로, 그다음 할 일을 같이 적는다
+            alert("가입 확인 메일을 보냈어요. 메일의 링크를 눌러 인증을 마치면 정보 입력으로 이어져요.\n"
+                + "이 화면으로 돌아오지 않으면, 로그인 화면에서 같은 이메일·비밀번호로 로그인해 주세요 — 정보 입력으로 이어집니다.");
             return;
         }
         // 세션이 바로 생기면 onAuthStateChange(SIGNED_IN)가 signup.html 로 자동으로 넘긴다.
