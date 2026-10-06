@@ -17,7 +17,8 @@
    금색(#E0B400)으로 바뀌어버리므로, 테마와 무관하게 값을 고정해 둔다 */
 #loginToggle {
   padding: 10px 20px;
-  border: none;
+  min-width: 110px;                     /* "로그인" ↔ "👤 마이페이지" 폭이 같게 */
+  border: 1px solid transparent;        /* .is-member 는 색만 바꾼다 — 크기가 안 변한다 */
   border-radius: 999px;
   background: #FFCC00;
   color: #2D2A32;
@@ -25,19 +26,16 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: var(--shadow);
-  transition: background 0.15s, transform 0.15s;
+  transition: background 0.15s;
 }
 
-#loginToggle:hover {
-  background: #FFC72C;
-  transform: translateY(-1px);
-}
+#loginToggle:hover { background: #FFC72C; }
 
 /* 로그인 뒤 — 노란 "로그인" 대신 차분한 면. 누르면 마이페이지로 간다(menu.js 의 syncLoginToggle 이 붙인다) */
 #loginToggle.is-member {
   background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--line);
+  border-color: var(--line);
 }
 #loginToggle.is-member:hover { background: var(--accent-soft); }
 
