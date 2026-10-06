@@ -10,18 +10,32 @@
 
 import { escapeAndFormat } from "../lib/format.js";
 
+// 아이콘은 핀 상세(ui/reason.js 의 지표 아이콘)와 슬라이더 절 머리글(index.html)과 같은 것을 쓴다 — 한쪽을 바꾸면 같이 바꾼다
 const SOURCES = [
   {
-    title: "동네 점수에 쓴 데이터",
+    icon: "📊",
+    title: "동네 점수에 쓴 데이터 — 슬라이더 일곱",
     items: [
-      { what: "공원 면적 · CCTV · 경찰관서 · 버스정류장 · 지하철역 · 점포 수 · 대형점포와 전통시장 · 병원·의원·보건소 · 학교(2023년) · 학원 · 문화시설과 도서관",
-        org: "서울 열린데이터 광장 · 공공데이터포털(각 구청 · 경찰청 · 서울교통공사 · 서울특별시교육청)" },
-      { what: "소음 · 초미세먼지 (자치구 단위)", org: "한국환경공단 · 국가소음정보시스템 · 서울 열린데이터 광장" },
-      { what: "세대원수 · 인구 이동", org: "서울 열린데이터 광장" },
-      { what: "건물 수", org: "주소정보누리집 · 국토교통부 건축물대장" },
+      { icon: "🌳", what: "녹지 — 공원 면적", org: "각 구청(공공데이터포털)" },
+      { icon: "🛡️", what: "안전 — CCTV · 경찰관서", org: "서울 열린데이터 광장 · 경찰청(공공데이터포털)" },
+      { icon: "🚇", what: "교통 — 버스정류장 · 지하철역", org: "서울 열린데이터 광장 · 서울교통공사(공공데이터포털)" },
+      { icon: "🏪", what: "상권 — 점포 수 · 대형점포와 전통시장", org: "서울 열린데이터 광장" },
+      { icon: "🏥", what: "의료 — 병원 · 의원 · 보건소", org: "서울 열린데이터 광장" },
+      { icon: "📚", what: "교육 — 학교 · 학원", org: "서울특별시교육청(공공데이터포털) · 서울 열린데이터 광장" },
+      { icon: "🎨", what: "문화 — 문화시설 · 도서관", org: "서울 열린데이터 광장" },
     ],
   },
   {
+    icon: "📍",
+    title: "동네 상세에 쓴 데이터",
+    items: [
+      { icon: "🌫️", what: "소음 · 초미세먼지 (자치구 단위)", org: "한국환경공단 · 국가소음정보시스템 · 서울 열린데이터 광장" },
+      { icon: "👥", what: "세대원수 · 인구 이동", org: "서울 열린데이터 광장" },
+      { icon: "🏢", what: "건물 수", org: "주소정보누리집 · 국토교통부 건축물대장" },
+    ],
+  },
+  {
+    icon: "🏠",
     title: "시세 · 평면도",
     items: [
       { what: "매매 · 전세 · 월세 시세", org: "국토교통부 실거래가 공개시스템" },
@@ -29,6 +43,7 @@ const SOURCES = [
     ],
   },
   {
+    icon: "🗺️",
     title: "지도 · 행정동",
     items: [
       { what: "지도와 좌표", org: "카카오맵 API" },
@@ -36,18 +51,18 @@ const SOURCES = [
     ],
   },
   {
+    icon: "👤",
     title: "가상 회원(페르소나)",
     items: [
       { what: "서울 거주자 1,000명의 생활 묘사", org: "NVIDIA Nemotron-Personas-Korea" },
     ],
   },
   {
+    icon: "📋",
     title: "지표와 가중치의 설계 근거",
     items: [
       { what: "일곱 지표(녹지 · 안전 · 교통 · 상권 · 의료 · 교육 · 문화)와 슬라이더 가중치의 기준 — 2024년 서울시 주거실태조사 마이크로데이터 (15,730명)",
         org: "국토교통부 · 서울특별시" },
-      { what: "SeoulHouse2Vec — 임베딩 기반 주택 추천 (Sustainability, 2020)", org: "한종준 외" },
-      { what: "A Personalized Recommendation System for Housing Information Based on Deep Learning (2025)", org: "Su Yu" },
     ],
   },
 ];
@@ -55,7 +70,6 @@ const SOURCES = [
 // 데이터가 못 보는 것. 채팅 안내문과 같은 내용이어야 한다
 const LIMITS = [
   "산림(북한산 등)은 공원 데이터에 없습니다.",
-  "학교 수는 2023년 기준입니다.",
   "소음과 초미세먼지는 자치구 평균이며, 소음은 측정값이 없는 동이 있습니다.",
   "거래가 적은 동의 시세는 법정동 · 자치구 값으로 대신합니다.",
 ];
@@ -64,10 +78,15 @@ const FOOTNOTE = "각 자료는 제공 기관의 공개 시점 기준이며 현�
 
 let sourcesModalEl = null;
 
+// 아이콘은 우리가 적은 글자(이모지)라 escape 하지 않는다. 없으면 빈 칸
+function renderIcon(icon) {
+  return icon ? `<span class="sources-icon" aria-hidden="true">${icon}</span>` : "";
+}
+
 function renderItem(item) {
   return `
     <div class="sources-row">
-      <span class="sources-what">${escapeAndFormat(item.what)}</span>
+      <span class="sources-what">${renderIcon(item.icon)}${escapeAndFormat(item.what)}</span>
       <span class="sources-org">${escapeAndFormat(item.org)}</span>
     </div>
   `;
@@ -76,14 +95,14 @@ function renderItem(item) {
 function renderBody() {
   const groups = SOURCES.map((group) => `
     <section class="sources-group">
-      <h4 class="sources-group-title">${escapeAndFormat(group.title)}</h4>
+      <h4 class="sources-group-title">${renderIcon(group.icon)}${escapeAndFormat(group.title)}</h4>
       ${group.items.map(renderItem).join("")}
     </section>
   `).join("");
 
   const limits = `
     <section class="sources-group">
-      <h4 class="sources-group-title">이 서비스가 모르는 것</h4>
+      <h4 class="sources-group-title">${renderIcon("⚠️")}이 서비스가 모르는 것</h4>
       <ul class="sources-limits">
         ${LIMITS.map((line) => `<li>${escapeAndFormat(line)}</li>`).join("")}
       </ul>
