@@ -253,6 +253,28 @@ h1 em {
   -webkit-overflow-scrolling: touch;
 }
 
+/* 패널 첫 줄 — 왼쪽 머리글, 오른쪽 귀퉁이에 작은 글자 링크("데이터 출처") */
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.panel-head h2 { margin: 0; }
+
+.link-text {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.link-text:hover { color: var(--text); text-decoration: underline; }
+
 .ctrl-panel h2 {
   font-size: 11px;
   text-transform: uppercase;

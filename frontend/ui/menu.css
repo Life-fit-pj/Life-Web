@@ -1,11 +1,8 @@
 /*
-메뉴 + 준비중 안내창
+헤더 버튼(로그인 · 마이페이지) + 로그인 모달
 */
 
-/* 메뉴창 */
-
-/* 로그인 버튼 + 메뉴 버튼을 같이 묶는 상자.
-   두 버튼이 우측 상단에 나란히 붙어야 해서 fixed 위치는 여기 하나만 잡는다 */
+/* 우상단 버튼 상자. 지금은 버튼 하나지만 자리를 잡는 틀은 그대로 둔다 */
 #topActions {
   position: fixed;
   top: 20px;
@@ -15,20 +12,6 @@
   align-items: center;
   gap: 10px;
 }
-
-#menuToggle {
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-}
-
-#menuToggle:hover { background: var(--accent-soft); }
 
 /* 로그인 버튼. 낮/밤 테마 변수(--accent-fill)를 쓰면 밤에는 톤 다운된
    금색(#E0B400)으로 바뀌어버리므로, 테마와 무관하게 값을 고정해 둔다 */
@@ -50,44 +33,13 @@
   transform: translateY(-1px);
 }
 
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  background: transparent;
-  z-index: 9000;
-  display: none;
-}
-.menu-backdrop.is-open { display: block; }
-
-.menu-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  height: 100%;
-  width: 260px;
+/* 로그인 뒤 — 노란 "로그인" 대신 차분한 면. 누르면 마이페이지로 간다(menu.js 의 syncLoginToggle 이 붙인다) */
+#loginToggle.is-member {
   background: var(--surface-2);
-  padding: 24px 16px;
-  box-shadow: var(--shadow);
-}
-
-.menu-item {
-  display: block;
-  padding: 12px 8px;
   color: var(--text);
-  text-decoration: none;
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
 }
-
-.menu-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-}
-
+#loginToggle.is-member:hover { background: var(--accent-soft); }
 
 
 /* ===== 로그인/회원가입 준비중 모달 =====
@@ -96,7 +48,7 @@
 .auth-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 9500;               /* 메뉴(.menu-backdrop, 9000)보다 위에 뜨도록 */
+  z-index: 9500;               /* 지도 · 패널(6) · 헤더 버튼(8000) · 채팅(8500)보다 위에 뜨도록 */
   background: rgba(30, 26, 22, 0.45);
   display: none;
   align-items: center;
