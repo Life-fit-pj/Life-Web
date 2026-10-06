@@ -9,6 +9,7 @@ Supabase 토큰을 엔진(/auth/login)에 물어 확인한다 — anonId 는 브
 """
 
 import datetime
+import re
 import threading
 
 from fastapi import HTTPException, Request
@@ -17,6 +18,8 @@ from services.engine import auth_login
 
 MEMBER_DAILY_LIMIT = 20
 GUEST_DAILY_LIMIT = 5
+
+MEMBER_ID = re.compile(r"C\d+")      # 회원 번호의 모양. 엔진 app/tools/tools.py 의 MEMBER_ID 와 같은 규칙이다
 
 _lock = threading.Lock()
 _counts: dict[tuple, int] = {}      # (날짜, 주체) -> 오늘 쓴 횟수
@@ -30,18 +33,53 @@ def _client_ip(request: Request) -> str:
 
 
 def _who(request: Request) -> tuple[str, int]:
-    """(주체, 하루 한도). 유효한 로그인 토큰이면 회원, 아니면 IP."""
+    """(주체, 하루 한도). 유효한 로그인 토큰이면 회원, 아니면 IP.
+
+    한 요청 안에서 consume · member_id · own 이 차례로 부르므로(/api/chat 은 셋 다) 답을 request.state 에 적어 두고
+    다시 쓴다 — 토큰이 틀린 브라우저는 실패를 안 기억하기 때문에, 안 적어 두면 엔진 왕복이 요청당 세 번이 된다
+    """
+    cached = getattr(request.state, "quota_who", None)
+    if cached is not None:
+        return cached
+    request.state.quota_who = _resolve_who(request)
+    return request.state.quota_who
+
+
+def _resolve_who(request: Request) -> tuple[str, int]:
+    """_who 의 몸. 토큰을 엔진에 물어 확인한다 — 요청당 한 번만 불린다"""
     token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
     if token:
-        if token not in _members:
+        member = _members.get(token)
+        if member is None:
             try:
-                _members[token] = auth_login(token)
+                member = auth_login(token)
             except Exception:
-                # 만료·위조 토큰이면 엔진이 401 을 준다 — 손님으로 센다
-                _members[token] = None
-        if _members[token]:
-            return f"member:{_members[token]}", MEMBER_DAILY_LIMIT
+                member = None       # 만료·위조 토큰이면 엔진이 401 을 준다 — 이번 요청만 손님으로 센다
+            # 확인된 회원만 기억한다. 실패(엔진이 잠깐 멈춤 · 아직 가입 전)까지 기억하면 그 토큰은 웹을 다시 띄울 때까지
+            # 손님으로 굳는다 — 로그인해 있는데 한도가 5번이 되고, 자기 기록 · 좋아요도 못 본다
+            if member:
+                _members[token] = member
+        if member:
+            return f"member:{member}", MEMBER_DAILY_LIMIT
     return f"ip:{_client_ip(request)}", GUEST_DAILY_LIMIT
+
+
+def member_id(request: Request) -> str | None:
+    """토큰으로 확인한 회원 번호. 손님이면 None.
+
+    회원에게만 주는 것(채팅의 회원 전용 도구)은 이 값으로 가른다 — 브라우저가 보낸 anonId 는 누구나 바꿔 보낼 수 있다
+    """
+    who, _ = _who(request)
+    return who.removeprefix("member:") if who.startswith("member:") else None
+
+
+def own(request: Request, anon_id: str | None) -> bool:
+    """이 요청이 그 번호의 주인인가.
+
+    기기 번호(UUID)는 추측할 수 없으므로 늘 참이다. 회원 번호(C107)는 누구나 지어 보낼 수 있으므로,
+    토큰으로 확인한 회원 번호와 같을 때만 참이다 — 기록 · 좋아요를 그 번호로 읽고 쓰기 전에 본다
+    """
+    return not MEMBER_ID.fullmatch(anon_id or "") or member_id(request) == anon_id
 
 
 def status(request: Request) -> dict:

@@ -1,484 +1,263 @@
+<div align="center">
+
 # LIFE,FIT — 웹
 
-서울 427개 행정동 중 라이프스타일에 맞는 동네를 추천하는 서비스의 화면·서버입니다..
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.141-009688?style=flat-square&logo=fastapi&logoColor=white)
+![JavaScript](https://img.shields.io/badge/Vanilla_JS-ES_Modules-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![Kakao Map](https://img.shields.io/badge/Kakao_Map-FFCD00?style=flat-square&logo=kakao&logoColor=black)
+![Supabase](https://img.shields.io/badge/Supabase_Auth-3FCF8E?style=flat-square&logo=supabase&logoColor=white)
 
-추천 계산과 LLM 호출은 형제 저장소 `Life-Embed-jh`가 담당합니다. 이 저장소는 요청을 받아
-`httpx`로 `Life-Embed-jh`가 띄운 자체 FastAPI 서버(`EMBED_API_BASE`, 기본
-`http://127.0.0.1:8000`)를 호출하고, 결과를 지도와 카드로 보여주는 역할만 합니다
-(2026-09-08 전까지는 `sys.path`로 코드를 직접 import했습니다 — 지금은 프로세스가 분리돼
-있어 두 서버를 각각 띄워야 합니다).
+서울 427개 행정동 중 라이프스타일에 맞는 동네를 추천하는 서비스의 화면·서버입니다.
 
-서버는 FastAPI + uvicorn으로 돌아갑니다 (예전에는 Flask였습니다).
+[시작하기](#시작하기) · [사용법](#사용법) · [API](#api) · [구조](#구조) · [다른 엔진 붙이기](#다른-엔진-붙이기) · [자주 나는 문제](#자주-나는-문제)
 
----
-
-## 폴더 배치
-
-로컬 개발은 두 저장소를 **나란히** 두는 걸 전제로 합니다. 추천 계산 자체는 HTTP 호출이라
-import 관계는 아니지만, `services/typespot.py`가 `../Life-Embed-jh/data/`를 직접 읽고
-두 uvicorn을 각각 띄워야 하기 때문입니다.
-
-```
-Life-fit-main/
-├── Life-Embed-jh/      추천 엔진 (DB, LLM, 파이프라인, 자체 FastAPI 서버 :8000)
-└── Life-Web/           이 저장소 (화면, FastAPI 서버 :5000)
-```
+</div>
 
 ---
 
-## 다른 엔진 붙이기
+추천 계산과 LLM 호출은 형제 저장소 [Life-Embed-jh](https://github.com/Life-fit-pj/Life-Embed-jh)가
+담당합니다. 이 저장소는 요청을 받아 `httpx`로 엔진 서버(`EMBED_API_BASE`, 기본
+`http://127.0.0.1:8000`)를 호출하고, 결과를 지도와 카드로 보여주는 역할만 합니다 —
+**두 서버를 각각 띄워야 합니다.**
 
-이 웹은 엔진이 무엇으로 만들어졌는지 모릅니다. `services/engine.py`가
-`EMBED_API_BASE` 환경변수가 가리키는 서버를 `httpx`로 호출할 뿐이라, 같은 API 계약을
-구현한 서버를 아무거나 그 자리에 붙일 수 있습니다. LangChain을 쓰든 OpenAI를 쓰든,
-서버 안에서 무엇을 하든 상관없습니다.
-
-### 1. 서버를 하나 띄우고 `EMBED_API_BASE`를 그쪽으로 돌립니다
-
-`Life-Embed-jh`가 참고 구현입니다(`app/api/`, `py -m uvicorn app.main:app --port 8000`).
-내 엔진 서버를 다른 포트(예: 8001)에 띄우고 `EMBED_API_BASE=http://127.0.0.1:8001`로
-바꾸면 이 웹은 그쪽을 부릅니다. 폴더를 나란히 둘 필요도, import할 필요도 없습니다.
-
-### 2. 최소 계약 — 엔드포인트 둘
-
-| 메서드 | 경로 | 요청 |
-|---|---|---|
-| POST | `/search` | `{"query": str, "top_k": int, "housing_override": {...} \| null}` |
-| POST | `/recommend` | `{"weights": {...}, "top_k": int, "housing": {...} \| null}` |
-
-`housing`(`housing_override`)의 모양은 아래와 같습니다. 가격 조건이 없으면 `None`입니다.
-
-```python
-{"건물유형": "아파트", "거래유형": "월세",
- "targets": {"예산": 70, "보증금": 3000}}   # 단위는 만원
+```
+브라우저 ──▶ Life-Web (:5000) ──httpx──▶ Life-Embed-jh (:8000) ──▶ Supabase Postgres
+            화면 · 라우팅                 추천 · LLM · DB
 ```
 
-**예산 감점은 엔진의 몫입니다.** 웹은 조건을 넘겨줄 뿐 점수를 다시 깎지
-않습니다. 양쪽에서 처리하면 예산이 두 번 반영되어 조용히 틀어집니다.
+## 시작하기
 
-### 3. 응답 모양
+### 1. 엔진 준비
 
-#### `/search` 응답
+`Life-Embed-jh`를 먼저 설치하고 `.env`를 채웁니다 — [Life-Embed-jh README](https://github.com/Life-fit-pj/Life-Embed-jh#설치) 참고.
 
-```python
-{
-    "weights": {
-        "녹지": 3.2, "안전": 3.3, "교통": 2.6, "상권": 3.2,
-        "의료": 3.0, "교육": 4.6, "문화": 2.6
-    },
-    "regions": [
-        {
-            "name": "노원구 중계1동",        # "구 행정동명" — 공백 하나로 구분
-            "total": 78.7,                   # 종합 점수
-            "scores": {                      # 7개 지표 백분위 (0~100)
-                "녹지": 88, "안전": 84, "교통": 48, "상권": 68,
-                "의료": 70, "교육": 98, "문화": 25
-            }
-        },
-        # ... top_k 개
-    ],
-    "explanation": "중계1동은 교육 98점으로 ...",  # 없으면 빈 문자열
-    "housing": None            # 검색어에서 읽어낸 가격 조건. 없으면 None
-}
-```
-
-`regions` 의 각 항목에 `price` 를 함께 담아 주면 결과 화면의 시세 탭이 채워집니다.
-없으면 `None` 이고, 프론트가 알아서 탭을 숨깁니다.
-
-#### `/recommend` 응답
-
-`/search`의 `regions` 부분과 같은 목록입니다.
-
-```python
-[
-    {"name": "노원구 중계1동", "total": 78.7, "scores": {...}},
-    # ...
-]
-```
-
-### 4. 지켜야 할 규칙
-
-| 항목 | 규칙 |
-|---|---|
-| 지표 이름 | 한국어 7개 고정 — `녹지 안전 교통 상권 의료 교육 문화` |
-| `name` | `"구 행정동명"` 형태. `서울특별시`를 붙이지 않습니다 |
-| `scores` | 0~100 숫자. 백분위가 아니어도 되지만 클수록 좋은 값이어야 합니다 |
-| `weights` | 1~5 범위 숫자. 소수점 가능 |
-| `explanation` | 없으면 빈 문자열 `""`. `None`은 안 됩니다 |
-
-**`name`의 공백이 중요합니다.** 웹이 `split(" ", 1)`로 구와 동을 나눠
-지도 좌표를 찾기 때문입니다. `"노원구 중계1동"`은 되지만
-`"노원구중계1동"`이나 `"서울특별시 노원구 중계1동"`은 좌표를 못 찾습니다.
-
-### 5. 추천 말고 다른 기능도 옮기려면
-
-`services/engine.py`가 아는 건 `EMBED_API_BASE` 하나뿐입니다. 추천(`/search`·`/recommend`)만
-갈아 끼울 거면 위 계약만 지키면 되지만, 좋아요·검색기록·로그인·회원가입·관리자 화면까지
-옮기려면 `Life-Embed-jh/app/api/`의 나머지 라우터(`auth.py`·`customers.py`·`admin.py`·
-`history.py`·`regions.py`·`chat.py`·`survey.py`)가 쓰는 경로도 같이 구현해야 합니다 —
-전체 목록은 `services/engine.py`의 `_call()` 호출부를 보세요.
-
-### 6. 붙이기 전에 확인하기
-
-새 서버를 웹에 붙이기 전에 단독으로 두드려 보세요. 모양이 틀리면 화면에서
-원인을 찾기 어렵습니다.
+### 2. 패키지
 
 ```bash
-curl -X POST http://127.0.0.1:8001/search -d '{"query":"애들 학원 보내기 좋은 곳"}'
-```
-
-`weights`가 한국어 7개 키를 갖고, `regions`가 `top_k`개고, `name`에 공백이 있고,
-`explanation`이 문자열이면 통과입니다. 그 다음 이 저장소의 `EMBED_API_BASE`를
-새 서버 주소로 바꾸면 됩니다.
-
-### 자주 나는 문제
-
-**지도에 마커가 안 찍힘**
-→ `name`이 `"구 행정동명"` 형태인지 확인하세요. 공백이 하나여야 합니다.
-
-**추천 사유 카드의 점이 다 비어 있음**
-→ `scores`의 키가 한국어 7개와 정확히 일치하는지 확인하세요.
-
-**슬라이더가 안 움직임**
-→ `weights`의 키가 한국어인지, 값이 숫자인지 확인하세요.
-문자열 `"4.6"`이 아니라 숫자 `4.6`이어야 합니다.
-
----
-
-## 설치
-
-### 1. 패키지
-
-```bash
-py -m pip install fastapi uvicorn pydantic pandas numpy
-```
-
-엔진 쪽 패키지도 필요합니다. `Life-Embed-jh`의 README를 참고하세요.
-
-### 2. 엔진 준비
-
-`Life-Embed-jh`에 아래 두 가지가 있어야 합니다.
-
-| 파일 | 설명 |
-|---|---|
-| `.env` | `ANTHROPIC_API_KEY=sk-ant-...` — 팀에서 따로 전달 |
-| `data/life.db` | 약 42MB. Git LFS 로 관리 — 체크아웃 직후 133바이트면 `git lfs pull` 먼저 |
-
-직접 만들려면 `Life-Embed-jh`에서:
-
-```bash
-py -m pipeline.schema          # 표 생성 + 데이터 적재
-py -m pipeline.embed_kb        # 지식베이스 임베딩 (약 5분)
-py -m pipeline.embed_member    # 회원 임베딩 (약 30초)
+py -m pip install -r requirements.txt
 ```
 
 ### 3. 카카오 지도
 
-`frontend/index.html`에 앱키가 들어 있습니다.
-[카카오 개발자 콘솔](https://developers.kakao.com)에서 플랫폼 → Web에
-`http://127.0.0.1:5000`을 등록해야 지도가 보입니다.
+`frontend/index.html`에 앱키가 들어 있습니다. [카카오 개발자 콘솔](https://developers.kakao.com)에서
+플랫폼 → Web에 `http://127.0.0.1:5000`을 등록해야 지도가 보입니다.
 
----
-
-## 실행
+### 4. 실행
 
 ```bash
 # 1) Life-Embed-jh 저장소에서 엔진 서버를 먼저 띄웁니다
-cd ../Life-Embed-jh
 py -m uvicorn app.main:app --reload --port 8000
 
 # 2) 이 저장소에서 웹 서버를 띄웁니다
-cd ../Life-Web
 py -m uvicorn main:app --reload --port 5000
 ```
 
-터미널에 아래가 뜨면 정상입니다.
-
-```
-✅ 동_좌표.csv 로드 완료! (총 427개 동)
-✅ LLM 파이프라인 연결 성공!
-✅ LH 평면도 데이터 로드 완료! (총 281개 행)
-INFO:     Uvicorn running on http://127.0.0.1:5000
-INFO:     Application startup complete.
-```
-
-브라우저에서 `http://127.0.0.1:5000`을 엽니다.
-
----
+브라우저에서 `http://127.0.0.1:5000`을 엽니다. 관리자 페이지는 `/admin.html`이고, 이 저장소의
+`.env`에 `ADMIN_TOKEN`(수정까지 하려면 `ADMIN_WRITE_ENABLED=1`)이 필요합니다.
 
 ## 사용법
 
-### 검색으로 시작하기 — 1차 유형 → 2차 추천
+### 검색 — 1차 유형 → 2차 추천
 
-첫 화면은 두 단계로 나뉩니다.
+| 단계 | 하는 일 | API | LLM |
+|---|---|---|---|
+| **1차** | 떠다니는 키워드를 누르거나 문장을 적으면 라이프스타일 유형과 어울리는 동네 2곳 | `/api/lifetype` | ✗ 즉시 |
+| **2차** | **내게 맞는 동네 5곳 보기** → 7개 지표 가중치를 슬라이더에 반영하고 지도를 채움 | `/api/predict` | ✓ 3~6초 |
 
-**1차** — 배경에 떠다니는 단어를 누르면 검색창 안에 태그로 쌓입니다.
-직접 문장을 적어도 되고, 태그와 섞어도 됩니다.
+1차가 LLM을 안 쓰는 이유는 키워드를 바꿔 가며 여러 번 눌러 보게 하기 위해서입니다. 2차로 넘어갈 때
+1차 가중치와 동네 목록이 함께 가서, 1차에 있던 동네에는 표시가 붙고 빠진 동네는 `droppedFromFirst`로
+알려 줍니다.
 
-```
-애들 학원 보내기 좋은 곳
-조용하고 공원 많은 동네
-병원이 가까운 곳
-```
+### 다른 시작 방법
 
-**찾기**를 누르면 `/api/lifetype` 이 라이프스타일 유형과 어울리는 동네 2곳을
-보여 줍니다. **LLM을 쓰지 않아 즉시 나옵니다** — 키워드를 바꿔 가며 여러 번
-눌러 볼 수 있습니다. 3개 미만을 고르면 축이 대부분 비어 유형이 흔들리므로
-"3개 이상 고르면 더 정확해요" 안내가 뜹니다.
+- **회원가입 설문** — 로그인 → 회원가입 → 15문항 설문. 제출하면 계정과 persona가 저장되고 곧바로 2차 추천을 돌립니다.
+- **슬라이더 직접 조절** — "직접 설정할게요" → 슬라이더·건물유형·거래유형·예산을 정하고 **AI 분석 실행**. 예산 감점은 웹이 아니라 **엔진**이 합니다.
 
-**2차** — 카드에서 **내게 맞는 동네 5곳 보기**를 누르면 `/api/predict` 로 갑니다.
-LLM이 7개 지표(녹지·안전·교통·상권·의료·교육·문화) 가중치를 만들어 슬라이더에
-반영하고 지도를 채웁니다. 1차에서 만든 가중치와 동네 목록이 함께 넘어가서,
-1차에 있던 동네에는 표시가 붙고 빠진 동네는 `droppedFromFirst` 로 알려 줍니다.
-
-### 회원가입 설문으로 시작하기
-
-우측 상단 **로그인 → 회원가입 → 설문 시작하기**를 누르면 `signup.html` 의
-15문항 설문으로 갑니다. 제출하면 답을 persona 칸(추천 엔진의 `CHUNK_COLUMNS`)
-형태로 묶어 첫 화면으로 돌아온 뒤 곧바로 2차 추천을 돌립니다.
-
-아직 서버에 저장하지는 않습니다 — 아래 "아직 안 된 것" 참고.
-
-### 슬라이더로 직접 조절하기
-
-"직접 설정할게요"를 누르면 검색을 건너뜁니다.
-슬라이더를 조절하고 **AI 분석 실행**을 누르면 됩니다.
-
-좌측 패널의 건축 정보(건물 유형, 거래 유형 — 매매/전세/월세, 매매가·보증금·
-월세, 건축 면적)도 함께 반영됩니다. 예산을 넘는 지역은 만족도 순위가 그만큼
-낮아집니다 — 계산은 웹이 아니라 **엔진**이 합니다(`search(housing_override=…)`).
-
-슬라이더를 직접 만졌다면 1차 가중치보다 슬라이더가 우선합니다.
-
-### 결과 보기
+### 결과 화면
 
 | 동작 | 결과 |
 |---|---|
 | 오른쪽 목록 클릭 | 지도가 그 위치로 이동 |
-| **지도 핀 클릭** | 추천 사유 카드가 열림 |
+| **지도 핀 클릭** | 추천 사유 카드 — 기대 수준 대비 "넉넉해요 / 딱 맞아요 / 조금 아쉬워요" + 동네별 LLM 설명 |
 | 카드 안 "로드뷰" 탭 | 그 위치의 카카오 로드뷰 |
-| 오른쪽 위 🔍 | 검색 화면으로 돌아감 |
-| 오른쪽 위 ☰ | 메뉴(로그인 등, 개발용 임시 구현) |
-| 화면 아래 💬 | 결과에 대해 추가로 물어보는 채팅 패널 |
+| 화면 아래 💬 | 결과에 대해 추가로 물어보는 채팅 |
+| 오른쪽 위 ☰ | 메뉴 — 로그인 · 마이페이지 · 좋아요 · 검색 기록 |
 
-추천 사유 카드는 사용자가 설정한 기대 수준과 그 동네의 실제 수준을 비교해
-"넉넉해요 / 딱 맞아요 / 조금 아쉬워요"로 보여주고, 그 동네가 왜 맞는지에 대한
-개별 LLM 설명도 함께 채워집니다.
+<details>
+<summary><b>관리자 페이지</b></summary>
 
-### 관리자 페이지
+<br/>
 
-`http://127.0.0.1:5000/admin.html` 입니다. 첫 화면에서 관리자 토큰
-(`.env` 의 `ADMIN_TOKEN`)을 입력하면 들어갑니다. 토큰은 브라우저에 저장되어
-다음부터는 묻지 않고, 서버가 401을 주면 다시 입력 화면으로 돌아옵니다.
-
-왼쪽 내비게이션으로 네 화면을 오갑니다.
+첫 화면에서 관리자 토큰을 입력하면 들어갑니다(브라우저에 저장, 401이면 다시 입력 화면).
 
 | 화면 | 무엇을 보나 |
 |---|---|
-| **대시보드** | 회원·행정동·페르소나 청크 수, 월별 가입 추이, 희망 조건 7지표 평균, 연령대·성별·희망 거래형태, 회원이 사는 자치구, 최근 수정 이력 |
-| **회원** | 왼쪽 목록(이름·아이디 검색) / 오른쪽 상세 — 기본정보 · 희망조건 슬라이더 7개 · 페르소나 9칸 |
-| **행정동** | 자치구 필터 + 동 이름 검색 / 지표 12개와 427개 동 중 백분위 막대 |
-| **시스템** | DB·캐시·쓰기 스위치 상태, 캐시 비우기, 페르소나 칸별 평균 길이, 수정 이력 전체 |
+| **대시보드** | 회원·행정동·청크 수, 월별 가입 추이, 7지표 평균, 연령·성별·거래형태, 최근 수정 |
+| **회원** | 목록 / 상세 — 기본정보 · 희망조건 7개 · 페르소나 9칸 · 추천 돌려보기 · 비슷한 회원 · 개인정보 점검 |
+| **행정동** | 자치구 필터 + 검색 / 지표 12개와 427개 동 중 백분위 |
+| **시스템** | DB·캐시·쓰기 스위치 상태, 캐시 비우기, 수정 이력 |
 
-대시보드는 `GET /api/admin/summary` **한 번**으로 위 숫자를 전부 받습니다.
-화면이 표를 여덟 번 세는 대신 엔진의 `dashboard()` 가 한 번에 세서 넘깁니다.
+- **저장은 처음 값과 달라진 칸만 보냅니다.** 전부 보내면 페르소나를 안 고쳐도 벡터를 다시 만들고, 이력에 "26칸 고침"만 남습니다.
+- 가중치를 고치면 저장 전후 TOP 5를 나란히 보여 줍니다(`▲2` `▼1` `NEW`).
+- 값이 규칙에 어긋나면(나이 0~120, 가중치 1~5, 밀도 음수 불가) 422로 막히고 어긋난 칸 아래에 이유가 붙습니다.
+- 테마는 시스템 설정을 따르고 3단 스위치(시스템/라이트/다크)로 덮어씁니다.
+- 차트는 바깥 라이브러리 없이 `bars`/`cols`/`donut`/`area` 네 함수가 HTML·SVG로 그립니다.
 
-회원 상세에는 버튼 세 개가 더 있습니다 — **추천 돌려보기**(이 회원 조건으로
-TOP 5를 뽑아 봅니다), **비슷한 회원**(페르소나 벡터로 이웃을 찾습니다),
-**개인정보 점검**(원본과 가린 글을 나란히 놓아 안 가려진 칸을 확인합니다).
-셋 다 조회일 뿐 아무것도 고치지 않습니다.
+</details>
 
-**저장은 처음 값과 달라진 칸만 보냅니다.** 폼 전체를 보내면 페르소나를 안
-고쳤어도 벡터를 다시 만들고, 수정 이력에 "26칸 고침"만 남아 무엇을 바꿨는지
-알 수 없게 됩니다. 페르소나를 실제로 고쳤을 때만 `resync_member()` 가 돌고,
-저장이 끝나면 서버가 캐시를 비웁니다 — **DB · 벡터 · 캐시 세 곳이 한 번에
-맞춰집니다.** 하나라도 빠지면 "화면엔 새 값인데 추천은 옛날 것"이 됩니다.
-
-가중치(7지표)를 고쳤을 때는 저장 전후의 TOP 5를 나란히 보여 줍니다
-(`▲2` `▼1` `NEW`). 내 수정이 순위를 어떻게 바꿨는지 바로 보라는 뜻입니다.
-가중치를 안 건드렸으면 순위가 바뀔 리 없으므로 계산하지 않습니다.
-
-값이 규칙에 어긋나면(나이 0~120, 가중치 1~5, 밀도 음수 불가) 저장이 422로
-막히고 **어긋난 칸 아래에 이유가 붙습니다.** 이때 DB에는 아무것도 안 씁니다 —
-검사가 저장보다 먼저 돌기 때문입니다.
-
-**테마**는 크롬·윈도우의 라이트/다크 설정을 그대로 따릅니다. 오른쪽 위
-3단 스위치(시스템 / 라이트 / 다크)로 덮어쓸 수 있고, 고른 값은 브라우저에
-저장됩니다.
-
-차트는 바깥 라이브러리를 쓰지 않습니다 — `admin.html` 안의 네 함수
-(`bars` / `cols` / `donut` / `area`)가 HTML·SVG로 직접 그립니다.
-빌드 단계가 없다는 이 저장소의 원칙은 관리자 페이지에도 그대로입니다.
-
----
-
-## API 한눈에 보기
+## API
 
 | 메서드 | 경로 | 하는 일 | LLM |
 |---|---|---|---|
 | POST | `/api/lifetype` | 1차 유형 판정 + 어울리는 동네 2곳 | ✗ |
-| GET | `/api/lifetype/keywords` | 첫 화면에 뿌릴 키워드 목록 | ✗ |
+| GET | `/api/lifetype/keywords` | 첫 화면 키워드 목록 | ✗ |
 | POST | `/api/predict` | 2차 추천 TOP 5 | ✓ |
 | POST | `/api/region` | 행정동 하나의 시설 정보 (핀 클릭) | ✗ |
 | POST | `/api/region/explain` | 행정동 하나의 설명 | ✓ |
 | POST | `/api/chat` | 결과에 대한 후속 질문 | ✓ |
 | GET | `/api/regions/gudong` | 구 → 동 목록 (25개 구 / 427개 동) | ✗ |
-| POST | `/api/survey` | 서술형 설문 15문항 → 규칙 기반 추천 (아직 프론트 미연결) | ✗ |
-| POST | `/api/auth/login` | Supabase 로그인 → customer_id 연결 | ✗ |
-| GET | `/api/auth/signed-up` | 이 Supabase 계정이 이미 가입돼 있나 | ✗ |
-| POST | `/api/signup` | Supabase 인증 + 기본정보/설문 → 신규 계정 생성 | ✗ |
-| GET | `/api/auth/me` | 로그인한 회원 기본정보 | ✗ |
-| GET·POST·DELETE | `/api/likes` | 좋아요 조회/추가/삭제 | ✗ |
-| GET | `/api/admin/summary` | 대시보드 집계 한 덩어리 (카운트 + 차트 + 최근 수정) | ✗ |
-| GET | `/api/admin/ready` | DB·캐시·쓰기 스위치 상태 | ✗ |
-| GET | `/api/admin/logs` | 관리자 수정 이력 (`admin_log` 표) | ✗ |
-| GET·PATCH | `/api/admin/members/*`, `/regions/*` | 회원·행정동 조회/수정 | ✗ |
-| POST | `/api/admin/cache/clear` | 추천·설명 캐시 비우기 | ✗ |
+| POST | `/api/survey` | 설문 15문항 → 규칙 기반 추천 (아직 프론트 미연결) | ✗ |
+| POST | `/api/auth/login` · `/api/signup` | Supabase 로그인 · 가입 | ✗ |
+| GET | `/api/auth/me` · `/api/auth/signed-up` | 내 정보 · 가입 여부 | ✗ |
+| GET·POST·DELETE | `/api/likes` | 좋아요 · 검색 기록 · 채팅 기록 | ✗ |
+| GET·PATCH·POST | `/api/admin/*` | 대시보드 · 회원/행정동 조회·수정 · 상태 · 이력 · 캐시 | ✗ |
 
-`/api/region` 과 `/api/region/explain` 을 나눈 이유는 시설 정보는 즉시 나오지만
-설명은 3~5초 걸리기 때문입니다. 한 요청으로 묶으면 빠른 쪽까지 기다리게 됩니다.
+- `/api/region`과 `/api/region/explain`을 나눈 이유 — 시설 정보는 즉시, 설명은 3~5초라 묶으면 빠른 쪽까지 기다립니다.
+- LLM을 부르는 요청은 하루 한도가 있습니다(`services/quota.py`, 회원은 `customer_id`, 비회원은 IP 기준).
+- `/api/admin/*`은 `Authorization: Bearer <ADMIN_TOKEN>`이 필요하고, 수정·캐시 비우기는 `ADMIN_WRITE_ENABLED=1`까지 있어야 통과합니다(잠겨 있으면 405). `/api/admin/health`만 예외로 토큰이 필요 없습니다.
 
-`/api/admin/*` 은 `Authorization: Bearer <ADMIN_TOKEN>` 헤더가 필요하고,
-수정(PATCH)과 캐시 비우기는 `.env` 의 `ADMIN_WRITE_ENABLED=1` 까지 있어야
-통과합니다. 잠겨 있으면 405가 나가고, 관리자 화면은 저장 버튼을 흐리게 두고
-상단에 "쓰기 잠김"을 띄웁니다 — 눌러 놓고 왜 안 되는지 찾게 하지 않으려는 것입니다.
-(예외로 `/api/admin/health` 는 토큰도 필요 없습니다. 프로세스가 살아 있는지만 봅니다.)
+<details>
+<summary><b><code>/api/predict</code>가 1차 결과를 이어받는 방법</b></summary>
 
-### `/api/predict` 가 1차 결과를 이어받는 방법
-
-1차 카드에서 넘어올 때 아래 세 값이 함께 옵니다.
+<br/>
 
 | 필드 | 쓰임 |
 |---|---|
 | `firstWeights` | **슬라이더를 안 만졌을 때만** 슬라이더 기본값 대신 쓴다 |
-| `firstSpots` | 2차 목록에 `fromFirst: true` 를 붙이는 데 쓴다 |
-| `typeName` | 응답의 `firstTypeName` 으로 되돌려 준다 |
+| `firstSpots` | 2차 목록에 `fromFirst: true`를 붙이는 데 쓴다 |
+| `typeName` | 응답의 `firstTypeName`으로 되돌려 준다 |
 
-1차에 있었는데 2차에서 빠진 동네는 `droppedFromFirst` 에 담깁니다 —
-예산 때문에 사라졌다면 그 이유를 알아야 납득하기 때문입니다.
+1차에 있었는데 2차에서 빠진 동네는 `droppedFromFirst`에 담깁니다 — 예산 때문에 사라졌다면 그 이유를
+알아야 납득하기 때문입니다.
 
----
+</details>
 
-## 확인된 동작
-
-```
-검색어: 애들 학원 보내기 좋은 곳
-→ 교육 4.6, 나머지 2.6~3.3
-→ 방이1동 · 중계1동 · 쌍문제4동 · 대치1동 · 염리동
-```
-
-서울의 실제 학원가가 상위에 나오면 정상입니다.
-
----
-
-## 폴더 구조
+## 구조
 
 ```
 Life-Web/
-├── main.py            FastAPI 앱 설정 + 정적 파일 서빙. 라우트는 routers/ 에 있다
-├── routers/           API 라우트
-│   ├── recommend.py     /api/predict · /api/region · /api/region/explain
-│   │                     /api/chat · /api/regions/gudong
-│   ├── lifetype.py      /api/lifetype · /api/lifetype/keywords  (1차 유형 판정)
-│   ├── survey.py        /api/survey/*   회원가입 설문 채점
-│   ├── auth.py          /api/auth/*     로그인 · 아이디 중복확인 · 가입
-│   ├── likes.py         /api/likes/*    좋아요 · 검색기록 · 채팅기록
-│   └── admin.py         /api/admin/*  (대시보드 집계 · 회원·행정동 조회/수정
-│                         · 상태 · 이력 · 캐시. 토큰 필요)
-├── services/          기능별 분리
-│   ├── coords.py        행정동 좌표 조회
-│   ├── engine.py        엔진 호출 + 한↔영 키 변환 + 시설 정보 조회
-│   ├── floorplan.py     LH 평면도 선택
-│   ├── lifetype.py      1차 유형 판정 (키워드 → 축 점수 → 유형·가중치). LLM 안 씀
-│   ├── persona_type.py  설문 15문항 → persona 9칸 + 유형 판정
-│   └── typespot.py      1차 유형에 어울리는 동네 2곳 고르기
-├── frontend/           빌드 단계 없음. index.html이 main.js 하나만 불러오고
-│   │                    나머지는 ES 모듈 import로 연결됨
-│   ├── index.html
-│   ├── signup.html       회원가입 라이프스타일 설문 15문항.
-│   │                     admin.html 처럼 HTML+CSS+JS 일체형 (공유 코드 없음)
-│   ├── admin.html        관리자 페이지. 역시 일체형. 대시보드 · 회원 ·
-│   │                     행정동 · 시스템 네 화면 + 라이트/다크 테마.
-│   │                     차트는 바깥 라이브러리 없이 HTML·SVG로 직접 그림
-│   ├── main.js           모듈 진입점
-│   ├── style.css         공용 스타일(테마, 좌측 컨트롤 패널 등)
-│   ├── search.css        첫 검색 화면 + 1차 유형 카드 + 결과 화면 상단 검색바
-│   ├── lib/
-│   │   ├── api.js          서버 fetch 호출 모음
-│   │   ├── state.js        화면 간 공유 상태(마지막 결과·검색어·1차 유형)
-│   │   └── format.js       문자열 다듬기 순수 함수
-│   └── ui/              화면 단위 JS + 그중 큰 화면은 짝이 되는 CSS
-│       ├── search.js         첫 검색 화면 · 키워드 태그 · 상단 검색바
-│       ├── lifetype.js       1차 유형 결과 카드
-│       ├── deal.js           거래유형 세그먼트 · 금액 슬라이더
-│       ├── map.js            카카오 지도 초기화 · 마커
-│       ├── result.js/.css    AI 분석 실행 · 결과 렌더링 · TOP5 목록
-│       ├── reason.js/.css    지도 핀 클릭 시 추천 사유 모달 · 레이더 차트
-│       ├── chat.js/.css      결과 화면 채팅 패널
-│       └── menu.js/.css      우측 상단 메뉴 패널 · 로그인 모달
+├── main.py              FastAPI 앱 설정 + 정적 파일 서빙. 라우트는 routers/에 있다
+├── routers/
+│   ├── recommend.py       /api/predict · /api/region · /api/region/explain · /api/chat · /api/regions/gudong
+│   ├── lifetype.py        /api/lifetype*  (1차 유형 판정, LLM 안 씀)
+│   ├── survey.py          /api/survey     (설문 채점)
+│   ├── auth.py            /api/auth/* · /api/signup
+│   ├── likes.py           /api/likes/*    (좋아요 · 검색 기록 · 채팅 기록)
+│   └── admin.py           /api/admin/*    (토큰 필요)
+├── services/
+│   ├── engine.py          ★ Life-Embed-jh를 아는 유일한 파일 + 한↔영 지표 키 매핑
+│   ├── coords.py          행정동 좌표 (427개)
+│   ├── lifetype.py        1차 유형 판정 — 4축 · 16유형 · 가중치 표의 원본
+│   ├── persona_type.py    설문 15문항 → 유형 판정 (lifetype.py 표를 그대로 import)
+│   ├── typespot.py        1차 유형에 어울리는 동네 2곳 (엔진 /recommend 호출)
+│   ├── floorplan.py       LH 평면도 선택
+│   └── quota.py           LLM 요청 하루 한도
+├── frontend/            빌드 단계 없음. index.html이 main.js 하나만 모듈로 불러온다
+│   ├── index.html · main.js · style.css · search.css
+│   ├── signup.html        회원가입 설문 (HTML+CSS+JS 일체형)
+│   ├── admin.html         관리자 페이지 (일체형)
+│   ├── lib/               api · state · format · supabaseClient
+│   └── ui/                search · lifetype · deal · map · result · reason · chat
+│                          · menu · mypage · likes · history
 └── data/
-    ├── 동_좌표.csv                    427개 행정동 위경도
-    ├── 0. 한국토지주택공사...csv        평면도 목록
-    └── LH평면도/                      평면도 이미지
+    ├── 동_좌표.csv          427개 행정동 위경도
+    └── LH평면도/            평면도 목록 CSV + 이미지
 ```
 
-**시세 데이터 파일은 이 저장소에 두지 않습니다.** `services/typespot.py` 가 쓰는 시세는
-이미 읽고 있는 `life.db` 의 `master_dataset_v3` 안에 동마다 한 줄로 들어 있습니다
-(`아파트_전세_보증금` 등, 칸 이름 규칙은 엔진의 `app/engine/housing.py` `DEAL_COLUMNS` 참고).
-따로 열 파일이 없습니다.
+> **`services/price.py`를 되살리지 마세요.** 예산 감점은 엔진이 `search(housing_override=…)` 안에서
+> 처리합니다. 웹에도 두면 **예산이 두 번 적용되어 오류 없이 결과가 틀어집니다.**
 
-> `services/price.py` 는 없습니다. 예산 감점은 엔진(`Life-Embed-jh`)이
-> `search(housing_override=…)` 안에서 처리합니다. 예전 `price.py` 를 되살리면
-> **예산이 두 번 적용되어 오류 없이 결과가 틀어집니다.**
+## 다른 엔진 붙이기
 
----
+이 웹은 엔진이 무엇으로 만들어졌는지 모릅니다. `services/engine.py`가 `EMBED_API_BASE`를
+`httpx`로 부를 뿐이라, 같은 API 계약을 구현한 서버를 그 자리에 붙일 수 있습니다.
+내 엔진을 다른 포트(예: 8001)에 띄우고 `EMBED_API_BASE=http://127.0.0.1:8001`로 바꾸면 됩니다.
+
+### 최소 계약 — 엔드포인트 둘
+
+| 메서드 | 경로 | 요청 | 응답 |
+|---|---|---|---|
+| POST | `/search` | `{"query": str, "top_k": int, "housing_override": {...} \| null}` | `{weights, regions, explanation, housing}` |
+| POST | `/recommend` | `{"weights": {...}, "top_k": int, "housing": {...} \| null}` | `regions` 목록 |
+
+<details>
+<summary><b>요청·응답 예시와 지켜야 할 규칙</b></summary>
+
+<br/>
+
+`housing` 모양(단위는 만원, 가격 조건이 없으면 `None`):
+
+```python
+{"건물유형": "아파트", "거래유형": "월세",
+ "targets": {"예산": 70, "보증금": 3000}}
+```
+
+`/search` 응답:
+
+```python
+{
+    "weights": {"녹지": 3.2, "안전": 3.3, "교통": 2.6, "상권": 3.2,
+                "의료": 3.0, "교육": 4.6, "문화": 2.6},
+    "regions": [
+        {
+            "name": "노원구 중계1동",        # "구 행정동명" — 공백 하나로 구분
+            "total": 78.7,                   # 종합 점수
+            "scores": {"녹지": 88, "안전": 84, "교통": 48, "상권": 68,
+                       "의료": 70, "교육": 98, "문화": 25},
+            "price": None,                   # 있으면 시세 탭이 채워진다
+        },
+        # ... top_k 개
+    ],
+    "explanation": "중계1동은 교육 98점으로 ...",  # 없으면 ""
+    "housing": None,
+}
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 지표 이름 | 한국어 7개 고정 — `녹지 안전 교통 상권 의료 교육 문화` |
+| `name` | `"구 행정동명"`. `서울특별시`를 붙이지 않습니다 — 웹이 `split(" ", 1)`로 좌표를 찾습니다 |
+| `scores` | 0~100 숫자, 클수록 좋은 값 |
+| `weights` | 1~5 범위 숫자 (문자열 `"4.6"` 안 됨) |
+| `explanation` | 없으면 `""`. `None`은 안 됩니다 |
+
+**예산 감점은 엔진의 몫입니다.** 웹은 조건을 넘겨줄 뿐 점수를 다시 깎지 않습니다.
+
+추천 말고 좋아요·로그인·관리자까지 옮기려면 `Life-Embed-jh/app/api/`의 나머지 라우터가 쓰는 경로도
+구현해야 합니다 — 전체 목록은 `services/engine.py`의 `_call()` 호출부를 보세요.
+
+붙이기 전에 단독으로 두드려 보세요:
+
+```bash
+curl -X POST http://127.0.0.1:8001/search -d '{"query":"애들 학원 보내기 좋은 곳"}'
+```
+
+</details>
 
 ## 자주 나는 문제
 
-**`httpx.ConnectError` / API 호출이 전부 500으로 실패함**
-→ `Life-Embed-jh`의 엔진 서버(포트 8000)를 안 띄웠거나 `EMBED_API_BASE`가 잘못된
-주소를 가리키고 있습니다. 이 저장소만 띄워서는 동작하지 않습니다.
-
-**`RuntimeError: API 키가 없다`**
-→ `Life-Embed-jh/.env` 파일이 있는지 확인하세요. 웹 쪽이 아니라 엔진 쪽입니다.
-
-**첫 검색이 10초 넘게 걸림**
-→ 정상입니다. 서버가 벡터 22,500개를 처음 불러오는 시간입니다.
-   두 번째부터는 3~5초입니다.
-
-**지도가 안 보임**
-→ 카카오 개발자 콘솔에 `http://127.0.0.1:5000`을 등록했는지 확인하세요.
-
-**`file is not a database`**
-→ `Life-Embed-jh/data/life.db`가 수십 MB(2026-09-07 기준 약 42MB)인지 확인하세요.
-   133바이트 정도로 작으면 Git LFS 포인터 텍스트 파일만 받아진 상태입니다.
-   `Life-Embed-jh` 폴더에서 `git lfs checkout data/life.db`(이미 받아둔 LFS
-   객체를 파일로 풀어쓰기만 함, 네트워크 불필요)나 `git lfs pull`(새로 내려받기)로
-   해결하세요.
-
----
-
-## 아직 안 된 것
-
-- LH 평면도를 가구원수 기준으로 추천 (지금은 면적만 기준)
-- 폴백 표시 (`fallback`이 지금은 항상 `False`로 고정 — 실제 폴백 감지 미구현)
-- 마이페이지 화면 (`GET /api/auth/me`는 있으나 프론트에 아직 안 붙음)
-- `POST /api/survey`(규칙 기반 축·가중치 계산) — 엔드포인트는 있지만
-  `signup.html`은 아직 이걸 안 부르고 답변을 문장으로 이어 붙여
-  `/api/predict`의 `query`(LLM 경로)로 우회합니다
-
-로그인·회원가입 자체는 이제 구현돼 있습니다. Supabase Auth(이메일/비번, 구글)로
-로그인하고, `signup.html`의 15문항 설문이 `POST /api/signup`으로 실제 계정과
-persona 9칸을 저장합니다(`routers/auth.py`). 비밀번호는 이 서버를 거치지 않고
-Supabase가 직접 처리하며, 서버는 발급된 access token만 `Life-Embed-jh`의
-`/auth/*`에 그대로 넘깁니다.
-
-### 설문이 아직 못 채우는 persona 칸
-
-| 칸 | 상태 |
+| 증상 | 원인 |
 |---|---|
-| `persona` | 이름·나이·성격을 아우르는 **총괄 요약**이라 문항 하나로 대신 못 함 |
-| `career_goals_and_ambitions` | 대응 문항 없음 (P1·P2는 현재 직업·일과라 다름) |
+| `httpx.ConnectError` / API가 전부 500 | 엔진 서버(`:8000`)를 안 띄웠거나 `EMBED_API_BASE`가 틀림 |
+| `RuntimeError: ... 없다` | `Life-Embed-jh/.env` 확인 — 웹이 아니라 엔진 쪽 |
+| 지도가 안 보임 | 카카오 개발자 콘솔에 `http://127.0.0.1:5000` 미등록 |
+| 지도에 마커가 안 찍힘 | 엔진 응답의 `name`이 `"구 행정동명"`(공백 하나) 형태가 아님 |
+| 추천 사유 카드의 점이 비어 있음 | `scores` 키가 한국어 7개와 정확히 일치하지 않음 |
 
-둘 다 비워 두고 있습니다. 문항을 추가하거나, 적재 단계의 LLM 정제가
-나머지 칸을 읽고 만들어 주는 방법이 있습니다.
+## 남은 일
+
+- LH 평면도를 가구원수 기준으로 추천 (지금은 면적만)
+- 폴백 표시 — `fallback`이 항상 `False` (실제 감지 미구현)
+- `POST /api/survey`는 있지만 `signup.html`은 아직 `/api/predict`의 LLM 경로로 우회
+- 설문이 못 채우는 persona 칸 — `persona`(총괄 요약), `career_goals_and_ambitions`(대응 문항 없음)

@@ -1,0 +1,96 @@
+/*
+원본 데이터 및 출처 안내 모달
+틀은 ui/mypage.css 를 따르고, 글이 많아 너비만 넓다(760px). 글은 ui/sources.js 의 SOURCES 에 있다
+*/
+
+.sources-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(30, 26, 22, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.sources-backdrop.is-open { display: flex; }
+
+.sources-modal {
+  position: relative;
+  width: min(760px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 28px 30px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.sources-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sources-close:hover { color: var(--text); }
+
+.sources-title {
+  margin: 0 0 18px;
+  font-family: 'Cafe24Ssurround', 'Fraunces', serif;
+  font-size: 19px;
+  color: var(--text);
+}
+
+/* 묶음 하나가 카드 하나 — 경계가 글자가 아니라 면으로 보이게 */
+.sources-group {
+  margin-bottom: 14px;
+  padding: 12px 16px 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.sources-group-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 묶음 제목 · 줄 앞의 그림. 슬라이더 머리글(🏠 건축)과 같은 모양 */
+.sources-icon { margin-right: 6px; }
+.sources-row .sources-icon { font-size: 14px; }
+
+/* 한 줄 = 위에 무엇에 썼나, 아래에 작은 글씨로 출처. 두 칸으로 나란히 두면 머리글 없이는 오른쪽이 무엇인지 읽어야 안다 */
+.sources-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  word-break: keep-all;
+}
+.sources-row:last-child { border-bottom: none; }
+.sources-what { color: var(--text); }
+.sources-org { color: var(--muted); font-size: 12px; }
+.sources-org::before { content: "출처 · "; }
+
+.sources-limits {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text);
+  word-break: keep-all;
+}
+.sources-limits li { padding: 2px 0; }
+
+.sources-footnote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}

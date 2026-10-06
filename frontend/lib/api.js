@@ -46,10 +46,10 @@ async function getJSON(url, extraHeaders) {
 }
 
 /** DELETE + JSON 을 보내고 JSON 을 받는 공통 부분 */
-async function deleteJSON(url, body) {
+async function deleteJSON(url, body, extraHeaders) {
   const res = await fetch(url, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
     body: JSON.stringify(body),
   });
 
@@ -113,24 +113,26 @@ export async function getQuota() {
   return getJSON("/api/quota", await authHeaders());
 }
 
+/* 기록 · 좋아요는 로그인 토큰을 같이 보낸다 — 회원 번호로 쌓인 것은 서버가 본인인지 확인한다(로그아웃 상태의 기기 번호는 그대로 된다) */
+
 /** 검색·대화 기록 조회 */
-export function getHistory(anonId) {
-  return getJSON(`/api/history?anonId=${encodeURIComponent(anonId)}`);
+export async function getHistory(anonId) {
+  return getJSON(`/api/history?anonId=${encodeURIComponent(anonId)}`, await authHeaders());
 }
 
 /** 좋아요한 동네 목록 조회 */
-export function getLikes(anonId) {
-  return getJSON(`/api/likes?anonId=${encodeURIComponent(anonId)}`);
+export async function getLikes(anonId) {
+  return getJSON(`/api/likes?anonId=${encodeURIComponent(anonId)}`, await authHeaders());
 }
 
 /** 좋아요 추가 */
-export function postLike(anonId, gu, dong) {
-  return postJSON("/api/likes", { anonId, gu, dong });
+export async function postLike(anonId, gu, dong) {
+  return postJSON("/api/likes", { anonId, gu, dong }, await authHeaders());
 }
 
 /** 좋아요 취소 */
-export function deleteLike(anonId, gu, dong) {
-  return deleteJSON("/api/likes", { anonId, gu, dong });
+export async function deleteLike(anonId, gu, dong) {
+  return deleteJSON("/api/likes", { anonId, gu, dong }, await authHeaders());
 }
 
 /** Authorization 헤더 조립. Supabase 세션의 access_token 을 그대로 싣는다 */
@@ -156,6 +158,6 @@ export function signup(token, basicInfo, answers) {
 }
 
 /** 마이페이지 — 로그인한 회원의 기본정보 */
-export function getMe(customerId) {
-  return getJSON(`/api/auth/me?customerId=${encodeURIComponent(customerId)}`);
+export async function getMe(customerId) {
+  return getJSON(`/api/auth/me?customerId=${encodeURIComponent(customerId)}`, await authHeaders());
 }

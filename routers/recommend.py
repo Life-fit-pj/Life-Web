@@ -10,13 +10,13 @@ GET  /api/quota            오늘 남은 AI 질문 횟수
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from services.coords import COORDS, lookup_coords
 from services.engine import (
     KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer,
-    save_search, save_chat, get_history,
+    save_search, save_chat, get_history, ANON_ID,
 )
 from services import quota
 from services.floorplan import find_floorplan
@@ -101,8 +101,8 @@ def predict(body: PredictRequest, request: Request):
     if body.query:
         quota.consume(request)
 
-    # 검색어로 찾아본 요청만 기록한다 — 슬라이더만 만진 요청은 "검색"이 아니다
-    if body.query and body.anonId:
+    # 남의 회원 번호로는 기록하지 않는다 — 기록은 그 회원의 성향 제안의 재료가 된다
+    if body.query and body.anonId and quota.own(request, body.anonId):
         save_search(body.anonId, body.query)
 
     # 1차 유형 카드에서 넘어왔고 슬라이더를 직접 만지지 않았으면,
@@ -216,9 +216,12 @@ def chat_api(body: ChatRequest, request: Request):
         regions=body.regions,
         weights=body.weights,
         history=body.history,
+        # 회원 전용 도구(좋아요 · 닮은 회원)는 토큰으로 확인한 회원에게만 연다. body.anonId 를 그대로 넘기면
+        # 로그아웃한 사람이 남의 회원 번호를 적어 보내 그 회원 기준의 답을 받을 수 있다
+        anon_id=quota.member_id(request),
     )
 
-    if body.anonId:
+    if body.anonId and quota.own(request, body.anonId):
         save_chat(body.anonId, body.question, answer)
 
     return {"answer": answer, "remaining": remaining}
@@ -231,6 +234,8 @@ def quota_api(request: Request):
 
 
 @router.get("/history")
-def history_api(anonId: str):
-    """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
+def history_api(request: Request, anonId: str = Query(pattern=ANON_ID)):
+    """메뉴 > 검색 및 대화 기록 저장소에서 부른다. 회원 번호로 쌓인 기록은 본인만 본다"""
+    if not quota.own(request, anonId):
+        raise HTTPException(403, "본인 기록만 볼 수 있다")
     return get_history(anonId)

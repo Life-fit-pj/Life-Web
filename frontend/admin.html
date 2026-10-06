@@ -402,6 +402,8 @@ pre.safe { background: rgba(12,163,12,.10); }
 .ok-note { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
 
 .logs { display: grid; gap: 8px; }
+/* 길어지는 목록을 가둔다 — 수정 이력 · 지난 분석 대화. 넘치면 안에서 굴린다 */
+.scroll { max-height: 290px; overflow-y: auto; padding-right: 4px; }
 .log { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 10px; font-size: 12.5px; flex-wrap: wrap; }
 .log .l-fields { color: var(--ink-2); font-size: 11.5px; }
 .log .l-when { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: auto; font-size: 11.5px; }
@@ -542,6 +544,7 @@ pre.safe { background: rgba(12,163,12,.10); }
 
 <div id="toast" hidden></div>
 
+<script src="lib/counter.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════
    0. 공통 — 통신 · 토스트 · 문자열
@@ -833,7 +836,7 @@ function analysisBar() {
       <div class="hint" style="margin-top:8px">답변은 집계된 숫자만 보고 만들어집니다. 자료에 없는 건 없다고 답합니다.</div>
       <div id="an-out"></div>
       <div class="card-title" style="margin:18px 0 8px">지난 대화</div>
-      <div id="an-list"><div class="skel">펼치면 불러옵니다</div></div>
+      <div id="an-list" class="scroll"><div class="skel">펼치면 불러옵니다</div></div>
     </div>
   </details>`;
 }
@@ -955,7 +958,7 @@ function logList(list) {
   if (!list || !list.length) return '<div class="skel">아직 수정 기록이 없습니다</div>';
   return '<div class="logs">' + list.map(l => `
     <div class="log">
-      <span class="tag">${l.target === 'member' ? '회원' : '행정동'}</span>
+      <span class="tag">${({ member: '회원', suggestion: 'LLM 제안' })[l.target] || '행정동'}</span>
       <b>${esc(l.target_id)}</b>
       <span class="l-fields">${esc(l.fields.join(', '))}${l.field_count > l.fields.length ? ` 외 ${l.field_count - l.fields.length}칸` : ''}</span>
       <span class="l-when">${when(l.changed_at)}</span>
@@ -978,6 +981,8 @@ const PERSONA_LABELS = {
   family_persona: '가족', cultural_background: '문화 배경',
   career_goals_and_ambitions: '커리어 목표',
 };
+/* 열 번째 칸 — 가입 설문이 아니라 활동(검색·좋아요)에서 정리한 성향. 엔진 config.ACTIVITY_COLUMN 과 같은 이름이다 */
+const ACTIVITY = 'activity_persona';
 /* 서버의 화이트리스트(CUSTOMER_FIELDS)에 없는 칸은 보내 봐야 조용히 버려진다.
    읽기 전용으로 그려서 "고칠 수 있는 것처럼" 보이지 않게 한다 */
 const READONLY = ['customer_id', 'joined_at'];
@@ -1055,7 +1060,7 @@ function openNewMemberForm() {
     <details class="persona" ${k === 'persona' ? 'open' : ''}>
       <summary>${esc(PERSONA_LABELS[k])}<span class="len">0자</span></summary>
       <div class="body">
-        <textarea name="${k}"
+        <textarea name="${k}" maxlength="800"
           oninput="this.closest('details').querySelector('.len').textContent = this.value.length + '자'"></textarea>
         <div class="err" data-err="${k}"></div>
       </div>
@@ -1075,9 +1080,10 @@ function openNewMemberForm() {
       ${card('희망 조건 <span class="hint">1~5</span>', `<div class="sliders">${sliders}</div>`,
              '기본값 3 · 안 건드리면 그대로 저장된다')}
       ${card('페르소나 <span class="hint">서술형</span>', personas,
-             `20자 미만으로 쓰면 저장은 되지만 벡터는 안 만들어진다 (MIN_LENGTH=20)`)}
+             `칸마다 20자 이상 800자 이하. 벗어나면 저장이 거절된다`)}
     </div>`;
 
+  mountCounters(board);
   $('#member-create').addEventListener('click', createMember);
 }
 
@@ -1098,7 +1104,11 @@ function renderMember(id, data) {
   const { customer, preferences, preferences_initial, persona, likes, searches, chats } = data;
   /* initial 은 "저장할 때 바뀐 칸 골라내는 기준"이다. preferences_initial(가입 시 값)과
      이름이 비슷하지만 전혀 다른 것이니 섞지 말 것 */
-  initial = { ...customer, ...preferences, ...persona };
+  /* 선호도 행이 없는 회원(설문을 건너뛴 가입)에게도 슬라이더를 보여 준다 — 기본값 3. 저장하면 엔진이 행을 만든다.
+     initial 에도 같은 값을 넣어야 한다 — 안 넣으면 다른 칸만 고쳐 저장해도 슬라이더 일곱이 전부 "바뀐 칸"으로 나간다 */
+  const hasPrefs = Object.keys(preferences).length > 0;
+  const current = hasPrefs ? preferences : Object.fromEntries(INDICATORS.map(k => [k, 3]));
+  initial = { ...customer, ...current, ...persona };
 
   const basic = Object.entries(customer).map(([k, v]) => `
     <div>
@@ -1132,7 +1142,7 @@ function renderMember(id, data) {
     </div>`).join('');
 
   /* 변동 블록 — 실제로 저장되는 값 */
-  const sliders = Object.entries(preferences).map(([k, v]) => `
+  const sliders = Object.entries(current).map(([k, v]) => `
     <div class="w-item${movedKeys.has(k) ? ' moved' : ''}">
       <div class="slider-row">
         <span class="s-lab">${esc(k)}</span>
@@ -1149,10 +1159,12 @@ function renderMember(id, data) {
       <div class="err" data-err="${k}"></div>
     </div>`).join('');
 
-  const personas = Object.entries(persona).map(([k, v]) => `
+  /* 아홉 칸을 늘 다 그린다. 글이 있는 칸만 그리면 설문을 건너뛴 회원은 채울 자리가 없고,
+     한 칸을 비워 저장하면 그 칸이 화면에서 사라져 다시 쓸 수 없다 */
+  const personas = Object.keys(PERSONA_LABELS).map(k => [k, persona[k] ?? '']).map(([k, v]) => `
     <details class="persona">
       <summary>${esc(PERSONA_LABELS[k] || k)}<span class="len">${String(v ?? '').length}자</span></summary>
-      <div class="body"><textarea name="${k}">${esc(v)}</textarea>
+      <div class="body"><textarea name="${k}" maxlength="800">${esc(v)}</textarea>
         <div class="err" data-err="${k}"></div></div>
     </details>`).join('');
 
@@ -1175,15 +1187,26 @@ function renderMember(id, data) {
           `<div class="sliders fixed">${fixedSliders}</div>`,
           '회원가입 때 받은 값이다. 여기서는 못 고친다') : ''}
       ${card('현재 희망 조건 <span class="hint">1~5 · 조정 가능</span>', `<div class="sliders">${sliders}</div>`,
-             '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다')}
+             hasPrefs ? '추천 점수를 매기는 가중치다. 가입 때와 달라진 칸은 점(•)으로 표시된다'
+                      : '아직 저장된 값이 없다(설문을 건너뛴 가입). 저장하면 그 값이 가입 시 값으로도 남는다')}
       ${card('페르소나 <span class="hint">9칸</span>', personas,
-             '이 글을 고치면 벡터가 다시 만들어진다')}
+             '이 글을 고치면 벡터가 다시 만들어진다. 칸마다 20자 이상 800자 이하')}
+      ${card('활동에서 본 성향 <span class="hint">검색 · 좋아요에서 정리</span>', activityPersonaBody(persona[ACTIVITY] || ''),
+             '제안을 받아도 저장되지 않는다. 고른 뒤 저장을 눌러야 반영된다')}
       ${card('활동', activityBody(likes, searches, chats),
              '로그인한 뒤 쌓인 좋아요·검색·채팅만 보인다')}
       <div id="panel-preview"></div>
       <div id="panel-similar"></div>
       <div id="panel-privacy"></div>
     </div>`;
+
+  mountCounters(board);
+  $('#suggest-btn').addEventListener('click', () => requestSuggestion(id));
+  $('#suggest-list').addEventListener('click', e => {
+    const pick = e.target.closest('[data-pick]');
+    if (pick) pickSuggestion(Number(pick.dataset.pick));
+  });
+  loadSuggestions(id);
 
   $('.acts', board).addEventListener('click', e => {
     const act = e.target.closest('button')?.dataset.act;
@@ -1193,6 +1216,88 @@ function renderMember(id, data) {
     if (act === 'privacy') showPrivacy(id);
     if (act === 'delete')  deleteMember(id);
   });
+}
+
+/* 글자 수 표시를 붙인다 — maxlength 가 있는 입력칸 전부에.
+   counter.js 를 못 불러왔으면 건너뛴다 — 표시 하나 때문에 화면의 나머지가 멈추면 안 된다 */
+function mountCounters(root) {
+  if (typeof mountCounter !== 'function') return;
+  $$('textarea[maxlength]', root).forEach(box => mountCounter(box, box.maxLength));
+}
+
+/* ── 활동에서 본 성향 ──────────────────────────────────────────
+   검색 · 좋아요에서 LLM 이 정리한 글과 가중치 수정안. 제안을 받아도 저장되지 않는다 —
+   고르면 글은 이 칸에, 가중치는 슬라이더에 채워질 뿐이고 평소의 저장 버튼이 저장한다(승인 버튼이 따로 없는 이유).
+   받은 제안은 엔진이 수정 기록에 원문으로 남긴다. 회원 한 명에 하루 다섯 번까지다 */
+let suggestions = [];
+
+function activityPersonaBody(text) {
+  return `
+    <textarea name="${ACTIVITY}" rows="5" maxlength="800" style="width:100%">${esc(text)}</textarea>
+    <div class="err" data-err="${ACTIVITY}"></div>
+    <div style="display:flex; align-items:center; gap:10px; margin-top:10px">
+      <button class="btn sm" id="suggest-btn" ${WRITE_ENABLED ? '' : 'disabled title="쓰기가 잠겨 있다"'}>제안 받기</button>
+      <span class="hint" id="suggest-left"></span>
+    </div>
+    <div class="logs" id="suggest-list" style="margin-top:10px"></div>`;
+}
+
+/* 오늘 받은 제안을 나란히 놓는다 — 견주어 보고 하나를 고르게 한다 */
+function renderSuggestions(data) {
+  suggestions = data.suggestions || [];
+  $('#suggest-left').textContent = `오늘 남은 횟수 ${data.remaining}번`;
+  $('#suggest-btn').disabled = !WRITE_ENABLED || data.remaining <= 0;
+  $('#suggest-list').innerHTML = suggestions.map((s, i) => `
+    <div class="log" style="flex-direction:column; align-items:flex-start; gap:6px">
+      <div><b>제안 ${i + 1}</b> <span class="l-when">${when(s.created_at)}</span>
+        <button class="btn sm" data-pick="${i}" style="margin-left:8px">이 안 쓰기</button></div>
+      <div>${esc(s[ACTIVITY])}</div>
+      <div class="l-fields">${INDICATORS.map(k => `${k} ${round4(s.가중치[k])}`).join(' · ')}</div>
+    </div>`).join('');
+}
+
+/* 회원을 열 때 오늘 받은 제안을 다시 보여 준다. 그사이 다른 회원을 열었으면 버린다. 엔진이 옛 판이면 조용히 넘어간다 */
+function loadSuggestions(id) {
+  api(`/members/${id}/suggestions`)
+    .then(data => { if (currentMember === id) renderSuggestions(data); })
+    .catch(() => {});
+}
+
+async function requestSuggestion(id) {
+  const btn = $('#suggest-btn');
+  btn.disabled = true;
+  btn.textContent = '정리하는 중…';
+  try {
+    const data = await api(`/members/${id}/suggestions`, { method: 'POST' });
+    if (currentMember === id) renderSuggestions(data);
+  } catch (e) {
+    let message = e.message;
+    try { message = JSON.parse(e.message).detail; } catch { /* 글자 그대로 보여 준다 */ }
+    toast(message);
+    btn.disabled = false;
+    loadSuggestions(id);     /* 남은 횟수와 버튼을 서버의 실제 값으로 맞춘다 — 한도를 다 썼으면 버튼이 꺼진다 */
+  } finally {
+    btn.textContent = '제안 받기';
+  }
+}
+
+/* 고른 제안을 화면에만 채운다. 저장은 저장 버튼이 한다 — 채운 뒤 고쳐도 된다 */
+function pickSuggestion(i) {
+  const s = suggestions[i];
+  const form = $('#member-form');
+  const box = $(`[name="${ACTIVITY}"]`, form);
+  box.value = s[ACTIVITY];
+  box.dispatchEvent(new Event('input'));       /* 글자 수 표시가 따라오게 한다 */
+
+  let filled = 0;
+  for (const [k, v] of Object.entries(s.가중치)) {
+    const field = $(`.w-num[name="${k}"]`, form);
+    if (!field) continue;                     /* 선호도 행이 없는 회원은 슬라이더가 없다 */
+    field.value = v;
+    field.previousElementSibling.value = v;   /* 옆의 막대도 같이 옮긴다 */
+    filled += 1;
+  }
+  toast(`제안 ${i + 1}을 채웠습니다${filled ? '' : ' (가중치는 선호도 행이 없어 못 채웠습니다)'} — 저장을 눌러야 반영됩니다`);
 }
 
 /* 되돌릴 수 없다 — customers·preferences·member 청크·로그인·활동 기록이 한 번에 지워진다 */
@@ -1484,6 +1589,17 @@ async function openRegion(gu, dong) {
     </div>`;
   }).join('');
 
+  const derived = Object.keys(data.percentiles).filter(k => !(k in data.values)).map(k => {
+    const pct = data.percentiles[k];
+    return `<div class="metric">
+      <div class="m-top">
+        <span class="m-name">${esc(k)} · 계산값</span>
+        <span class="m-rank">상위 ${100 - pct}%</span>
+      </div>
+      <div class="meter"><i style="width:${pct}%"></i></div>
+    </div>`;
+  }).join('');
+
   box.innerHTML = `
     <div class="detail-head">
       <h3>${esc(data['행정동명'])}</h3>
@@ -1494,7 +1610,7 @@ async function openRegion(gu, dong) {
       </div>
     </div>
     <div class="detail-body" id="region-form">
-      ${card('지표 <span class="hint">12개</span>', `<div class="grid2">${metrics}</div>`,
+      ${card(`지표 <span class="hint">${Object.keys(data.percentiles).length}개</span>`, `<div class="grid2">${metrics}${derived}</div>`,
              '막대는 427개 동 중 이 동의 위치다 · 값은 소수점 4자리까지 보여 준다')}
     </div>`;
 
@@ -1553,7 +1669,7 @@ function findIssues(s, sum) {
   /* 세 방향에서 "비어 있는 회원 수"를 센다 */
   const noProfile = members - sumOf(ch.ages);            /* 나이가 빈 회원 */
   const noPrefs   = members - sumOf(ch.dealType);        /* 선호도 행이 없는 회원 */
-  const gap       = members * CHUNK_SLOTS - c.chunks;    /* 비어 있는 페르소나 칸 */
+  const gap       = members * CHUNK_SLOTS - c.slots;     /* 비어 있는 설문 칸. 조각이 둘인 칸도 한 칸으로 센 값이다 */
   const asMembers = gap / CHUNK_SLOTS;                   /* 그 칸을 사람 수로 환산 */
 
   /* 셋이 딱 맞으면 같은 계정들이다 — 세 번 말할 이유가 없다 */
@@ -1568,7 +1684,7 @@ function findIssues(s, sum) {
         .filter(k => !ch.persona.some(x => x.label === k))
         .map(k => PERSONA_LABELS[k]);
       add('bad', '페르소나 칸 유실',
-        `회원당 ${(c.chunks / members).toFixed(1)}칸 · `
+        `회원당 ${(c.slots / members).toFixed(1)}칸 · `
         + `${num(gap)}칸(회원 ${asMembers.toFixed(1)}명분)이 비었습니다`
         + (empty.length ? ` — 한 명도 없는 칸: ${empty.join(', ')}` : '')
         + '. 빈 칸은 벡터가 안 만들어져 이웃 찾기에서 빠집니다');
@@ -1602,6 +1718,23 @@ function findIssues(s, sum) {
   return out;
 }
 
+/* 성향을 갱신할 회원 — 활동 칸을 마지막으로 저장한 뒤 검색이 5건 이상 늘어난 회원.
+   세는 것은 엔진이 한다(Claude 를 안 부른다). 누르면 회원 탭에서 그 회원을 연다 */
+function refreshList(list) {
+  if (!list.length) return '';
+  return `
+    <div class="card-title" style="margin:18px 0 8px">성향을 갱신할 회원
+      <span class="hint">${list.length}명 · 마지막 저장 뒤 검색 5건 이상</span></div>
+    <div>${list.map(c => `<button class="btn sm" data-open-member="${esc(c.customer_id)}"
+        style="margin:0 6px 6px 0">${esc(c.customer_id)} · 새 검색 ${c.new_searches}건</button>`).join('')}</div>`;
+}
+$('#system-pane').addEventListener('click', e => {
+  const btn = e.target.closest('[data-open-member]');
+  if (!btn) return;
+  showView('member');
+  openMember(btn.dataset.openMember);
+});
+
 function issueList(list, okNote) {
   if (!list.length) return `<div class="ok-note">${esc(okNote)}</div>`;
   return '<div class="logs">' + list.map(i => `
@@ -1625,8 +1758,9 @@ function fact(label, value, sub = '', level = '') {
   const pane = $('#system-pane');
   pane.innerHTML = '<div class="skel">불러오는 중…</div>';
 
-  const [s, logs, sum] = await Promise.all([
+  const [s, logs, sum, cands] = await Promise.all([
     api('/ready'), api('/logs?limit=50'), api('/summary'),
+    api('/refresh-candidates').catch(() => []),
   ]);
   paintStatus(s);
 
@@ -1653,27 +1787,31 @@ function fact(label, value, sub = '', level = '') {
   let chunkCard = '', weightCard = '';
   if (sum.ok) {
     const c = sum.counts, ch = sum.charts;
-    const per = c.members ? c.chunks / c.members : 0;
-    const gap = Math.max(0, c.members * CHUNK_SLOTS - c.chunks);
+    const per = c.members ? c.slots / c.members : 0;
+    const gap = Math.max(0, c.members * CHUNK_SLOTS - c.slots);
     const filled = ch.persona.length;
     const shortest = filled ? ch.persona.reduce((x, y) => (x.value <= y.value ? x : y)) : null;
 
+    /* 칸 = 회원 × 종류, 조각 = 벡터 하나. 350자를 넘는 글은 한 칸이 조각 둘이라 둘을 따로 센다.
+       설문 9칸은 필수(비면 빨강), 활동 칸은 선택이다 — 관리자가 승인해야 생긴다 */
     chunkCard = card('청킹 <span class="hint">페르소나 → 벡터</span>', `
       <div class="facts">
-        ${fact('총 청크', num(c.chunks) + '<small>개</small>', `회원 ${num(c.members)}명`)}
-        ${fact('회원당', per.toFixed(1) + '<small>칸</small>', `${CHUNK_SLOTS}칸이면 정상`,
+        ${fact('총 조각', num(c.chunks) + '<small>개</small>', `회원 ${num(c.members)}명 · 칸 ${num(c.slots + c.activity)}개`)}
+        ${fact('회원당', per.toFixed(1) + '<small>칸</small>', `설문 ${CHUNK_SLOTS}칸이면 정상 · 활동까지 ${CHUNK_SLOTS + 1}칸`,
                per < CHUNK_SLOTS ? 'bad' : '')}
         ${fact('빈 칸', num(gap) + '<small>칸</small>',
                gap ? `회원 ${(gap / CHUNK_SLOTS).toFixed(1)}명분` : '없다', gap ? 'bad' : '')}
         ${fact('채워진 칸', `${filled}<small>/${CHUNK_SLOTS}</small>`, '한 명도 없는 칸은 제외',
                filled < CHUNK_SLOTS ? 'warn' : '')}
+        ${fact('활동 칸', num(c.activity) + '<small>명</small>', '검색 · 좋아요에서 정리해 승인한 회원')}
+        ${fact('나뉜 칸', num(c.split) + '<small>칸</small>', c.split ? '350자를 넘어 조각이 둘 이상' : '350자를 넘는 글이 없다')}
         ${shortest ? fact('가장 짧은 칸', shortest.value + '<small>자</small>',
                PERSONA_LABELS[shortest.label] || shortest.label,
                shortest.value < CHUNK_WARN_LEN ? 'warn' : '') : ''}
       </div>
       ${bars(ch.persona.map(d => ({ ...d, label: PERSONA_LABELS[d.label] || d.label })),
              { color: 'var(--s3)', labelWidth: '110px' })}`,
-      `칸별 평균 길이 · ${CHUNK_MIN_LEN}자 미만은 청킹에서 버려진다`);
+      `설문 칸별 평균 길이 · ${CHUNK_MIN_LEN}자 미만은 저장이 거절된다`);
 
     const ws = ch.weights;
     const avg = ws.length ? (ws.reduce((t, w) => t + w.value, 0) / ws.length).toFixed(2) : '-';
@@ -1700,9 +1838,10 @@ function fact(label, value, sub = '', level = '') {
 
     ${card(`이슈 <span class="hint">${issues.length ? issues.length + '건' : '없음'}</span>`, `
       ${issueList(issues, okNote)}
+      ${refreshList(cands)}
       <div class="card-title" style="margin:18px 0 8px">관리자 수정 이력
         <span class="hint">최근 ${logs.length}건</span></div>
-      ${logList(logs)}`,
+      <div class="scroll">${logList(logs)}</div>`,
       'DB 특이사항과 손대던 기록을 한자리에 모은다')}
 
     ${chunkCard}
