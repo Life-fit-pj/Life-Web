@@ -33,7 +33,20 @@ def _client_ip(request: Request) -> str:
 
 
 def _who(request: Request) -> tuple[str, int]:
-    """(주체, 하루 한도). 유효한 로그인 토큰이면 회원, 아니면 IP."""
+    """(주체, 하루 한도). 유효한 로그인 토큰이면 회원, 아니면 IP.
+
+    한 요청 안에서 consume · member_id · own 이 차례로 부르므로(/api/chat 은 셋 다) 답을 request.state 에 적어 두고
+    다시 쓴다 — 토큰이 틀린 브라우저는 실패를 안 기억하기 때문에, 안 적어 두면 엔진 왕복이 요청당 세 번이 된다
+    """
+    cached = getattr(request.state, "quota_who", None)
+    if cached is not None:
+        return cached
+    request.state.quota_who = _resolve_who(request)
+    return request.state.quota_who
+
+
+def _resolve_who(request: Request) -> tuple[str, int]:
+    """_who 의 몸. 토큰을 엔진에 물어 확인한다 — 요청당 한 번만 불린다"""
     token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
     if token:
         member = _members.get(token)
