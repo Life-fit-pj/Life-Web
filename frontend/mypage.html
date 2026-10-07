@@ -114,6 +114,7 @@
     .field-error { font-size: 12.5px; color: var(--danger); margin-top: 4px; min-height: 1em; }
 
     .actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+    .actions[hidden] { display: none; }       /* display: flex 가 hidden 속성을 덮지 않게 — 읽기 전용일 때 저장 버튼을 숨긴다 */
     .btn-submit {
       padding: 12px 22px; font-family: inherit; font-size: 14.5px; font-weight: 700; color: var(--bg);
       background: var(--primary); border: none; border-radius: 10px; cursor: pointer; transition: background 0.2s;
