@@ -245,7 +245,8 @@ const STORY_LIMIT = 800;      // 엔진 config.MAX_PERSONA_LENGTH
 
 let me = null;                // 서버가 준 원본
 let gudong = {};
-const loaded = { history: false, likes: false };
+const loaded = { history: false, likes: false };    // 성공해서 다시 안 받아도 되는가
+const loading = { history: false, likes: false };   // 지금 받는 중인가 — 빠르게 두 번 눌러도 요청은 한 번
 
 const $ = (id) => document.getElementById(id);
 
@@ -260,8 +261,8 @@ function showView(name) {
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("is-active", b.dataset.view === name));
   document.querySelectorAll(".view").forEach((s) => s.classList.toggle("is-active", s.dataset.view === name));
   history.replaceState(null, "", "#" + name);
-  if (name === "history" && !loaded.history) loadHistory();
-  if (name === "likes" && !loaded.likes) loadLikes();
+  if (name === "history" && !loaded.history && !loading.history) loadHistory();
+  if (name === "likes" && !loaded.likes && !loading.likes) loadLikes();
 }
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
 
@@ -326,22 +327,29 @@ function renderList(el, items, empty, toHtml) {
 }
 
 async function loadHistory() {
-  loaded.history = true;
-  $("historySearches").innerHTML = `<p class="empty">불러오는 중...</p>`;
+  // 상자가 둘이다 — 둘 다 같은 말을 보여 줘야 한쪽이 빈 채로 남지 않는다
+  const boxes = [$("historySearches"), $("historyChats")];
+  const say = (html) => boxes.forEach((b) => { b.innerHTML = html; });
+
+  loading.history = true;
+  say(`<p class="empty">불러오는 중...</p>`);
   try {
     const { searches = [], chats = [] } = await getHistory(getAnonId());
     renderList($("historySearches"), searches, "검색 기록이 없어요.",
       (s) => `<div class="list-item"><span>${escapeAndFormat(s.query)}</span><span class="list-when">${(s.created_at || "").slice(0, 10)}</span></div>`);
     renderList($("historyChats"), chats, "대화 기록이 없어요.",
       (c) => `<div class="list-item"><div><div class="list-q">Q. ${escapeAndFormat(c.question)}</div><div class="list-a">A. ${escapeAndFormat(c.answer)}</div></div></div>`);
+    loaded.history = true;        // 성공했을 때만 — 실패하면 탭을 다시 눌러 받아 볼 수 있다
   } catch (err) {
     console.error(err);
-    $("historySearches").innerHTML = `<p class="empty">기록을 불러오지 못했어요.</p>`;
+    say(`<p class="empty">기록을 불러오지 못했어요. 탭을 다시 눌러 주세요.</p>`);
+  } finally {
+    loading.history = false;      // 성공이든 실패든 "받는 중"은 끝났다
   }
 }
 
 async function loadLikes() {
-  loaded.likes = true;
+  loading.likes = true;
   $("likesItems").innerHTML = `<p class="empty">불러오는 중...</p>`;
   try {
     const items = await getLikes(getAnonId());
@@ -350,12 +358,15 @@ async function loadLikes() {
         <button type="button" class="btn-text" data-gu="${escapeAndFormat(i.gu)}" data-dong="${escapeAndFormat(i.dong)}">취소</button></div>`);
     $("likesItems").querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
-      try { await deleteLike(getAnonId(), b.dataset.gu, b.dataset.dong); loadLikes(); }
+      try { await deleteLike(getAnonId(), b.dataset.gu, b.dataset.dong); loaded.likes = false; loadLikes(); }
       catch (err) { console.error(err); b.disabled = false; }
     }));
+    loaded.likes = true;
   } catch (err) {
     console.error(err);
-    $("likesItems").innerHTML = `<p class="empty">목록을 불러오지 못했어요.</p>`;
+    $("likesItems").innerHTML = `<p class="empty">목록을 불러오지 못했어요. 탭을 다시 눌러 주세요.</p>`;
+  } finally {
+    loading.likes = false;
   }
 }
 
