@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LIFE,FIT 마이페이지</title>
+  <link rel="icon" type="image/png" href="img/logo_B_day_circle.png">
+  <link rel="icon" type="image/png" href="img/logo_B_night_circle.png" media="(prefers-color-scheme: dark)">
+
+  <!-- 테마를 CSS 보다 먼저 정한다. index.html · signup.html 과 같은 키를 읽는다 -->
+  <script>
+    (function () {
+      const saved = localStorage.getItem("lifefit-theme");
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = saved || (prefersDark ? "dark" : "light");
+    })();
+  </script>
+
+  <!--
+    signup.html 과 같은 일체형 페이지다. 색 변수 · 카드 · 입력칸 모양을 거기서 그대로 가져왔다 —
+    두 화면은 같은 아홉 칸을 다룬다(가입 때 쓰고, 여기서 본다). 한쪽 모양을 바꾸면 다른 쪽도 본다.
+    지도 화면과 공유하는 것은 lib/ 뿐이다.
+    탭 전환은 관리자 화면(admin.html)과 같은 방식 — data-view 가 같은 절만 켠다.
+    지금은 읽기 전용이다(EDIT_ENABLED = false). 수정을 켜는 법은 Life-Fit-main/docs/교안-마이페이지.md 의 B
+  -->
+  <style>
+    @font-face {
+      font-family: 'Cafe24Ssurround';
+      src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
+      font-weight: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --bg:          #FBF8F1;
+      --surface:     #FFFFFF;
+      --surface-2:   #F1E9CE;
+      --line:        #D7C39B;
+      --text:        #1C1A20;
+      --text-muted:  #6E6C60;
+      --muted:       var(--text-muted);
+      --primary:     #344E41;
+      --accent:      #344E41;
+      --danger:      #C0563F;
+      --accent-fill: #FFCC00;
+      --accent-ink:  #1C1A20;
+      --logo-mark:   url("img/logo_A_day_344E41.png");
+    }
+    [data-theme="dark"] {
+      --bg:          #2B2D2D;
+      --surface:     #5F6364;
+      --surface-2:   #414443;
+      --line:        #5F6364;
+      --text:        #B1B695;
+      --text-muted:  #7B7E7F;
+      --primary:     #869481;
+      --accent:      #FFCC00;
+      --danger:      #E08A72;
+      --logo-mark:   url("img/logo_A_night_B1B695.png");
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+      padding: 36px 20px 80px;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; }
+
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .brand { font-family: 'Cafe24Ssurround', 'Inter', sans-serif; font-weight: normal; font-size: 20px; color: var(--primary); letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .brand::before { content: ""; flex: none; width: 28px; height: 28px; background: var(--logo-mark) center / contain no-repeat; }
+    .brand i { color: var(--accent); font-style: normal; }
+    .back { font-size: 13px; color: var(--text-muted); text-decoration: none; }
+    .back:hover { color: var(--text); text-decoration: underline; }
+
+    h1 { font-family: 'Cafe24Ssurround', 'Inter', sans-serif; font-weight: normal; font-size: 26px; margin: 18px 0 14px; letter-spacing: -0.5px; }
+
+    /* 탭 — 관리자 화면처럼 한 줄. 켜진 탭만 밑줄 */
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+    .tab {
+      padding: 10px 14px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text-muted);
+      background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+    .view { display: none; }
+    .view.is-active { display: block; }
+
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin-bottom: 14px; }
+    .sec { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 14px; }
+    [data-theme="dark"] .sec { color: var(--accent); }
+
+    .sq-item { margin-bottom: 16px; }
+    .sq-item:last-child { margin-bottom: 0; }
+    .sq-item label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; line-height: 1.45; }
+    .sq-item .hint { display: block; font-size: 12px; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+    .sq-item input, .sq-item select, .sq-item textarea {
+      width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit; color: var(--text);
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .sq-item textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+    .sq-item input:focus, .sq-item select:focus, .sq-item textarea:focus { border-color: var(--accent); background: var(--surface); }
+    /* 읽기 전용일 때 — 상자 모양은 그대로 두고(글자만 떠 보이지 않게), 커서로 "입력 못 함"만 알린다 */
+    .sq-item input:disabled, .sq-item select:disabled, .sq-item textarea:disabled { color: var(--text); opacity: 1; cursor: default; }
+    .sq-item select:disabled { appearance: none; -webkit-appearance: none; }   /* 잠긴 드롭다운의 화살표를 뗀다 */
+    .sq-item .error, .sq-item input.error, .sq-item textarea.error { border-color: var(--danger); }
+    .sq-row { display: flex; gap: 8px; }
+    .sq-row select { flex: 1; }
+    .field-error { font-size: 12.5px; color: var(--danger); margin-top: 4px; min-height: 1em; }
+
+    .actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+    .actions[hidden] { display: none; }       /* display: flex 가 hidden 속성을 덮지 않게 — 읽기 전용일 때 저장 버튼을 숨긴다 */
+    .btn-submit {
+      padding: 12px 22px; font-family: inherit; font-size: 14.5px; font-weight: 700; color: var(--bg);
+      background: var(--primary); border: none; border-radius: 10px; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-submit:hover { background: var(--accent-fill); color: var(--accent-ink); }
+    .btn-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-text { padding: 8px 4px; font-family: inherit; font-size: 13px; color: var(--text-muted); background: none; border: none; text-decoration: underline; cursor: pointer; }
+    .btn-text:hover { color: var(--text); }
+    .btn-text.danger { color: var(--danger); }
+    .status { font-size: 13px; color: var(--text-muted); min-height: 1.2em; }
+    .status.ok { color: #3a9d5d; }
+    .status.bad { color: var(--danger); }
+
+    /* 기록 · 좋아요 — 전 모달(ui/history.css)의 줄 모양 */
+    .list-item { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .list-item:last-child { border-bottom: none; }
+    .list-q { font-weight: 600; }
+    .list-a { margin-top: 2px; color: var(--text-muted); }
+    .list-when { flex: none; font-size: 12px; color: var(--text-muted); }
+    .empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 14px 0; }
+    /* 기록 · 좋아요는 끝없이 길어진다 — 상자 높이를 고정하고 안에서 스크롤 */
+    .list-box { max-height: 320px; overflow-y: auto; padding-right: 6px; }
+
+    .gate { text-align: center; padding: 48px 0; color: var(--text-muted); }
+    .gate a { color: var(--primary); }
+
+    .note { margin-top: 18px; padding: 12px 16px; font-size: 12.5px; color: var(--text-muted); background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <a class="brand" href="index.html">LIFE<i>,</i>FIT</a>
+    <a class="back" href="index.html">← 지도로 돌아가기</a>
+  </div>
+  <h1>마이페이지</h1>
+
+  <!-- 로그인이 안 됐거나 풀렸을 때만 보인다 -->
+  <div id="gate" class="gate" hidden></div>
+
+  <div id="app" hidden>
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-view="basic">내 정보</button>
+      <button class="tab" data-view="story">나의 이야기</button>
+      <button class="tab" data-view="history">검색·대화 기록</button>
+      <button class="tab" data-view="likes">좋아요 한 거주지</button>
+    </nav>
+
+    <!-- ① 내 정보 -->
+    <section class="view is-active" data-view="basic">
+      <form id="basicForm" class="card" novalidate>
+        <div class="sec">👤 기본정보</div>
+        <div class="sq-item"><label for="name">이름</label><input id="name" data-key="name" type="text" required><div class="field-error"></div></div>
+        <div class="sq-item"><label for="gender">성별</label>
+          <select id="gender" data-key="gender"><option value="">선택 안 함</option><option value="M">남성</option><option value="F">여성</option></select></div>
+        <div class="sq-item"><label for="age">나이</label><input id="age" data-key="age" type="number" min="0" max="120"><div class="field-error"></div></div>
+        <div class="sq-item"><label>거주 지역</label>
+          <div class="sq-row"><select id="cityGu"><option value="">구 선택</option></select><select id="cityDong" data-key="city_dong"><option value="">동 선택</option></select></div></div>
+        <div class="sq-item"><label>직장 지역 (선택)</label>
+          <div class="sq-row"><select id="workGu"><option value="">구 선택</option></select><select id="workDong" data-key="work_dong"><option value="">동 선택</option></select></div></div>
+        <div class="sq-item"><label for="email">이메일 (선택)</label><input id="email" data-key="email" type="email"></div>
+        <div class="sq-item"><label for="phone">전화번호 (선택)</label><input id="phone" data-key="phone" type="tel"></div>
+        <div class="actions edit-only" hidden>
+          <button type="submit" class="btn-submit">저장</button>
+          <span id="basicStatus" class="status"></span>
+        </div>
+      </form>
+      <div class="card">
+        <div class="sec">계정</div>
+        <p style="font-size:13.5px">회원 번호 <strong id="customerId"></strong> · 가입일 <span id="joinedAt"></span></p>
+        <div class="actions">
+          <button type="button" id="logoutBtn" class="btn-text danger">로그아웃</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ② 나의 이야기 — 가입 설문 아홉 칸. 서버가 준 글을 그대로 보여 준다 -->
+    <section class="view" data-view="story">
+      <form id="storyForm" novalidate>
+        <div id="storyFields"></div>
+        <div class="actions edit-only" hidden>
+          <button type="submit" class="btn-submit">저장</button>
+          <span id="storyStatus" class="status"></span>
+        </div>
+        <p class="note" id="storyNote"></p>
+      </form>
+    </section>
+
+    <!-- ③ 기록 -->
+    <section class="view" data-view="history">
+      <div class="card"><div class="sec">최근 검색어</div><div id="historySearches" class="list-box"></div></div>
+      <div class="card"><div class="sec">최근 대화</div><div id="historyChats" class="list-box"></div></div>
+    </section>
+
+    <!-- ④ 좋아요 -->
+    <section class="view" data-view="likes">
+      <div class="card"><div class="sec">좋아요 한 거주지</div><div id="likesItems" class="list-box"></div></div>
+    </section>
+
+  </div>
+</div>
+
+<script src="lib/counter.js"></script>
+<script type="module">
+import { getMe, getHistory, getLikes, deleteLike, getGuDong } from "./lib/api.js";
+import { getAnonId, isLoggedIn } from "./lib/state.js";
+import { escapeAndFormat } from "./lib/format.js";
+import { supabase } from "./lib/supabaseClient.js";
+
+// 지금은 보기만. 켜는 법은 Life-Fit-main/docs/교안-마이페이지.md 의 B — 서버 경로(PATCH /api/auth/me)가 같이 있어야 한다
+const EDIT_ENABLED = false;
+
+/* 가입 설문 아홉 칸. 키는 엔진 config.CHUNK_COLUMNS 와 글자까지 같아야 한다.
+   제목은 signup.html 의 절 제목 · 질문을 요약한 것. activity_persona 는 서버가 주지 않으므로 여기에도 없다 */
+const STORY_FIELDS = [
+  { key: "persona", label: "나를 한 줄로", hint: "가입 설문에는 없던 칸입니다" },
+  { key: "professional_persona", label: "💼 일·커리어", hint: "무슨 일을 하고, 일터까지 어떻게 다니며, 일과가 끝나면 보통 어떻게 하시나요?" },
+  { key: "sports_persona", label: "⚽ 운동·활동", hint: "몸을 움직이는 활동은 어디서 하고, 야외와 실내 중 어느 쪽이 편하세요?" },
+  { key: "arts_persona", label: "🎨 문화생활·취미", hint: "쉴 때 뭘 보고 듣는지, 어떤 분위기의 장소가 좋은지, 요즘 빠져 있는 것" },
+  { key: "travel_persona", label: "✈️ 여행 성향", hint: "어떤 곳으로 가고, 거기서는 어떻게 다니세요?" },
+  { key: "culinary_persona", label: "🍲 음식·식생활", hint: "끼니는 어떻게 해결하고, 자주 가는 가게는 어떤 곳인가요?" },
+  { key: "family_persona", label: "👨‍👩‍👧‍👦 가족 구성", hint: "누구와 살고, 2년 안에 달라질 것, 지금 집에서 아쉬운 점" },
+  { key: "cultural_background", label: "🏡 주거 환경 배경", hint: "어떤 동네에서 자랐고, 살아본 동네 중 가장 편했던 곳은 어디였나요?" },
+  { key: "career_goals_and_ambitions", label: "🎯 앞으로의 계획", hint: "가입 설문에는 없던 칸입니다" },
+];
+const STORY_LIMIT = 800;      // 엔진 config.MAX_PERSONA_LENGTH
+
+let me = null;                // 서버가 준 원본
+let gudong = {};
+const loaded = { history: false, likes: false };    // 성공해서 다시 안 받아도 되는가
+const loading = { history: false, likes: false };   // 지금 받는 중인가 — 빠르게 두 번 눌러도 요청은 한 번
+
+const $ = (id) => document.getElementById(id);
+
+function showGate(html) {
+  $("gate").innerHTML = html;
+  $("gate").hidden = false;
+  $("app").hidden = true;
+}
+
+/* 탭 — data-view 가 같은 절만 켠다. 주소의 #story 로 바로 열 수도 있다 */
+function showView(name) {
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("is-active", b.dataset.view === name));
+  document.querySelectorAll(".view").forEach((s) => s.classList.toggle("is-active", s.dataset.view === name));
+  history.replaceState(null, "", "#" + name);
+  if (name === "history" && !loaded.history && !loading.history) loadHistory();
+  if (name === "likes" && !loaded.likes && !loading.likes) loadLikes();
+}
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+
+/* ── ① 내 정보 ─────────────────────────────────────── */
+function fillDongOptions(dongSel, dongs, selected) {
+  dongSel.innerHTML = '<option value="">동 선택</option>'
+    + dongs.map((d) => `<option value="${d}"${d === selected ? " selected" : ""}>${d}</option>`).join("");
+}
+
+function renderBasic(c) {
+  $("name").value = c.name ?? "";
+  $("gender").value = c.gender ?? "";
+  $("age").value = c.age ?? "";
+  $("email").value = c.email ?? "";
+  $("phone").value = c.phone ?? "";
+  $("customerId").textContent = c.customer_id;
+  $("joinedAt").textContent = c.joined_at ?? "-";
+
+  const guOptions = Object.keys(gudong).map((gu) => `<option value="${gu}">${gu}</option>`).join("");
+  for (const [guSel, dongSel, gu, dong] of [[$("cityGu"), $("cityDong"), c.city, c.city_dong], [$("workGu"), $("workDong"), c.work_city, c.work_dong]]) {
+    guSel.innerHTML = '<option value="">구 선택</option>' + guOptions;
+    guSel.value = gu ?? "";
+    fillDongOptions(dongSel, gudong[gu] || [gu && dong].filter(Boolean), dong ?? "");   // 구 목록을 못 받았어도 저장된 동은 보인다
+    guSel.onchange = () => fillDongOptions(dongSel, gudong[guSel.value] || []);
+  }
+}
+
+$("logoutBtn").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  localStorage.setItem("lf-anon", crypto.randomUUID());     // 로그아웃 = 새 기기 번호(state.js 의 규칙)
+  location.href = "index.html";
+});
+
+/* ── ② 나의 이야기 ─────────────────────────────────── */
+function renderStory(persona) {
+  $("storyFields").innerHTML = STORY_FIELDS.map((f) => `
+    <div class="card">
+      <div class="sq-item">
+        <label for="story-${f.key}">${f.label}<span class="hint">${escapeAndFormat(f.hint)}</span></label>
+        <textarea id="story-${f.key}" data-key="${f.key}" placeholder="${EDIT_ENABLED ? "비워 두면 이 칸은 추천에 쓰이지 않습니다" : "(비어 있음)"}">${escapeAndFormat(persona[f.key] ?? "")}</textarea>
+        <div class="field-error"></div>
+      </div>
+    </div>
+  `).join("");
+  if (EDIT_ENABLED && typeof mountCounter === "function") {       // counter.js 가 안 실려도 저장은 된다 — 길이는 서버가 다시 본다
+    $("storyFields").querySelectorAll("textarea").forEach((t) => mountCounter(t, STORY_LIMIT));
+  }
+  $("storyNote").textContent = EDIT_ENABLED
+    ? "적어주신 내용은 추천에만 쓰입니다. 칸을 비우면 그 칸은 지워지고, 20자 이상 써야 저장됩니다(한 칸 800자까지). 고친 칸은 저장 직후 추천에 반영됩니다."
+    : "가입 때 적어주신 내용입니다. 추천에만 쓰입니다. 지금은 보기만 할 수 있어요 — 고치고 싶은 것이 있으면 관리자에게 알려 주세요.";
+}
+
+/* 읽기 전용 — 칸을 잠그고 저장 버튼은 숨긴다 */
+function lockForms() {
+  document.querySelectorAll("#basicForm input, #basicForm select, #storyFields textarea").forEach((el) => (el.disabled = true));
+  document.querySelectorAll(".edit-only").forEach((el) => (el.hidden = true));
+}
+
+/* ── ③ ④ 기록 · 좋아요 — 서버가 anonId(=회원 번호) 기준으로 준다. 토큰은 api.js 가 싣는다 ── */
+function renderList(el, items, empty, toHtml) {
+  el.innerHTML = items.length ? items.map(toHtml).join("") : `<p class="empty">${empty}</p>`;
+}
+
+async function loadHistory() {
+  // 상자가 둘이다 — 둘 다 같은 말을 보여 줘야 한쪽이 빈 채로 남지 않는다
+  const boxes = [$("historySearches"), $("historyChats")];
+  const say = (html) => boxes.forEach((b) => { b.innerHTML = html; });
+
+  loading.history = true;
+  say(`<p class="empty">불러오는 중...</p>`);
+  try {
+    const { searches = [], chats = [] } = await getHistory(getAnonId());
+    renderList($("historySearches"), searches, "검색 기록이 없어요.",
+      (s) => `<div class="list-item"><span>${escapeAndFormat(s.query)}</span><span class="list-when">${(s.created_at || "").slice(0, 10)}</span></div>`);
+    renderList($("historyChats"), chats, "대화 기록이 없어요.",
+      (c) => `<div class="list-item"><div><div class="list-q">Q. ${escapeAndFormat(c.question)}</div><div class="list-a">A. ${escapeAndFormat(c.answer)}</div></div></div>`);
+    loaded.history = true;        // 성공했을 때만 — 실패하면 탭을 다시 눌러 받아 볼 수 있다
+  } catch (err) {
+    console.error(err);
+    say(`<p class="empty">기록을 불러오지 못했어요. 탭을 다시 눌러 주세요.</p>`);
+  } finally {
+    loading.history = false;      // 성공이든 실패든 "받는 중"은 끝났다
+  }
+}
+
+async function loadLikes() {
+  loading.likes = true;
+  $("likesItems").innerHTML = `<p class="empty">불러오는 중...</p>`;
+  try {
+    const items = await getLikes(getAnonId());
+    renderList($("likesItems"), items, "좋아요한 동네가 없어요.",
+      (i) => `<div class="list-item"><span>${escapeAndFormat(i.gu + " " + i.dong)}</span>
+        <button type="button" class="btn-text" data-gu="${escapeAndFormat(i.gu)}" data-dong="${escapeAndFormat(i.dong)}">취소</button></div>`);
+    $("likesItems").querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await deleteLike(getAnonId(), b.dataset.gu, b.dataset.dong); loaded.likes = false; loadLikes(); }
+      catch (err) { console.error(err); b.disabled = false; }
+    }));
+    loaded.likes = true;
+  } catch (err) {
+    console.error(err);
+    $("likesItems").innerHTML = `<p class="empty">목록을 불러오지 못했어요. 탭을 다시 눌러 주세요.</p>`;
+  } finally {
+    loading.likes = false;
+  }
+}
+
+/* ── 시작 ─────────────────────────────────────────── */
+async function start() {
+  if (!isLoggedIn()) {
+    showGate(`로그인 후 볼 수 있어요. <a href="index.html">첫 화면</a>에서 로그인해 주세요.`);
+    return;
+  }
+  try {
+    [me, gudong] = await Promise.all([getMe(), getGuDong().catch(() => ({}))]);
+  } catch (err) {
+    console.error(err);
+    if (err.status === 401 || err.status === 404) {
+      // 세션은 없는데 기기 번호만 회원 번호로 남아 있던 것 — 로그인이 풀린 상태다. 번호를 새로 발급해 손님으로 돌린다
+      localStorage.setItem("lf-anon", crypto.randomUUID());
+      showGate(`로그인이 풀렸어요. <a href="index.html">첫 화면</a>에서 다시 로그인해 주세요.`);
+    } else {
+      showGate("정보를 불러오지 못했어요. 잠시 후 다시 열어 주세요.");
+    }
+    return;
+  }
+  renderBasic(me.customer);
+  renderStory(me.persona);
+  if (!EDIT_ENABLED) lockForms();
+  $("app").hidden = false;
+  const first = location.hash.slice(1);
+  showView(["basic", "story", "history", "likes"].includes(first) ? first : "basic");
+}
+start();
+</script>
+</body>
+</html>

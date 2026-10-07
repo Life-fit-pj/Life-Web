@@ -135,11 +135,6 @@ def predict(body: PredictRequest, request: Request):
             "price": r.get("price"),   # housing 조건이 없었으면 None — 프론트에서 탭을 숨기거나 안내문으로 대체
         })
 
-    # 가중치 합이 클수록 높은 점수
-    base_score = 40 + sum(weights.values()) * 1.3
-    if body.area >= 59:
-        base_score += 5
-
     # 1차에서 보여 준 동네가 2차 목록에 있으면 표시해 준다.
     # 예산 때문에 빠졌다면 그것도 알려 준다 — 사라진 이유를 알아야 납득한다.
     # name 은 "서울특별시 구 동" 이므로 마지막 조각이 동 이름이다
@@ -150,7 +145,8 @@ def predict(body: PredictRequest, request: Request):
     dropped = sorted(first_names - {r["name"].split(" ")[-1] for r in top_regions})
 
     return {
-        "score": round(min(98.5, max(30.0, base_score)), 1),
+        # 1위 동네의 종합 점수(엔진 recommend 의 total). 전에는 가중치 합으로 만든 가짜 숫자였다(2026-10-06 까지)
+        "score": round(top_regions[0]["score"], 1) if top_regions else None,
         "query": body.query or "",
         "topRegions": top_regions,
         "firstTypeName": body.typeName or "",

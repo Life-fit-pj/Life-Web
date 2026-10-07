@@ -157,7 +157,7 @@ export function signup(token, basicInfo, answers) {
   return postJSON("/api/signup", { ...basicInfo, answers }, authHeader(token));
 }
 
-/** 마이페이지 — 로그인한 회원의 기본정보 */
-export async function getMe(customerId) {
-  return getJSON(`/api/auth/me?customerId=${encodeURIComponent(customerId)}`, await authHeaders());
+/** 마이페이지 — 본인의 기본정보 + 가입 설문 페르소나. 번호를 안 보낸다(토큰이 누구인지다). 401·404 면 로그인이 풀린 것 */
+export async function getMe() {
+  return getJSON("/api/auth/me", await authHeaders());
 }

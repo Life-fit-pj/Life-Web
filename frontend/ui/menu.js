@@ -1,12 +1,7 @@
-import { openHistory } from "./history.js";
-import { openLikes } from "./likes.js";
-import { openMypage } from "./mypage.js";
-import { openSources } from "./sources.js";
 import { authLogin, getSignedUp } from "../lib/api.js";
-import { getAnonId, isLoggedIn } from "../lib/state.js";
+import { isLoggedIn } from "../lib/state.js";
 import { supabase } from "../lib/supabaseClient.js";
 
-let menuModalEl = null;
 let authModalEl = null;
 
 // Supabase 로그인 직후(이메일/비번, 구글 리디렉션 복귀 포함)마다 한 번씩 불린다.
@@ -58,78 +53,6 @@ async function resolveBackendAccount(token) {
     }
 }
 
-// 메뉴 패널 DOM을 처음 열릴 때 한 번만 만든다.
-function ensureMenu() {
-    if (menuModalEl) return menuModalEl;
-    menuModalEl = document.createElement("div");
-    menuModalEl.className = "menu-backdrop";
-    menuModalEl.innerHTML = `
-        <nav class="menu-panel">
-            <button class="menu-close" aria-label="닫기">&times;</button>
-            <div class="menu-items" id="menuItems"></div>
-        </nav>
-    `;
-    document.body.appendChild(menuModalEl);
-
-    // 배경 클릭하면 닫기
-    menuModalEl.addEventListener("click", (e) => {
-        if (e.target === menuModalEl) closeMenu();
-    });
-    menuModalEl.querySelector(".menu-close").addEventListener("click", closeMenu);
-
-    return menuModalEl;
-}
-
-
-// 로그인/회원가입은 헤더의 별도 버튼(#loginToggle)으로 옮겼기 때문에,
-// 이 메뉴에는 실제 로그인 여부와 무관하게 로그인 이후 항목만 상시로 보여준다.
-// 관리자 페이지는 메뉴에 두지 않는다 — 관리자는 /admin.html 로 직접 들어가고 ADMIN_TOKEN 으로 막는다.
-function renderMenuItems() {
-    const box = document.getElementById("menuItems");
-
-    box.innerHTML = `
-        <a class="menu-item" id="menuMypage" href="#">마이페이지</a>
-        <a class="menu-item" id="menuHistory" href="#">검색 및 대화 기록 저장소</a>
-        <a class="menu-item" id="menuLikes" href="#">좋아요 한 거주지</a>
-        <a class="menu-item" id="menuSources" href="#">원본 데이터 및 출처 안내</a>
-    `;
-    box.querySelector("#menuSources").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        openSources();
-    });
-    box.querySelector("#menuMypage").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        if (!isLoggedIn()) {
-            openAuthModal();
-            return;
-        }
-        openMypage();
-    });
-    box.querySelector("#menuHistory").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        openHistory();
-    });
-    box.querySelector("#menuLikes").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        openLikes();
-    });
-}
-
-export function openMenu() {
-    const el = ensureMenu();
-    renderMenuItems();
-    el.classList.add("is-open");
-}
-
-function closeMenu() {
-    if (!menuModalEl) return;
-    menuModalEl.classList.remove("is-open");
-}
-
 // 헤더 "로그인" 버튼을 누르면 뜨는 모달.
 // 실제 인증(비밀번호 확인, 구글 OAuth)은 Supabase SDK 가 처리한다 — 이 모달은
 // 그 UI만 띄우고, 로그인 성공 뒤처리(resolveBackendAccount)는 위쪽
@@ -150,25 +73,6 @@ function ensureAuthModal() {
     return authModalEl;
 }
 
-function renderLoggedInAuthModal(el) {
-    el.innerHTML = `
-        <div class="auth-modal">
-            <button class="auth-close" aria-label="닫기">&times;</button>
-            <div class="auth-section">
-                <h3 class="auth-title">로그인 중</h3>
-                <p class="auth-notice">아이디: <strong>${getAnonId()}</strong></p>
-                <button id="logoutBtn" class="auth-cta">로그아웃</button>
-            </div>
-        </div>
-    `;
-    el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
-    el.querySelector("#logoutBtn").addEventListener("click", () => {
-        supabase.auth.signOut();
-        localStorage.setItem("lf-anon", crypto.randomUUID());
-        syncLoginToggle();
-        renderGuestAuthModal(el);
-    });
-}
 
 function startGoogleLogin() {
     // 지금 페이지로 그대로 돌아온다 — 복귀하면 onAuthStateChange(SIGNED_IN)가
@@ -294,31 +198,28 @@ function renderSignupAuthModal(el) {
     });
 }
 
-// 우상단 로그인 버튼의 표시 문구. 로그아웃은 계정을 지우는 게 아니라
-// 새 익명 id를 발급하는 것뿐이라(state.js), 로그인 폼과 별도 화면 없이 그 자리에서 처리한다.
+// 우상단 버튼 하나가 두 역할을 한다 — 로그아웃 상태면 "로그인"(모달), 로그인 상태면 "마이페이지"(mypage.html 로 이동).
+// 로그아웃은 마이페이지 안에 있다 — 지도 화면에서 실수로 누르던 것을 없앴다
 export function syncLoginToggle() {
     const btn = document.getElementById("loginToggle");
     if (!btn) return;
-    btn.textContent = isLoggedIn() ? "로그아웃" : "로그인";
+    const loggedIn = isLoggedIn();
+    btn.textContent = loggedIn ? "👤 마이페이지" : "로그인";
+    btn.classList.toggle("is-member", loggedIn);
 }
 
 export function handleLoginToggleClick() {
     if (isLoggedIn()) {
-        supabase.auth.signOut();
-        localStorage.setItem("lf-anon", crypto.randomUUID());
-        syncLoginToggle();
+        location.href = "mypage.html";
     } else {
         openAuthModal();
     }
 }
 
+// 로그인 모달. 로그인 상태에서는 부를 일이 없다 — 하트(reason.js) · 검색(search.js)이 isLoggedIn() 을 먼저 보고, 헤더 버튼은 마이페이지로 간다
 export function openAuthModal() {
     const el = ensureAuthModal();
-    if (isLoggedIn()) {
-        renderLoggedInAuthModal(el);
-    } else {
-        renderGuestAuthModal(el);
-    }
+    renderGuestAuthModal(el);
     el.classList.add("is-open");
 }
 

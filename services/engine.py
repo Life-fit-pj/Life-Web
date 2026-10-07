@@ -237,9 +237,9 @@ def get_chat_answer(question, regions=None, weights=None, history=None, anon_id=
 
 # ── 회원/설문 ─────────────────────────────────────
 
-def get_customer(customer_id):
-    """회원 기본정보(이름, 이메일, 가입일 등). 마이페이지에서 쓴다."""
-    return _call("GET", f"/customers/{_seg(customer_id)}", none_on=(404,))
+def get_me(token: str):
+    """로그인한 회원 본인의 기본정보 + 가입 설문 페르소나. 가입 전이면 None. 마이페이지에서 쓴다."""
+    return _call("GET", "/auth/me", headers=_bearer(token), none_on=(404,))
 
 
 def score_survey(prompt):
