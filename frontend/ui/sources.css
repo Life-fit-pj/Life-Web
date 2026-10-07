@@ -1,6 +1,6 @@
 /*
-원본 데이터 및 출처 안내 모달
-틀은 ui/mypage.css 를 따르고, 글이 많아 너비만 넓다(760px). 글은 ui/sources.js 의 SOURCES 에 있다
+이용 안내 · 데이터 출처 모달(탭 둘)
+글이 많아 너비가 넓다(820px). 글은 ui/sources.js 의 GUIDE · SOURCES 에 있다
 */
 
 .sources-backdrop {
@@ -16,7 +16,8 @@
 
 .sources-modal {
   position: relative;
-  width: min(760px, 92vw);
+  width: min(820px, 92vw);
+  transition: width 0.15s;
   max-height: 86vh;
   overflow-y: auto;
   background: var(--surface-2);
@@ -93,4 +94,161 @@
   margin: 8px 0 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+
+/* ── 탭 둘 — 관리자 · 마이페이지와 같은 밑줄 방식 ── */
+.sources-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin: -6px 0 16px;
+}
+.sources-tab {
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.sources-tab:hover { color: var(--text); }
+.sources-tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+.sources-pane { display: none; }
+.sources-pane.is-active { display: block; }
+
+/* ── 이용 안내 — 한 번에 한 장: 왼쪽 그림(영역마다 번호 하나), 오른쪽 흰 카드에 글. 스크롤 없이 한눈에 ── */
+.sources-modal.is-guide { width: min(1180px, 96vw); }
+
+/* 넘기기 줄 — [🔍 검색 → 📍 결과 → …]. 칩이 곧 버튼이다 */
+.guide-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.guide-flow i { font-style: normal; }
+.guide-chip {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.guide-chip:hover { border-color: var(--accent); }
+.guide-chip.is-active {
+  background: var(--accent-fill, #FFCC00);
+  color: var(--accent-ink, #1C1A20);
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* 장 — 보이는 것 하나만. 왼쪽 그림이 남는 폭을 다 쓰고 오른쪽 글은 340px */
+/* 미끄러져 들어오는 장이 모달 밖으로 삐져나가 가로 스크롤바를 만들지 않게 — 그게 0.28초 동안 모달을 위아래로 흔들었다 */
+.guide-stage { overflow: hidden; }
+.guide-page { display: none; }
+.guide-page.is-active {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 장이 바뀔 때 — 새 장이 이동 방향에서 미끄러져 들어온다. 그림이 미리 실려 있어 깜빡이지 않는다(loading="lazy" 를 뺐다) */
+@keyframes guide-in-right { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes guide-in-left  { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+.guide-page.is-active.from-right { animation: guide-in-right 0.28s ease-out; }
+.guide-page.is-active.from-left  { animation: guide-in-left  0.28s ease-out; }
+@media (prefers-reduced-motion: reduce) { .guide-page.is-active { animation: none; } }
+
+.guide-shot {
+  position: relative;                /* 번호 동그라미의 기준 */
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.guide-shot img { display: block; width: 100%; height: auto; }
+
+/* 번호 동그라미 — 설명하는 영역의 왼쪽 위 모서리에 걸친다(x · y 가 그 모서리). 흰 테두리로 지도 위에서도 보이게 */
+.guide-mark {
+  position: absolute;
+  transform: translate(-45%, -45%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-fill, #FFCC00);
+  color: var(--accent-ink, #1C1A20);
+  border: 2px solid #fff;
+  font: 700 13px/22px 'Inter', sans-serif;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+/* 오른쪽 글 카드 */
+.guide-text {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.guide-intro {
+  margin: -2px 0 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  word-break: keep-all;
+}
+.guide-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  word-break: keep-all;
+}
+.guide-list > li {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.guide-list > li:last-child { border-bottom: none; }
+.guide-list b { display: block; margin-bottom: 3px; color: var(--text); font-weight: 700; }
+.guide-list ul {
+  margin: 0;
+  padding-left: 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.guide-list ul li { padding: 1px 0; }
+.guide-num {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--accent-fill, #FFCC00);
+  color: var(--accent-ink, #1C1A20);
+  font: 700 12px/20px 'Inter', sans-serif;
+  text-align: center;
+}
+
+/* 좁은 화면 — 그림 위, 글 아래 */
+@media (max-width: 860px) {
+  .guide-page.is-active { grid-template-columns: 1fr; }
+  .guide-text { max-height: none; }
 }

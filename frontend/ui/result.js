@@ -68,7 +68,7 @@ export function renderResult(data) {
   const elScore = document.getElementById('resScore');
   if (elScore) {
     elScore.innerHTML =
-      `${data.score} <span style="font-size:16px; color:var(--muted, #888);">/ 100</span>`;
+      `${data.score ?? "—"} <span style="font-size:16px; color:var(--muted, #888);">/ 100</span>`;
   }
 
   // ② 추천 TOP 5 리스트
