@@ -186,6 +186,12 @@ function renderSignupAuthModal(el) {
             errorEl.textContent = "회원가입에 실패했어요: " + error.message;
             return;
         }
+        // 이미 가입된 이메일이면 Supabase 는 오류 대신 identities 가 빈 가짜 사용자를 돌려준다(이메일 존재 여부를 감추려고).
+        // 그대로 두면 "메일을 보냈어요"가 뜨는데 메일은 안 온다
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+            errorEl.textContent = "이미 가입된 이메일이에요. 로그인해 주세요.";
+            return;
+        }
         if (!data.session) {
             // 프로젝트에 이메일 확인이 켜져 있으면 세션이 바로 안 생긴다 — 메일의 링크를
             // 눌러 돌아오면 그때 onAuthStateChange(SIGNED_IN)가 이어서 처리한다.
