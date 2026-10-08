@@ -140,19 +140,53 @@
   border: 1px dashed var(--line-strong);
 }
 
-.floorplan-img {
-  width: 100%;
-  height: auto;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--surface-2);
+.floorplan-area h4 small {
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 6px;
 }
 
-.filename-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px;
-  color: var(--muted);
-  margin-top: 8px;
-  word-break: break-all;
+.floorplan-area[hidden] { display: none; }
+
+/* 템플릿 한 줄 — "자녀가 있는 가구라면 …" */
+.fp-note {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: var(--navy);
+  line-height: 1.5;
+}
+.fp-note:empty { display: none; }
+
+/* 가로 스크롤 카드 — 상품 목록처럼 옆으로 민다 */
+.fp-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+}
+.fp-strip:empty { display: none; }
+
+.fp-card {
+  flex: 0 0 72%;
+  margin: 0;
+  scroll-snap-align: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.fp-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #fff;
+}
+.fp-card figcaption {
+  padding: 6px 8px;
+  font-size: 10.5px;
+  color: var(--text);
   line-height: 1.4;
 }

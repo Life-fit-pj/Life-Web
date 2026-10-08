@@ -77,8 +77,8 @@ export function renderResult(data) {
   // ③ 지도 마커
   renderKakaoMapMarkers(data.topRegions, data.weights);
 
-  // ④ LH 평면도
-  renderFloorplan(data.floorplanPath);
+  // ④ LH 평면도 — 가구 구성에 맞는 구조 3~4장
+  renderFloorplans(data.floorplans, data.floorplanNote, data.floorplanMode);
 }
 
 
@@ -129,20 +129,21 @@ function updateTopRegionsList(regions, dropped) {
 }
 
 
-/** ④ LH 평면도 : 평면도를 그리거나, 경로가 없으면 깔끔히 비운다 */
-function renderFloorplan(path) {
-  const img = document.getElementById('floorplanImg');
-  const txt = document.getElementById('fpFilename');
+/** ④ LH 평면도 : 가구 구성에 맞는 도면 3~4장을 가로 카드로. 없으면(아파트가 아니면) 영역을 숨긴다 */
+function renderFloorplans(plans, note, mode) {
+  const area = document.getElementById('floorplanArea');
+  const strip = document.getElementById('fpStrip');
+  const noteEl = document.getElementById('fpNote');
   const ph = document.getElementById('fpPlaceholder');
+  if (!area || !strip) return;
 
-  if (path) {
-    if (img) { img.src = path; img.style.display = 'block'; }
-    if (txt) txt.innerText = `매칭 경로: ${path}`;
-    if (ph) ph.style.display = 'none';
-  } else {
-    // 경로가 없으면 이전 이미지가 남지 않게 지운다
-    if (img) { img.removeAttribute('src'); img.style.display = 'none'; }
-    if (txt) txt.innerText = '';
-    if (ph) ph.style.display = 'block';
-  }
+  const list = Array.isArray(plans) ? plans : [];
+  area.hidden = mode === 'off';                      // 오피스텔·빌라를 고르면 LH 아파트 도면은 뜻이 없다
+  strip.innerHTML = list.map((p) => `
+    <figure class="fp-card">
+      <img src="${p.path}" alt="${p.caption}" loading="lazy" onerror="this.closest('.fp-card').remove()">
+      <figcaption>${p.caption}</figcaption>
+    </figure>`).join('');
+  if (noteEl) noteEl.textContent = list.length ? (note || '') : '';
+  if (ph) ph.style.display = list.length ? 'none' : 'block';
 }
