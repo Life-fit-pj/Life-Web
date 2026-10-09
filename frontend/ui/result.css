@@ -157,18 +157,28 @@
 }
 .fp-note:empty { display: none; }
 
-/* 가로 스크롤 카드 — 상품 목록처럼 옆으로 민다 */
+/* 한 장씩 넘겨 보는 카드 — 스크롤바 대신 화살표·그림 반 클릭·점.
+   화살표는 카드 밖 양옆에 두고, 가운데(카드든 안내 상자든)의 높이에 맞춰 세로 가운데로 */
+.fp-carousel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fp-body {
+  flex: 1;
+  min-width: 0;                           /* 안 두면 긴 카드가 화살표를 밀어낸다 */
+}
 .fp-strip {
   display: flex;
-  gap: 10px;
   overflow-x: auto;
-  padding-bottom: 6px;
   scroll-snap-type: x mandatory;
+  scrollbar-width: none;                 /* Firefox */
 }
+.fp-strip::-webkit-scrollbar { display: none; }   /* Chrome · Edge */
 .fp-strip:empty { display: none; }
 
 .fp-card {
-  flex: 0 0 72%;
+  flex: 0 0 100%;
   margin: 0;
   scroll-snap-align: start;
   border: 1px solid var(--line);
@@ -176,6 +186,39 @@
   background: var(--surface-2);
   overflow: hidden;
 }
+.fp-card img { cursor: pointer; }
+
+.fp-arrow {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--navy);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fp-arrow:hover { background: #fff; }
+
+.fp-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.fp-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.fp-dots i.is-on { background: var(--navy); }
+.fp-single .fp-arrow, .fp-single .fp-dots { display: none; }
+.fp-dots:empty { display: none; }
+
 .fp-card img {
   display: block;
   width: 100%;

@@ -313,8 +313,15 @@
     <div class="floorplan-area" id="floorplanArea">
       <h4>🏠 평면도 <small>이런 구조의 아파트는 어떠세요?</small></h4>
       <p class="fp-note" id="fpNote"></p>
-      <div class="placeholder" id="fpPlaceholder">아파트 유형 검색 시 면적 슬라이더 값과 가족 구성에 맞는 도면이 나와요.</div>
-      <div class="fp-strip" id="fpStrip"></div>
+      <div class="fp-carousel">
+        <button type="button" class="fp-arrow fp-prev" id="fpPrev" aria-label="이전 도면">‹</button>
+        <div class="fp-body">
+          <div class="placeholder" id="fpPlaceholder">아파트 유형 검색 시 면적 슬라이더 값과 가족 구성에 맞는 도면이 나와요.</div>
+          <div class="fp-strip" id="fpStrip"></div>
+        </div>
+        <button type="button" class="fp-arrow fp-next" id="fpNext" aria-label="다음 도면">›</button>
+      </div>
+      <div class="fp-dots" id="fpDots"></div>
     </div>
 
   </div>
