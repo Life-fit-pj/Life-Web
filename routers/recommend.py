@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from services.coords import COORDS, lookup_coords
 from services.engine import (
     KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer,
-    save_search, save_chat, get_history, get_me, ANON_ID,
+    save_search, save_chat, get_history, ANON_ID,
 )
 from services import quota
 from services.floorplan import find_floorplans
@@ -89,20 +89,16 @@ class ChatRequest(BaseModel):
 # ==========================================
 
 def _member_persona_text(request: Request) -> str:
-    """로그인한 회원이면 저장된 가입 설문 글 중 가족·취미 두 칸. 손님이거나 못 받으면 빈 글.
+    """로그인한 회원이면 저장된 가입 설문 글 중 다섯 칸. 손님이거나 못 받으면 빈 글.
 
-    이 두 칸은 가입 때 7개 가중치로 안 바뀐다(persona_type.QUESTIONS 에 축이 없다) — 평면도를 위해 받아 둔 칸이라
-    여기서 읽는다. 엔진 GET /auth/me 는 토큰으로 본인 것만 준다. 실패(만료 토큰 · 엔진 꺼짐)는 평면도를 못 고르는 게 아니라
-    가구 구성을 모르는 것뿐이므로 조용히 빈 글로 간다"""
-    token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
-    if not token:
-        return ""
-    try:
-        me = get_me(token) or {}
-    except Exception:
-        return ""
-    persona = me.get("persona") or {}
-    return " ".join(persona.get(k) or "" for k in ("family_persona", "hobbies_and_interests_list"))
+    글은 quota 가 토큰을 확인할 때 같이 받아 둔 것이다(엔진 /auth/me, 토큰마다 한 번) — 여기서 엔진을 다시 부르지 않는다.
+    못 받았으면(만료 토큰 · 엔진 꺼짐) 평면도를 못 고르는 게 아니라 가구 구성을 모르는 것뿐이므로 빈 글로 간다"""
+    persona = quota.persona(request)
+    # 엔진 app/core/config.py 의 CHUNK_COLUMNS 에 있는 이름만. 저장소가 둘이라 import 못 하니 이름을 지어내지 않게 거기를 보고 적는다.
+    # 평면도가 읽는 낱말이 흩어져 있다 — 가족은 family, "운동기구"는 sports, "악기·피아노"(취미 답 h1 도 여기)는 arts,
+    # "요리·집밥"은 culinary, "재택·작업실"은 professional. 없는 이름을 적으면 .get() 이 조용히 빈 글을 준다(10-08 에 그랬다)
+    columns = ("family_persona", "sports_persona", "arts_persona", "culinary_persona", "professional_persona")
+    return " ".join(persona.get(k) or "" for k in columns)
 
 
 def _floorplan_fields(body: PredictRequest, request: Request) -> dict:
