@@ -170,6 +170,17 @@ PERSONA_MAP = {
     "cultural_background":  ["g1", "g2"],
 }
 
+NEGATORS = ("안 ", "않", "못 ", "없", "별로", "아니", "싫", "질색", "힘들")
+
+# 취미(h1) → 어느 지표가 올라가나. h1 은 축이 없어 가중치에 전혀 안 들어가고 있었다(2026-10-08 까지).
+# 가구 보정과 같은 자리(to_weights)에서 직접 더한다. 낱말은 어간만 — "등산을/등산하는" 다 걸린다
+HOBBY_WORDS = {
+    "culture":  ("전시", "공연", "영화", "미술", "독서", "책 읽", "도서관", "악기",
+             "피아노", "뮤지컬", "연극", "콘서트", "사진 찍"),
+    "green":    ("등산", "산책", "러닝", "달리기", "자전거", "캠핑", "낚시", "반려", "강아지", "트레킹", "조깅"),
+    "fitness":  ("헬스", "수영", "요가", "필라테스", "클라이밍", "배드민턴", "테니스", "골프"),
+    "commerce": ("맛집", "카페", "쇼핑", "베이킹", "와인", "디저트"),
+}
 
 # Life-Embed-jh app/core/config.py 의 MIN_LENGTH 와 같은 값이다. persona_type.py는
 # 그 저장소를 몰라도 되게 만든 파일(services/engine.py만 안다)이라 값만 그대로 옮겨
@@ -188,8 +199,6 @@ def answers_to_persona(answers: dict) -> dict:
         if len(text) >= _MIN_LENGTH:
             persona[column] = text
     return persona
-
-NEGATORS = ("안 ", "않", "못 ", "없", "별로", "아니", "싫", "질색", "힘들")
 
 
 # ============================================================
@@ -297,6 +306,16 @@ def extract_household(answers: dict) -> dict:
     if space is not None and abs(space) >= 0.25:
         h["space_pref"] = "new" if space > 0 else "area"
 
+    hobby = answers.get("h1") or ""
+    # 부정문이면 안 센다 — "등산은 싫어해요"가 녹지를 올리던 것(2026-10-09).
+    # 문장 단위로 가른다: "등산은 좋고 전시는 싫어요" 를 통째로 버리지 않으려는 것
+    positive = " ".join(s for s in re.split(r"[.,!?·\n]| 그리고 | 하지만 ", hobby)
+                        if not any(n in s for n in NEGATORS))
+    kinds = [kind for kind, words in HOBBY_WORDS.items() if any(w in positive for w in words)]
+    if kinds:
+        h["hobbies"] = kinds                                  # ["culture", "green"] 처럼 걸린 종류들
+        h["hobby_count"] = sum(1 for words in HOBBY_WORDS.values() for w in words if w in hobby)
+
     return h
 
 
@@ -375,6 +394,17 @@ def to_weights(axis: dict, household: dict | None = None) -> dict:
         w["교통"] += 1.0
     elif h.get("commute") == "car":
         w["교통"] -= 0.5
+
+    # 취미 — 종류마다 한 번씩. 자녀·동거 보정(1.0~2.0)보다 작게 둔다: 취미는 "주말에 가는 곳"이고 가족은 "매일 사는 조건"이다
+    for kind in h.get("hobbies") or ():
+        if kind == "culture":
+            w["문화"] += 1.0
+        elif kind == "green":
+            w["녹지"] += 1.0
+        elif kind == "fitness":
+            w["문화"] += 0.5                                   # 체육시설은 문화시설 표에 있다
+        elif kind == "commerce":
+            w["상권"] += 0.8
 
     return {k: round(max(1.0, min(5.0, v)), 2) for k, v in w.items()}
 
