@@ -27,6 +27,7 @@ from __future__ import annotations
 import re
 
 from services import lifetype as lt
+from services.household import household_from_text
 
 # ============================================================
 # 문항 15개 — signup.html 의 15개 입력 id(p1,p2,s1,s2,...)와 정확히 대응한다.
@@ -273,23 +274,9 @@ def parse_llm_scores(raw: str) -> dict:
 # 답변에서 가구·통근 정보 뽑기 (7지표 가중치 보정에 쓴다)
 # ============================================================
 def extract_household(answers: dict) -> dict:
-    h = {}
     fam = answers.get("f1") or ""
-    if any(w in fam for w in ("혼자", "1인", "자취")):
-        h["household"] = "single"
-    elif any(w in fam for w in ("아이", "자녀", "딸", "아들", "육아")):
-        h["household"] = "family"
-    elif any(w in fam for w in ("아내", "남편", "배우자", "둘이", "부부")):
-        h["household"] = "couple"
-    elif any(w in fam for w in ("부모님", "어머니", "아버지")):
-        h["household"] = "parent"
-
-    if any(w in fam for w in ("영유아", "아기", "돌", "어린이집", "태어")):
-        h["child"] = "infant"
-    elif any(w in fam for w in ("초등", "유치원")):
-        h["child"] = "elementary"
-    elif any(w in fam for w in ("중학", "고등", "수능", "학원")):
-        h["child"] = "secondary"
+    # 가구 구성·자녀 나이는 평면도와 같은 표(services/household.py)로 읽는다 — 낱말이 두 곳이면 어긋난다
+    h = {k: v for k, v in household_from_text(fam).items() if k in ("household", "child")}
 
     if any(w in fam for w in ("부모님", "어머니", "아버지", "장인", "시어머니")):
         h["elder"] = True

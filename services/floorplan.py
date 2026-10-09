@@ -16,6 +16,8 @@ LLM 은 안 부른다. 비회원이 슬라이더를 바꿔 가며 눌러도 공�
 import csv
 import os
 
+from services.household import household_from_text
+
 # 이 파일은 services/ 안에 있으므로 두 단계 올라가야 프로젝트 뿌리다
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -47,49 +49,7 @@ AREA_SPAN_WIDE = 25     # "넓은 게 최고인" 이면 위로 더 넓게
 AREA_MIN, AREA_MAX = 25, 115    # 자료의 전용면적 범위
 
 
-# ============================================================
-# 글에서 가구 구성 읽기
-#   검색어("아이 둘이랑 살 조용한 동네")도, 2차 설문 15개 답을 이은 글도 같은 함수로 읽는다 —
-#   설문은 /api/predict 에 답을 통째로 이어 보내므로(search.js runSurveyIfPending) 문항별로 못 받는다.
-#   낱말은 persona_type.extract_household 와 같은 것을 쓴다. 한쪽을 바꾸면 다른 쪽도 본다
-# ============================================================
-HOUSEHOLD_WORDS = {
-    "family": ("아이", "자녀", "딸", "아들", "육아", "애들", "애기", "아기", "유치원", "초등", "중학", "고등"),
-    "parent": ("부모님", "어머니", "아버지", "장인", "장모", "시어머니", "시아버지", "모시"),
-    "couple": ("아내", "남편", "배우자", "둘이", "부부", "신혼", "와이프"),
-    "single": ("혼자", "1인", "자취", "독립", "싱글"),
-}
-CHILD_WORDS = {
-    "infant": ("영유아", "아기", "애기", "어린이집", "태어", "신생아", "돌"),
-    "elementary": ("초등", "유치원"),
-    "secondary": ("중학", "고등", "수능", "학원"),
-}
-# "방이 더 필요하다"는 신호 — 2차 설문 f2(아쉬운 점) · h1(취미)에서 나온다. 침실 수를 올리는 게 아니라 알파룸을 우선한다(침실 4 는 2장뿐)
-EXTRA_ROOM_WORDS = ("재택", "작업실", "서재", "취미", "운동기구", "악기", "피아노", "수납", "짐이 많", "방이 부족", "방이 좁", "좁아",
-                    "컴퓨터", "게임", "작업 공간", "맥시멀")
-COOK_WORDS = ("요리", "직접 해", "해 먹", "집밥", "주방")
-
-
-def household_from_text(text: str) -> dict:
-    """글에서 가구 구성·신호를 뽑는다. 못 읽은 칸은 없다(키가 없다).
-
-    먼저 걸리는 종류를 쓰되, 가족·부모님이 1인보다 우선한다 — "혼자 키우는 아이"는 family 다.
-    """
-    t = str(text or "")
-    h = {}
-    for kind in ("family", "parent", "couple", "single"):
-        if any(w in t for w in HOUSEHOLD_WORDS[kind]):
-            h["household"] = kind
-            break
-    for kind in ("infant", "elementary", "secondary"):
-        if any(w in t for w in CHILD_WORDS[kind]):
-            h["child"] = kind
-            break
-    if any(w in t for w in EXTRA_ROOM_WORDS):
-        h["extra_room"] = True
-    if any(w in t for w in COOK_WORDS):
-        h["cook"] = True
-    return h
+AREA_MIN, AREA_MAX = 25, 115    # 자료의 전용면적 범위
 
 
 # ============================================================
@@ -118,10 +78,12 @@ def wanted_layout(household: dict, house_picks: list | None = None) -> dict:
     if kind == "single":
         bed, bath_min = (0, 2), 0
         prefer["욕실1"] = 1
+        prefer["침실<=1"] = 1.5                                # 원룸·방 하나가 먼저. 없으면 방 둘로
         note = "혼자 살면 방 하나에 작업 공간 하나면 충분해요"
     elif kind == "couple":
         bed, bath_min = (2, 3), 0
         prefer["드레스룸"] = 1
+        prefer["침실==2"] = 1.5                                # 신혼은 방 둘부터. 59㎡ 를 넣어도 55~56㎡ 방 둘이 59㎡ 방 셋을 이기게
         note = "둘이면 침실 둘 — 하나는 옷방이나 서재로 쓰기 좋아요"
     elif kind == "family":
         bed, bath_min = (3, 4), 2
@@ -162,6 +124,10 @@ def _score(plan: dict, wanted: dict, area: float) -> float:
             s += weight if plan["욕실"] == 1 else 0
         elif key == "욕실3":
             s += weight if plan["욕실"] >= 3 else 0
+        elif key == "침실<=1":
+            s += weight if plan["침실"] <= 1 else 0
+        elif key == "침실==2":
+            s += weight if plan["침실"] == 2 else 0
         else:
             s += weight * plan[key]
     s -= abs(plan["전용면적"] - area) / 10       # 10㎡ 멀어질 때마다 가점 하나만큼 깎는다
@@ -173,7 +139,7 @@ def _caption(plan: dict) -> str:
     for k in ("알파룸", "드레스룸", "팬트리"):
         if plan[k]:
             parts.append(k)
-    return " · ".join(parts) + f" — 전용 {plan['전용면적']:.0f}㎡ · LH {plan['사업지구']}"
+    return " · ".join(parts) + f" — 전용 {plan['전용면적']:.0f}㎡"      # 어느 단지인지는 안 적는다. 동네와 무관한 공공주택 도면이라 뜻이 없다
 
 
 def find_floorplans(area: float, text: str = "", house_picks: list | None = None, n: int = 4) -> dict:
@@ -228,12 +194,6 @@ def find_floorplans(area: float, text: str = "", house_picks: list | None = None
         "note": note,
         "mode": "layout" if wanted["known"] else "area",
     }
-
-
-def find_floorplan(area: float) -> str:
-    """면적만으로 한 장. 옛 호출처를 위해 남긴다 — 새 코드는 find_floorplans() 를 쓴다."""
-    got = find_floorplans(area, n=1)
-    return got["plans"][0]["path"] if got["plans"] else ""
 
 
 if __name__ == "__main__":
