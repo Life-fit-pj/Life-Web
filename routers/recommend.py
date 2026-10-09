@@ -19,7 +19,7 @@ from services.engine import (
     save_search, save_chat, get_history, ANON_ID,
 )
 from services import quota
-from services.floorplan import find_floorplan
+from services.floorplan import find_floorplans
 
 router = APIRouter(prefix="/api", tags=["추천"])
 
@@ -43,6 +43,7 @@ class PredictRequest(BaseModel):
 
     area: int = 59
     bldgType: str | None = None
+    housePicks: list[str] | None = None   # 1차 집 조건 키워드("방이 많은" 등). 평면도 고를 때만 쓴다
 
     dealType: str | None = None
     salePrice: int | None = None
@@ -86,6 +87,30 @@ class ChatRequest(BaseModel):
 # ==========================================
 # API 라우트: 예측 및 추천 수행
 # ==========================================
+
+def _member_persona_text(request: Request) -> str:
+    """로그인한 회원이면 저장된 가입 설문 글 중 다섯 칸. 손님이거나 못 받으면 빈 글.
+
+    글은 quota 가 토큰을 확인할 때 같이 받아 둔 것이다(엔진 /auth/me, 토큰마다 한 번) — 여기서 엔진을 다시 부르지 않는다.
+    못 받았으면(만료 토큰 · 엔진 꺼짐) 평면도를 못 고르는 게 아니라 가구 구성을 모르는 것뿐이므로 빈 글로 간다"""
+    persona = quota.persona(request)
+    # 엔진 app/core/config.py 의 CHUNK_COLUMNS 에 있는 이름만. 저장소가 둘이라 import 못 하니 이름을 지어내지 않게 거기를 보고 적는다.
+    # 평면도가 읽는 낱말이 흩어져 있다 — 가족은 family, "운동기구"는 sports, "악기·피아노"(취미 답 h1 도 여기)는 arts,
+    # "요리·집밥"은 culinary, "재택·작업실"은 professional. 없는 이름을 적으면 .get() 이 조용히 빈 글을 준다(10-08 에 그랬다)
+    columns = ("family_persona", "sports_persona", "arts_persona", "culinary_persona", "professional_persona")
+    return " ".join(persona.get(k) or "" for k in columns)
+
+
+def _floorplan_fields(body: PredictRequest, request: Request) -> dict:
+    """응답의 평면도 칸 셋. 아파트일 때만 고른다 — 가격 조건을 끈 검색(bldgType None)은 화면 기본값이 아파트라 같이 친다.
+    글(검색어 — 설문 답을 이어 보낸 것도 여기로 온다 — 와 회원의 저장된 가족·취미 글)에서 가구 구성을 읽고,
+    1차 집 조건 키워드를 더해 도면 3~4장을 고른다"""
+    if body.bldgType not in (None, "아파트"):
+        return {"floorplans": [], "floorplanNote": "", "floorplanMode": "off"}
+    text = f"{body.query or ''} {_member_persona_text(request)}"
+    got = find_floorplans(body.area, text=text, house_picks=body.housePicks)
+    return {"floorplans": got["plans"], "floorplanNote": got["note"], "floorplanMode": got["mode"]}
+
 
 @router.post("/predict")      # @app.post("/api/predict") 였던 것
 def predict(body: PredictRequest, request: Request):
@@ -151,7 +176,7 @@ def predict(body: PredictRequest, request: Request):
         "topRegions": top_regions,
         "firstTypeName": body.typeName or "",
         "droppedFromFirst": dropped,
-        "floorplanPath": find_floorplan(body.area),
+        **_floorplan_fields(body, request),
         "fallback": False,
         "explanation": explanation,
         "weights": weights,

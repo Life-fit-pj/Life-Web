@@ -14,7 +14,7 @@ import threading
 
 from fastapi import HTTPException, Request
 
-from services.engine import auth_login
+from services.engine import get_me
 
 MEMBER_DAILY_LIMIT = 20
 GUEST_DAILY_LIMIT = 5
@@ -24,6 +24,7 @@ MEMBER_ID = re.compile(r"C\d+")      # 회원 번호의 모양. 엔진 app/tools
 _lock = threading.Lock()
 _counts: dict[tuple, int] = {}      # (날짜, 주체) -> 오늘 쓴 횟수
 _members: dict[str, str | None] = {}  # 토큰 -> customer_id. 같은 토큰으로 매번 엔진을 부르지 않는다
+_personas: dict[str, dict] = {}       # 토큰 -> 가입 설문 글(엔진 /auth/me 의 persona). 평면도가 읽는다 — 토큰 확인과 한 왕복으로 받아 둔다
 
 
 def _client_ip(request: Request) -> str:
@@ -51,17 +52,35 @@ def _resolve_who(request: Request) -> tuple[str, int]:
     if token:
         member = _members.get(token)
         if member is None:
+            # /auth/me 는 /auth/login 과 같은 확인(토큰 → 회원 번호)을 하고 가입 설문 글까지 준다 — 둘을 따로 부르면
+            # 회원 검색 한 번에 엔진 왕복이 하나 는다(2026-10-09 까지 그랬다). 글은 관리자 수정 때만 바뀌므로 토큰마다 한 번이면 된다
             try:
-                member = auth_login(token)
+                me = get_me(token)
             except Exception:
-                member = None       # 만료·위조 토큰이면 엔진이 401 을 준다 — 이번 요청만 손님으로 센다
+                me = None           # 만료·위조 토큰이면 엔진이 401 을 준다 — 이번 요청만 손님으로 센다
+            member = me["customer_id"] if me else None
             # 확인된 회원만 기억한다. 실패(엔진이 잠깐 멈춤 · 아직 가입 전)까지 기억하면 그 토큰은 웹을 다시 띄울 때까지
             # 손님으로 굳는다 — 로그인해 있는데 한도가 5번이 되고, 자기 기록 · 좋아요도 못 본다
             if member:
                 _members[token] = member
+                _personas[token] = me.get("persona") or {}
         if member:
             return f"member:{member}", MEMBER_DAILY_LIMIT
     return f"ip:{_client_ip(request)}", GUEST_DAILY_LIMIT
+
+
+def persona(request: Request) -> dict:
+    """토큰으로 확인한 회원의 가입 설문 글(칸 이름 → 글). 손님이면 빈 사전. 평면도가 가구 구성을 읽는 데 쓴다"""
+    _who(request)                      # 아직 확인 전이면 여기서 확인한다(요청당 한 번)
+    token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    return _personas.get(token, {}) if _members.get(token) else {}
+
+
+def forget_member(customer_id: str) -> None:
+    """관리자가 회원 글을 고쳤을 때 — 그 회원의 토큰 캐시를 비워 다음 요청이 새 글을 받게 한다"""
+    for token in [t for t, m in _members.items() if m == customer_id]:
+        _members.pop(token, None)
+        _personas.pop(token, None)
 
 
 def member_id(request: Request) -> str | None:
