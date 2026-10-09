@@ -77,8 +77,8 @@ export function renderResult(data) {
   // ③ 지도 마커
   renderKakaoMapMarkers(data.topRegions, data.weights);
 
-  // ④ LH 평면도
-  renderFloorplan(data.floorplanPath);
+  // ④ LH 평면도 — 가구 구성에 맞는 구조 3~4장
+  renderFloorplans(data.floorplans, data.floorplanNote, data.floorplanMode);
 }
 
 
@@ -129,20 +129,51 @@ function updateTopRegionsList(regions, dropped) {
 }
 
 
-/** ④ LH 평면도 : 평면도를 그리거나, 경로가 없으면 깔끔히 비운다 */
-function renderFloorplan(path) {
-  const img = document.getElementById('floorplanImg');
-  const txt = document.getElementById('fpFilename');
+/** ④ LH 평면도 : 가구 구성에 맞는 도면 3~4장을 한 장씩 넘겨 본다. 화살표, 그림의 왼쪽·오른쪽 반 클릭, 점. 없으면(아파트가 아니면) 영역을 숨긴다 */
+function renderFloorplans(plans, note, mode) {
+  const area = document.getElementById('floorplanArea');
+  const strip = document.getElementById('fpStrip');
+  const noteEl = document.getElementById('fpNote');
   const ph = document.getElementById('fpPlaceholder');
+  const dots = document.getElementById('fpDots');
+  if (!area || !strip) return;
 
-  if (path) {
-    if (img) { img.src = path; img.style.display = 'block'; }
-    if (txt) txt.innerText = `매칭 경로: ${path}`;
-    if (ph) ph.style.display = 'none';
-  } else {
-    // 경로가 없으면 이전 이미지가 남지 않게 지운다
-    if (img) { img.removeAttribute('src'); img.style.display = 'none'; }
-    if (txt) txt.innerText = '';
-    if (ph) ph.style.display = 'block';
-  }
+  const list = Array.isArray(plans) ? plans : [];
+  area.hidden = mode === 'off';                      // 오피스텔·빌라를 고르면 LH 아파트 도면은 뜻이 없다
+  strip.innerHTML = list.map((p) => `
+    <figure class="fp-card">
+      <img src="${p.path}" alt="${p.caption}" loading="lazy" onerror="this.closest('.fp-card').remove(); document.querySelector('#fpDots i:last-child')?.remove()">
+      <figcaption>${p.caption}</figcaption>
+    </figure>`).join('');
+  if (dots) dots.innerHTML = list.map((_, i) => `<i class="${i === 0 ? 'is-on' : ''}"></i>`).join('');
+  if (noteEl) noteEl.textContent = list.length ? (note || '') : '';
+  if (ph) ph.style.display = list.length ? 'none' : 'block';
+  area.classList.toggle('fp-single', list.length < 2);   // 한 장뿐이면 화살표·점을 숨긴다
+  strip.scrollTo({ left: 0 });
+  bindFloorplanNav(strip);
+}
+
+
+/** 넘기기 — 한 번만 건다. 카드 한 장이 띠 폭과 같아서 띠 폭만큼 밀면 다음 장이다 */
+function bindFloorplanNav(strip) {
+  if (strip.dataset.bound) return;
+  strip.dataset.bound = '1';
+  const step = (dir) => strip.scrollBy({ left: dir * strip.clientWidth, behavior: 'smooth' });
+
+  document.getElementById('fpPrev')?.addEventListener('click', () => step(-1));
+  document.getElementById('fpNext')?.addEventListener('click', () => step(1));
+
+  // 그림의 왼쪽 반을 누르면 이전, 오른쪽 반을 누르면 다음
+  strip.addEventListener('click', (e) => {
+    const img = e.target.closest('img');
+    if (!img) return;
+    const r = img.getBoundingClientRect();
+    step(e.clientX - r.left < r.width / 2 ? -1 : 1);
+  });
+
+  // 지금 몇 장째인지 점으로. 스크롤이 멈춘 자리로 센다
+  strip.addEventListener('scroll', () => {
+    const i = Math.round(strip.scrollLeft / Math.max(strip.clientWidth, 1));
+    document.querySelectorAll('#fpDots i').forEach((d, k) => d.classList.toggle('is-on', k === i));
+  }, { passive: true });
 }

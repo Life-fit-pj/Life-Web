@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel    
 
+from services import quota
 from services.engine import (
     get_member, list_members, get_region, list_regions,
     update_member, update_region, preview_member, similar_members, InvalidPatch, health,
@@ -104,8 +105,8 @@ def admin_update_member(customer_id: str, patch: dict):
         raise HTTPException(status_code=422, detail=e.errors)
     if updated is None:
         raise HTTPException(status_code=404, detail="그런 회원이 없다")
+    quota.forget_member(customer_id)      # 웹이 토큰마다 기억해 둔 그 회원의 설문 글을 버린다 — 다음 검색이 새 글을 받는다
     return updated
-
 
 
 @router.patch("/regions/{gu}/{dong}", dependencies=[Depends(check_admin), Depends(check_writable)])
