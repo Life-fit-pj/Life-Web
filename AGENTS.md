@@ -27,8 +27,9 @@ py -m uvicorn main:app --reload --port 5000
 
 `http://127.0.0.1:5000`에서 서비스된다. `services/engine.py`가 `EMBED_API_BASE`
 (기본 `http://127.0.0.1:8000`)로 1)을 호출하므로 두 uvicorn을 **둘 다** 띄워야 한다.
-사전 준비물: `Life-Embed-jh/.env`(`DATABASE_URL`·API 키 — 엔진 README 참고). 테스트 스위트·린터·빌드 단계는 없다 — 대신
-각 `services/*.py`에 `if __name__ == "__main__":` 스모크 체크가 있어 단독 실행으로 점검한다
+사전 준비물: `Life-Embed-jh/.env`(`DATABASE_URL`·API 키 — 엔진 README 참고).
+테스트는 `py -m pytest tests -q` — 엔진은 띄우지 않고 가짜 응답으로 바꿔 끼운다. PR 마다 GitHub Actions 가 돌린다.
+각 `services/*.py`의 `if __name__ == "__main__":` 스모크 체크로 모듈 하나를 단독 점검할 수도 있다
 (예: `py services/engine.py`, `py services/coords.py`).
 
 
