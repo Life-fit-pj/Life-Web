@@ -135,6 +135,16 @@ export async function deleteLike(anonId, gu, dong) {
   return deleteJSON("/api/likes", { anonId, gu, dong }, await authHeaders());
 }
 
+/** AI가 채팅에서 기억한 거주 선호. 회원 본인 것만 — 서버가 토큰으로 누구인지 정한다 */
+export async function getMemory() {
+  return getJSON("/api/memory", await authHeaders());
+}
+
+/** AI가 기억한 선호 모두 지우기 */
+export async function deleteMemory() {
+  return deleteJSON("/api/memory", {}, await authHeaders());
+}
+
 /** Authorization 헤더 조립. Supabase 세션의 access_token 을 그대로 싣는다 */
 function authHeader(token) {
   return { Authorization: `Bearer ${token}` };

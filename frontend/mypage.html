@@ -162,6 +162,7 @@
       <button class="tab" data-view="story">나의 이야기</button>
       <button class="tab" data-view="history">검색·대화 기록</button>
       <button class="tab" data-view="likes">좋아요 한 거주지</button>
+      <button class="tab" data-view="memory">AI가 기억한 선호</button>
     </nav>
 
     <!-- ① 내 정보 -->
@@ -215,12 +216,22 @@
       <div class="card"><div class="sec">좋아요 한 거주지</div><div id="likesItems" class="list-box"></div></div>
     </section>
 
+    <!-- ⑤ 장기 메모리 — 채팅에서 말한 선호를 AI가 기억해 다음 대화에 반영한다 -->
+    <section class="view" data-view="memory">
+      <div class="card">
+        <div class="sec">AI가 기억한 선호</div>
+        <div id="memoryItems"></div>
+        <div class="actions"><button type="button" id="forgetBtn" class="btn-text danger" hidden>모두 지우기</button></div>
+      </div>
+      <p class="note">채팅에서 직접 말씀하신 예산·거래 방식·통근지·중요한 것·피하고 싶은 것만 기억해요. 다음 대화의 답을 맞추는 데만 쓰이고, 지우면 바로 반영돼요.</p>
+    </section>
+
   </div>
 </div>
 
 <script src="lib/counter.js"></script>
 <script type="module">
-import { getMe, getHistory, getLikes, deleteLike, getGuDong } from "./lib/api.js";
+import { getMe, getHistory, getLikes, deleteLike, getGuDong, getMemory, deleteMemory } from "./lib/api.js";
 import { getAnonId, isLoggedIn } from "./lib/state.js";
 import { escapeAndFormat } from "./lib/format.js";
 import { supabase } from "./lib/supabaseClient.js";
@@ -245,8 +256,8 @@ const STORY_LIMIT = 800;      // 엔진 config.MAX_PERSONA_LENGTH
 
 let me = null;                // 서버가 준 원본
 let gudong = {};
-const loaded = { history: false, likes: false };    // 성공해서 다시 안 받아도 되는가
-const loading = { history: false, likes: false };   // 지금 받는 중인가 — 빠르게 두 번 눌러도 요청은 한 번
+const loaded = { history: false, likes: false, memory: false };    // 성공해서 다시 안 받아도 되는가
+const loading = { history: false, likes: false, memory: false };   // 지금 받는 중인가 — 빠르게 두 번 눌러도 요청은 한 번
 
 const $ = (id) => document.getElementById(id);
 
@@ -263,6 +274,7 @@ function showView(name) {
   history.replaceState(null, "", "#" + name);
   if (name === "history" && !loaded.history && !loading.history) loadHistory();
   if (name === "likes" && !loaded.likes && !loading.likes) loadLikes();
+  if (name === "memory" && !loaded.memory && !loading.memory) loadMemory();
 }
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
 
@@ -370,6 +382,42 @@ async function loadLikes() {
   }
 }
 
+/* ── ⑤ AI가 기억한 선호 — 서버가 토큰으로 본인 것만 준다 ── */
+function memoryRows(m) {
+  const won = (v) => (v >= 10000 ? `${Math.floor(v / 10000)}억 ${v % 10000 ? (v % 10000).toLocaleString() + "만원" : ""}` : `${v.toLocaleString()}만원`).trim();
+  return [
+    ["예산", m.budget_manwon ? won(m.budget_manwon) : ""],
+    ["거래 방식", m.deal_type || ""],
+    ["통근·통학", m.commute || ""],
+    ["중요하게 보는 것", (m.priorities || []).join(", ")],
+    ["피하고 싶은 것", (m.avoid || []).join(", ")],
+  ].filter(([, v]) => v);
+}
+
+async function loadMemory() {
+  loading.memory = true;
+  $("memoryItems").innerHTML = `<p class="empty">불러오는 중...</p>`;
+  try {
+    const rows = memoryRows((await getMemory()) || {});
+    renderList($("memoryItems"), rows, "아직 기억한 선호가 없어요. 채팅에서 예산이나 출퇴근하는 곳을 말해 보세요.",
+      ([k, v]) => `<div class="list-item"><span class="list-q">${k}</span><span>${escapeAndFormat(v)}</span></div>`);
+    $("forgetBtn").hidden = rows.length === 0;
+    loaded.memory = true;
+  } catch (err) {
+    console.error(err);
+    $("memoryItems").innerHTML = `<p class="empty">불러오지 못했어요. 탭을 다시 눌러 주세요.</p>`;
+  } finally {
+    loading.memory = false;
+  }
+}
+
+$("forgetBtn").addEventListener("click", async () => {
+  $("forgetBtn").disabled = true;
+  try { await deleteMemory(); loaded.memory = false; loadMemory(); }
+  catch (err) { console.error(err); }
+  finally { $("forgetBtn").disabled = false; }
+});
+
 /* ── 시작 ─────────────────────────────────────────── */
 async function start() {
   if (!isLoggedIn()) {
@@ -394,7 +442,7 @@ async function start() {
   if (!EDIT_ENABLED) lockForms();
   $("app").hidden = false;
   const first = location.hash.slice(1);
-  showView(["basic", "story", "history", "likes"].includes(first) ? first : "basic");
+  showView(["basic", "story", "history", "likes", "memory"].includes(first) ? first : "basic");
 }
 start();
 </script>

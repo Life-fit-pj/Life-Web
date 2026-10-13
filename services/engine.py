@@ -312,6 +312,16 @@ def get_likes(anon_id):
     return _call("GET", f"/likes/{_seg(anon_id)}")
 
 
+def get_memory(customer_id):
+    """마이페이지 > AI가 기억한 선호. 기억이 없으면 None."""
+    return _call("GET", f"/memory/{_seg(customer_id)}")
+
+
+def delete_memory(customer_id):
+    """마이페이지 > AI가 기억한 선호 > 모두 지우기."""
+    return _call("DELETE", f"/memory/{_seg(customer_id)}")
+
+
 # ── 관리자 ────────────────────────────────────────
 
 def get_member(customer_id):
