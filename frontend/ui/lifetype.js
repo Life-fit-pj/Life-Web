@@ -101,7 +101,7 @@ export function showTypeCard(t, { onContinue, onSkip }) {
       ${spots ? `
         <div class="tr-spots-head">
           <span>이런 동네가 어울려요</span>
-          <em>예산은 아직 반영 전이에요</em>
+          <em>예산은 다음 단계에서 맞춰 드려요</em>
         </div>
         <div class="tr-spots">${spots}</div>`
         : `<p class="tr-nodata">${noSpotReason(t)}</p>`}

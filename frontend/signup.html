@@ -419,14 +419,14 @@ import { signup, getGuDong } from "./lib/api.js";
    설문 답변 → persona 칸
 
    칸 이름은 추천 엔진의 CHUNK_COLUMNS(Life-Embed-jh/app/core/config.py)와
-   글자 하나까지 같아야 한다. 나중에 회원가입 정보를 DB 에 적재할 때
+   글자 하나까지 같아야 한다. 회원가입 정보를 DB 에 적재할 때
    이 객체를 그대로 넘기기 위해서다 — 여기서 이름을 바꾸면 그때 변환
    코드를 새로 써야 한다.
 
    비워 두는 칸이 둘 있다.
      persona                    — 이름·나이·성격을 아우르는 총괄 요약이라
                                   설문 답 하나로 대신할 수 없다
-     career_goals_and_ambitions — 대응하는 문항이 아직 없다
+     career_goals_and_ambitions — 대응하는 문항이 없다
    빈 칸은 청크가 안 만들어질 뿐 나머지 칸으로 추천이 돌아간다
    ========================================================= */
 const PERSONA_MAP = {

@@ -11,15 +11,13 @@
   2차는 자유 문장 15개를 규칙 기반으로 채점한다(느슨함, 대신 정보량이 많다).
   같은 lifetype.type_of()/to_weights() 를 거치므로 결과 모양은 동일하다.
 
-[LLM을 안 쓰는 이유]
+[규칙 먼저, LLM 은 보조]
   Life-Embed-jh 쪽에 이미 검색어 하나를 LLM 이 가중치로 바꾸는 경로(ask_claude,
   app/engine/weights.py)가 있다. 하지만 그건 "장소를 찾는 문장" 을 위해 만든
-  프롬프트라 15개 답변을 통째로 넣으면 품질이 떨어진다(실제로 지금 프론트가
-  그렇게 하고 있다 — search.js 의 survey 처리 부분).
+  프롬프트라 15개 답변을 통째로 넣으면 품질이 떨어진다.
   설문은 이미 구조화돼 있어(문항마다 축이 정해짐) 규칙 기반으로도 축 점수가
-  바로 나온다. LLM 추정을 아예 건너뛸 수 있다는 뜻이라 무료·즉시 응답이다.
-  build_llm_prompt/parse_llm_scores 는 나중에 LLM 채점을 얹고 싶을 때 쓰라고
-  남겨 둔다(2차유형.py 의 원안 그대로) — 지금 profile() 은 규칙 기반만 쓴다.
+  바로 나온다 — 무료·즉시 응답이다. 규칙이 절반도 못 채운 답변만
+  build_llm_prompt/parse_llm_scores 로 LLM 채점을 받는다(routers/survey.py).
 """
 
 from __future__ import annotations
@@ -237,7 +235,7 @@ def score_text_rule(qid: str, text: str) -> float | None:
 
 
 # ============================================================
-# LLM 채점 (선택 사항 — 지금 profile() 은 안 부른다. 나중에 붙일 자리)
+# LLM 채점 (규칙이 절반도 못 채웠을 때만 routers/survey.py 가 부른다)
 # ============================================================
 def build_llm_prompt(answers: dict) -> str:
     items = []
