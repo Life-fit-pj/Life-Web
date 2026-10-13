@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt pytest==9.1.1
+      # 엔진(Life-Embed-jh)은 띄우지 않는다. tests/ 가 가짜 응답으로 바꿔 끼운다
+      - run: python -m pytest tests -q
