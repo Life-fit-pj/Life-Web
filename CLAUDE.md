@@ -41,10 +41,10 @@ py -m uvicorn main:app --reload --port 5000
 ```
 
 `http://127.0.0.1:5000`에서 서비스됩니다. `services/engine.py`가 `EMBED_API_BASE`로 1)을
-호출하므로 두 uvicorn을 **둘 다** 띄워야 합니다. 이 저장소에는 테스트 스위트, 린터, 빌드 단계가
-없습니다 — 대신 각 `services/*.py` 파일에 `if __name__ == "__main__":` 스모크 체크가 있으며,
-해당 모듈을 단독으로 점검하려면 직접 실행하면 됩니다(예: `py services/coords.py`,
-`py services/engine.py`, `py services/floorplan.py`).
+호출하므로 두 uvicorn을 **둘 다** 띄워야 합니다. 테스트는 `py -m pytest tests -q`이며 엔진은
+가짜 응답으로 바꿔 끼우므로 띄우지 않아도 됩니다(PR 마다 GitHub Actions 가 돌립니다).
+각 `services/*.py` 파일의 `if __name__ == "__main__":` 스모크 체크로 모듈 하나를 단독 점검할 수도
+있습니다(예: `py services/coords.py`, `py services/engine.py`, `py services/floorplan.py`).
 
 Kakao Maps JS 키는 `frontend/index.html`에 내장되어 있습니다. Kakao Developers 콘솔의 Web
 플랫폼에 `http://127.0.0.1:5000`이 등록되어 있어야 하며, 그렇지 않으면 지도가 아무 오류 없이
