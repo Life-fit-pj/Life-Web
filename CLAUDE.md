@@ -26,8 +26,7 @@ Life-fit-main/
 `services/engine.py`는 `httpx.Client`로 `Life-Embed-jh`가 띄운 FastAPI 서버를 호출합니다.
 그 서버가 안 떠 있으면 요청마다 `httpx.ConnectError`로 실패합니다(임포트 시점 오류가
 아니라 요청 시점 오류입니다 — `Life-Embed-jh`도 함께 실행하세요, 아래 "실행 방법" 참고).
-`Life-Embed-jh`는 자체 `.env`에 `ANTHROPIC_API_KEY`와 `data/life.db`(약 216MB, git에 포함되지
-않음)가 필요합니다 — 해당 저장소의 README를 참고하세요.
+`Life-Embed-jh`는 자체 `.env`(`DATABASE_URL`·API 키)가 필요합니다 — 해당 저장소의 README를 참고하세요.
 
 ## 실행 방법
 
@@ -92,13 +91,11 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
   그대로 import해서 씁니다.
 - `services/persona_type.py` — 2차(서술형 설문) 유형 판정. `services/lifetype.py`의 축·유형
   표를 그대로 가져다 쓰고(따로 베끼지 않음), 15문항 답변을 키워드 사전으로 규칙 기반 채점합니다.
-  `first_axes`를 주면 1차 결과를 덮어쓰지 않고 보강합니다(`merge_axes`). LLM 채점용
-  `build_llm_prompt`/`parse_llm_scores`도 있지만 지금 `profile()`은 호출하지 않습니다(추후 확장 자리).
-- `services/typespot.py` — 1차 유형에 어울리는 동네 2곳. `life.db`(없으면
-  `master_dataset_v3.csv`)를 `_find()`로 형제 폴더에서 찾아 **그 표 하나만** 읽습니다.
-  시세도 그 안에 있습니다(`아파트_전세_보증금`) — 따로 열 파일이 없습니다. 시세는
-  "서울 전세 중앙값의 0.65~1.35배" 밴드로 후보를 거르는 데 씁니다(예산을 아직 안 받은
-  단계라 아무나 못 가는 동네를 보여 주지 않으려는 것).
+  `first_axes`를 주면 1차 결과를 덮어쓰지 않고 보강합니다(`merge_axes`). 규칙이 절반도
+  못 채운 답변만 `build_llm_prompt`/`parse_llm_scores`로 LLM 채점을 받습니다(`routers/survey.py`).
+- `services/typespot.py` — 1차 유형에 어울리는 동네 2곳. 엔진의 `POST /recommend`를 불러
+  순위와 원본 개수를 받습니다. 1차 단계는 예산을 받지 않으므로 housing 없이 부르고, 엔진이
+  시세를 8번째 신호로 얹어 저렴한 동네를 살짝 우대합니다.
 - `services/floorplan.py` — LH 평면도 CSV(cp949 인코딩)를 임포트 시점에 pandas로 로드합니다.
   `find_floorplan(area)`는 *실제로 디스크에 이미지 파일이 존재하는* 평면도 중 면적이 가장
   가까운 것을 선택합니다.
@@ -240,30 +237,3 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
 API 키, 토큰, 기타 비밀 정보는 반드시 `.env`(gitignore 처리됨)에 두고 절대 커밋하지 마세요.
 추천 엔진이 사용하는 Anthropic 키는 이 저장소의 `.env`가 아닌 `Life-Embed-jh/.env`에
 있습니다. 관리자 토큰(`ADMIN_TOKEN`)은 이 저장소의 `.env`입니다.
-
-## 진단·수정 기록은 study.md에 남깁니다
-
-버그 진단, 수정 전/후 코드 비교, 초보자용 설명처럼 과정을 자세히 풀어 쓰는 기록은
-`study.md`에 적습니다. 여기 CLAUDE.md에는 저장소의 현재 사실 관계만 간결하게 유지합니다.
-
-## 다음에 할 일
-
-1. **회원가입 백엔드** — `POST /api/signup` + 엔진 쪽 적재(`resync_member` → 벡터,
-   `find_similar_members` + `blend` → 7지표). 회원가입 폼(목업 또는 카카오 API) 확정 후 착수.
-   설문 답변은 지금 추천에만 쓰이고 저장되지 않습니다. `POST /api/survey`(규칙 기반 축·가중치
-   계산)는 이미 있지만, 이것만으로는 부족합니다 — `persona_type.profile()`의 결과는 추천용
-   가중치일 뿐 `CHUNK_COLUMNS` 9칸 원문이 아니라서, 저장하려면 여전히 문항별 답변 원문을
-   persona 칸에 매핑하는 로직이 따로 필요합니다. 또한 프론트(`signup.html`)는 아직
-   `/api/survey`를 호출하지 않고 `/api/predict`의 LLM 검색어 경로로 우회하고 있으니, 백엔드를
-   붙일 때 프론트 전환도 함께 검토하세요.
-2. **설문 최소 길이 실험** — 기존 회원 100명을 정답지로 삼아 5/10/15자 역테스트.
-   최소 길이를 추측이 아니라 숫자로 정할 수 있습니다(README 참고).
-3. **LLM persona 정제** — 목적은 "짧은 답 늘리기"가 아니라 "기존 데이터와 문체 맞추기".
-   새 사실 추가·근거 없는 추론은 금지 — 환각이 그대로 DB에 남습니다.
-4. **`career_goals_and_ambitions` 문항 추가** 또는 정제 단계에서 생성.
-5. **`fallback` 실제 감지** — 지금은 항상 `False`로 고정되어 있습니다.
-6. **시세 밴드의 하한을 열지 결정** — `typespot.py`의 밴드는 양방향이라 비싼 동네뿐 아니라
-   **싼 동네도 뺍니다**(중계2.3동 2.9억, 공릉1동 3.3억 등이 걸립니다). 예산이 적은 사용자에게
-   저렴한 동네를 감추는 게 맞는지 따져볼 필요가 있습니다. `BAND_LOW = 0.65`를 0으로 두면
-   상한만 걸립니다. 또 427개 중 **180개는 시세 데이터가 없어 그대로 통과**하므로 필터가
-   절반만 걸린다는 점도 감안하세요.

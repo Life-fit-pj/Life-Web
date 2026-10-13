@@ -117,7 +117,7 @@ py -m uvicorn main:app --reload --port 5000
 | POST | `/api/region/explain` | 행정동 하나의 설명 | ✓ |
 | POST | `/api/chat` | 결과에 대한 후속 질문 | ✓ |
 | GET | `/api/regions/gudong` | 구 → 동 목록 (25개 구 / 427개 동) | ✗ |
-| POST | `/api/survey` | 설문 15문항 → 규칙 기반 추천 (아직 프론트 미연결) | ✗ |
+| POST | `/api/survey` | 설문 15문항 → 규칙 기반 추천 (화면에서는 미사용) | ✗ |
 | POST | `/api/auth/login` · `/api/signup` | Supabase 로그인 · 가입 | ✗ |
 | GET | `/api/auth/me` · `/api/auth/signed-up` | 내 정보 · 가입 여부 | ✗ |
 | GET·POST·DELETE | `/api/likes` | 좋아요 · 검색 기록 · 채팅 기록 | ✗ |
@@ -255,9 +255,9 @@ curl -X POST http://127.0.0.1:8001/search -d '{"query":"애들 학원 보내기 
 | 지도에 마커가 안 찍힘 | 엔진 응답의 `name`이 `"구 행정동명"`(공백 하나) 형태가 아님 |
 | 추천 사유 카드의 점이 비어 있음 | `scores` 키가 한국어 7개와 정확히 일치하지 않음 |
 
-## 남은 일
+## 알려진 한계
 
-- LH 평면도를 가구원수 기준으로 추천 (지금은 면적만)
-- 폴백 표시 — `fallback`이 항상 `False` (실제 감지 미구현)
-- `POST /api/survey`는 있지만 `signup.html`은 아직 `/api/predict`의 LLM 경로로 우회
+- LH 평면도는 면적 기준으로만 고른다 (가구원수 미반영)
+- `fallback`은 항상 `False` — 폴백 감지 없음
+- 설문 화면(`signup.html`)은 `/api/survey`가 아니라 `/api/predict`의 LLM 경로를 쓴다
 - 설문이 못 채우는 persona 칸 — `persona`(총괄 요약), `career_goals_and_ambitions`(대응 문항 없음)

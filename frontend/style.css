@@ -58,7 +58,7 @@ placeholder 공통 색상 규칙
      바탕색에 따라 파일을 바꿔 끼운다 */
   --logo-mark:    url("img/logo_A_day_344E41.png");
 
-  /* ── 옛 이름. CSS 곳곳이 아직 이 이름을 쓰고 있어 당분간 남겨 둔다 ── */
+  /* ── 별칭. 위 토큰을 다른 이름으로 부르는 CSS 가 쓴다 ── */
   --paper:        var(--bg);
   --card:         var(--surface);
   --card-2:       var(--surface-2);

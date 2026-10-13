@@ -9,7 +9,7 @@
     한 번에 1.6초다 — 1차는 "즉시 나오는 맛보기"(routers/lifetype.py 주석)라 안 맞는다.
 
 [가격]
-  예산을 아직 안 받으므로 housing 없이 부른다. 그러면 엔진이 시세를 8번째 신호로
+  1차 단계는 예산을 받지 않으므로 housing 없이 부른다. 그러면 엔진이 시세를 8번째 신호로
   얹어 "저렴한 동네를 살짝 우대" 한다 — 2차 화면의 "고려안함(ANY)" 과 같은 동작이다
   (services/engine.py to_housing 의 주석). 옛 중앙값 ±35% 밴드는 없앴다.
   카드의 price 는 None 이다. 화면이 "가격 미정" 으로 그린다.
@@ -78,7 +78,7 @@ def _to_card(r, weights):
         "name": f"서울특별시 {gu} {dong}",
         "score": r["total"],
         "blurb": _blurb(r.get("counts", {}), weights),
-        "price": None,          # 예산을 아직 안 받았다 — 파일 머리 [가격] 참고
+        "price": None,          # 1차는 예산을 받지 않는다 — 파일 머리 [가격] 참고
     }
 
 

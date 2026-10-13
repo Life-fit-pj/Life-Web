@@ -13,9 +13,6 @@ FastAPI 서버 + 정적 프론트엔드. 이 저장소는 UI/HTTP 레이어만 �
 (`Life-Embed-jh/docs/adr/0001-move-fastapi-to-embed.md`).
 두 저장소는 반드시 같은 상위 폴더 아래 나란히 있어야 하고, 실행 시 두 uvicorn을 각각 띄운다.
 
-## Reference projects
-
-
 ## Setup / commands
 
 ```bash
@@ -30,8 +27,7 @@ py -m uvicorn main:app --reload --port 5000
 
 `http://127.0.0.1:5000`에서 서비스된다. `services/engine.py`가 `EMBED_API_BASE`
 (기본 `http://127.0.0.1:8000`)로 1)을 호출하므로 두 uvicorn을 **둘 다** 띄워야 한다.
-사전 준비물: `Life-Embed-jh/.env`(`ANTHROPIC_API_KEY`)와
-`Life-Embed-jh/data/life.db`(약 216MB, git 미포함). 테스트 스위트·린터·빌드 단계는 없다 — 대신
+사전 준비물: `Life-Embed-jh/.env`(`DATABASE_URL`·API 키 — 엔진 README 참고). 테스트 스위트·린터·빌드 단계는 없다 — 대신
 각 `services/*.py`에 `if __name__ == "__main__":` 스모크 체크가 있어 단독 실행으로 점검한다
 (예: `py services/engine.py`, `py services/coords.py`).
 
@@ -41,20 +37,14 @@ py -m uvicorn main:app --reload --port 5000
 디자인패턴을 준수하고, 파일에서 정해진 역할외에 의존성을 어기지않는 코드 설계를 한다.
 함수 인자값에는 자료형을 명시하고 (doc : str), 핵심 주석을 간단 명료하게 작성한다.
 코드 네이밍을 규격화하고 모두가 읽기 편한 방식으로 구조를 설계한다.
-<!-- 이 저장소에서 지키는 코드 스타일/컨벤션. -->
-
-## Testing instructions
-
 
 ## Security considerations
 
 API, Key 등 민감정보가 포함된 데이터는 .env파일에서 별도로 관리하며, 외부로 노출시키지 않는다.
-<!-- 예: selectory.db는 더미 데이터라 민감정보 없음, API 키/자격증명 다루는 부분이 생기면 여기 추가. -->
 
 ## Commit / PR guidelines
 
 사용자가 직접 git 에 접근하며, Agent는 Commit, Push는 하지않는다.
-<!-- 커밋 메시지 컨벤션(예: 이 repo의 "fix :", "feat :" 접두사 패턴), PR 규칙. -->
 
 ## Architecture
 
@@ -79,4 +69,3 @@ API, Key 등 민감정보가 포함된 데이터는 .env파일에서 별도로 �
   나머지는 ES 모듈 import로 연결된다. `lib/`는 공용(서버 호출·상태·문자열 다듬기), `ui/`는
   화면 단위.
 
-## Logging
