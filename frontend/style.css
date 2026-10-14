@@ -249,8 +249,17 @@ h1 em {
   width: 310px;
   padding: 24px;
   max-height: calc(100vh - 182px);
+  display: flex;
+  flex-direction: column;
+}
+
+.ctrl-scroll {
+  flex: 1;
+  min-height: 0;              /* 없으면 flex 자식이 내용만큼 늘어나 스크롤이 안 생긴다 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  margin-right: -10px;        /* 스크롤바를 패널 안쪽 여백으로 비켜 둔다 */
+  padding-right: 10px;
 }
 
 /* 패널 첫 줄 — 왼쪽 머리글, 오른쪽 귀퉁이에 둥근 i(데이터 출처) */
@@ -421,8 +430,24 @@ input[type=range]::-moz-range-thumb {
 }
 
 
-/* AI 분석 버튼 */
+/* 패널 머리 — 이 패널의 역할 한 줄 */
+.ctrl-intro {
+  margin: 0 0 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.ctrl-intro strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* 다시 찾기 버튼은 스크롤 영역(.ctrl-scroll) 밖에 있어 패널이 길어도 늘 보인다 */
 .run-btn {
+  flex-shrink: 0;
   margin-top: 16px;
   width: 100%;
   padding: 11px;

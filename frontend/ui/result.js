@@ -5,7 +5,7 @@ import { renderKakaoMapMarkers, panToRegion } from "./map.js";
 import { initChatWithResult } from "./chat.js";
 
 
-// 2. [AI 분석 실행] 버튼 클릭 시 실행되는 메인 함수
+// 2. [이 조건으로 다시 찾기] 버튼 클릭 시 실행되는 메인 함수
 export async function runSimulation() {
   const loadingEl = document.getElementById('loading');
   if (loadingEl) loadingEl.style.display = 'block';
@@ -43,7 +43,7 @@ export async function runSimulation() {
   } catch (error) {
     if (!isLatest(seq)) return;
     console.error("❌ 분석 중 오류 발생:", error);
-    alert("AI 분석 실행 중 오류가 발생했습니다. 백엔드 서버 상태를 확인해 주세요.");
+    alert("다시 찾는 중 오류가 발생했습니다. 백엔드 서버 상태를 확인해 주세요.");
   } finally {
     if (loadingEl) loadingEl.style.display = 'none';
   }
