@@ -10,16 +10,16 @@ GET  /api/quota            오늘 남은 AI 질문 횟수
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from services.coords import COORDS, lookup_coords
 from services.engine import (
     KEY_MAP, get_regions, get_facilities, get_region_explain, get_chat_answer,
-    save_search, save_chat, get_history,
+    save_search, save_chat, get_history, ANON_ID,
 )
 from services import quota
-from services.floorplan import find_floorplan
+from services.floorplan import find_floorplans
 
 router = APIRouter(prefix="/api", tags=["추천"])
 
@@ -43,6 +43,7 @@ class PredictRequest(BaseModel):
 
     area: int = 59
     bldgType: str | None = None
+    housePicks: list[str] | None = None   # 1차 집 조건 키워드("방이 많은" 등). 평면도 고를 때만 쓴다
 
     dealType: str | None = None
     salePrice: int | None = None
@@ -87,6 +88,30 @@ class ChatRequest(BaseModel):
 # API 라우트: 예측 및 추천 수행
 # ==========================================
 
+def _member_persona_text(request: Request) -> str:
+    """로그인한 회원이면 저장된 가입 설문 글 중 다섯 칸. 손님이거나 못 받으면 빈 글.
+
+    글은 quota 가 토큰을 확인할 때 같이 받아 둔 것이다(엔진 /auth/me, 토큰마다 한 번) — 여기서 엔진을 다시 부르지 않는다.
+    못 받았으면(만료 토큰 · 엔진 꺼짐) 평면도를 못 고르는 게 아니라 가구 구성을 모르는 것뿐이므로 빈 글로 간다"""
+    persona = quota.persona(request)
+    # 엔진 app/core/config.py 의 CHUNK_COLUMNS 에 있는 이름만. 저장소가 둘이라 import 못 하니 이름을 지어내지 않게 거기를 보고 적는다.
+    # 평면도가 읽는 낱말이 흩어져 있다 — 가족은 family, "운동기구"는 sports, "악기·피아노"(취미 답 h1 도 여기)는 arts,
+    # "요리·집밥"은 culinary, "재택·작업실"은 professional. 없는 이름을 적으면 .get() 이 조용히 빈 글을 준다(10-08 에 그랬다)
+    columns = ("family_persona", "sports_persona", "arts_persona", "culinary_persona", "professional_persona")
+    return " ".join(persona.get(k) or "" for k in columns)
+
+
+def _floorplan_fields(body: PredictRequest, request: Request) -> dict:
+    """응답의 평면도 칸 셋. 아파트일 때만 고른다 — 가격 조건을 끈 검색(bldgType None)은 화면 기본값이 아파트라 같이 친다.
+    글(검색어 — 설문 답을 이어 보낸 것도 여기로 온다 — 와 회원의 저장된 가족·취미 글)에서 가구 구성을 읽고,
+    1차 집 조건 키워드를 더해 도면 3~4장을 고른다"""
+    if body.bldgType not in (None, "아파트"):
+        return {"floorplans": [], "floorplanNote": "", "floorplanMode": "off"}
+    text = f"{body.query or ''} {_member_persona_text(request)}"
+    got = find_floorplans(body.area, text=text, house_picks=body.housePicks)
+    return {"floorplans": got["plans"], "floorplanNote": got["note"], "floorplanMode": got["mode"]}
+
+
 @router.post("/predict")      # @app.post("/api/predict") 였던 것
 def predict(body: PredictRequest, request: Request):
     """추천 요청을 처리한다.
@@ -101,8 +126,8 @@ def predict(body: PredictRequest, request: Request):
     if body.query:
         quota.consume(request)
 
-    # 검색어로 찾아본 요청만 기록한다 — 슬라이더만 만진 요청은 "검색"이 아니다
-    if body.query and body.anonId:
+    # 남의 회원 번호로는 기록하지 않는다 — 기록은 그 회원의 성향 제안의 재료가 된다
+    if body.query and body.anonId and quota.own(request, body.anonId):
         save_search(body.anonId, body.query)
 
     # 1차 유형 카드에서 넘어왔고 슬라이더를 직접 만지지 않았으면,
@@ -135,11 +160,6 @@ def predict(body: PredictRequest, request: Request):
             "price": r.get("price"),   # housing 조건이 없었으면 None — 프론트에서 탭을 숨기거나 안내문으로 대체
         })
 
-    # 가중치 합이 클수록 높은 점수
-    base_score = 40 + sum(weights.values()) * 1.3
-    if body.area >= 59:
-        base_score += 5
-
     # 1차에서 보여 준 동네가 2차 목록에 있으면 표시해 준다.
     # 예산 때문에 빠졌다면 그것도 알려 준다 — 사라진 이유를 알아야 납득한다.
     # name 은 "서울특별시 구 동" 이므로 마지막 조각이 동 이름이다
@@ -150,12 +170,13 @@ def predict(body: PredictRequest, request: Request):
     dropped = sorted(first_names - {r["name"].split(" ")[-1] for r in top_regions})
 
     return {
-        "score": round(min(98.5, max(30.0, base_score)), 1),
+        # 1위 동네의 종합 점수(엔진 recommend 의 total). 전에는 가중치 합으로 만든 가짜 숫자였다(2026-10-06 까지)
+        "score": round(top_regions[0]["score"], 1) if top_regions else None,
         "query": body.query or "",
         "topRegions": top_regions,
         "firstTypeName": body.typeName or "",
         "droppedFromFirst": dropped,
-        "floorplanPath": find_floorplan(body.area),
+        **_floorplan_fields(body, request),
         "fallback": False,
         "explanation": explanation,
         "weights": weights,
@@ -216,9 +237,12 @@ def chat_api(body: ChatRequest, request: Request):
         regions=body.regions,
         weights=body.weights,
         history=body.history,
+        # 회원 전용 도구(좋아요 · 닮은 회원)는 토큰으로 확인한 회원에게만 연다. body.anonId 를 그대로 넘기면
+        # 로그아웃한 사람이 남의 회원 번호를 적어 보내 그 회원 기준의 답을 받을 수 있다
+        anon_id=quota.member_id(request),
     )
 
-    if body.anonId:
+    if body.anonId and quota.own(request, body.anonId):
         save_chat(body.anonId, body.question, answer)
 
     return {"answer": answer, "remaining": remaining}
@@ -231,6 +255,8 @@ def quota_api(request: Request):
 
 
 @router.get("/history")
-def history_api(anonId: str):
-    """메뉴 > 검색 및 대화 기록 저장소에서 부른다."""
+def history_api(request: Request, anonId: str = Query(pattern=ANON_ID)):
+    """메뉴 > 검색 및 대화 기록 저장소에서 부른다. 회원 번호로 쌓인 기록은 본인만 본다"""
+    if not quota.own(request, anonId):
+        raise HTTPException(403, "본인 기록만 볼 수 있다")
     return get_history(anonId)

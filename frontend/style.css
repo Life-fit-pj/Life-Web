@@ -253,6 +253,29 @@ h1 em {
   -webkit-overflow-scrolling: touch;
 }
 
+/* 패널 첫 줄 — 왼쪽 머리글, 오른쪽 귀퉁이에 둥근 i(데이터 출처) */
+/* 패널 맨 위 오른쪽 — 둥근 i(데이터 출처) 혼자 한 줄. 머리글과 섞지 않는다 */
+.panel-top {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px -8px 2px 0;      /* 패널 안쪽 여백(24px) 귀퉁이로 바짝 */
+}
+
+/* 둥근 i — 누르면 출처 모달. 글자 대신 아이콘이라 index.html 의 title 이 뜻을 단다. 더 크게 원하면 width/height 32px · 글자 15px */
+.link-icon {
+  flex: none;
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  font: 700 14px/1 Georgia, 'Times New Roman', serif;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.link-icon:hover { background: var(--accent-soft); color: var(--text); }
+
 .ctrl-panel h2 {
   font-size: 11px;
   text-transform: uppercase;

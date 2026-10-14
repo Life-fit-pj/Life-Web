@@ -27,6 +27,7 @@ export function firstPayload() {
     firstWeights: t.weights || null,
     firstSpots: (t.spots || []).map((s) => ({ gu: s.gu, dong: s.dong })),
     typeName: t.typeName || "",
+    housePicks: t.housePicks || null,      // 집 조건 키워드("방이 많은" 등). 평면도를 고를 때 쓴다
   };
 }
 

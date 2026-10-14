@@ -14,7 +14,8 @@
 import { postPredict, postLifeType, getLifeTypeKeywords } from "../lib/api.js";
 import { nextSeq, isLatest, getAnonId, isLoggedIn } from "../lib/state.js";
 import { renderResult } from "./result.js";
-import { openMenu, handleLoginToggleClick, syncLoginToggle, openAuthModal } from "./menu.js";
+import { handleLoginToggleClick, syncLoginToggle, openAuthModal } from "./menu.js";
+import { openSources } from "./sources.js";
 import { showTypeCard, firstPayload } from "./lifetype.js";
 
 
@@ -605,7 +606,7 @@ function bindEvents() {
   document.getElementById("searchBox")?.addEventListener("click", () => input.focus());
 
   document.getElementById("skipSearch").addEventListener("click", closeSearch);
-  document.getElementById("menuToggle").addEventListener("click", openMenu);
+  document.getElementById("sourcesLink")?.addEventListener("click", openSources);
   document.getElementById("loginToggle").addEventListener("click", handleLoginToggleClick);
   syncLoginToggle();
 }

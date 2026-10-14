@@ -1,12 +1,7 @@
-import { openHistory } from "./history.js";
-import { openLikes } from "./likes.js";
-import { openMypage } from "./mypage.js";
 import { authLogin, getSignedUp } from "../lib/api.js";
-import { getAnonId, isLoggedIn } from "../lib/state.js";
+import { isLoggedIn } from "../lib/state.js";
 import { supabase } from "../lib/supabaseClient.js";
 
-let menuModalEl = null;
-let comingSoonEl = null;
 let authModalEl = null;
 
 // Supabase 로그인 직후(이메일/비번, 구글 리디렉션 복귀 포함)마다 한 번씩 불린다.
@@ -28,8 +23,11 @@ supabase.auth.onAuthStateChange((event, session) => {
     if (isFirst) {
         let cameFromOAuth = false;
         try { cameFromOAuth = sessionStorage.getItem(OAUTH_PENDING_KEY) === "1"; } catch { /* 무시 */ }
-        if (!cameFromOAuth) return;              // 새로고침 등으로 복원된 옛 세션 — 넘어간다
+        // 가입 확인 메일의 링크로 돌아온 경우 — 새 탭이라 sessionStorage 표시가 없다. 주소의 ?confirmed=1 로 가른다
+        const cameFromEmailLink = new URLSearchParams(location.search).has("confirmed");
+        if (!cameFromOAuth && !cameFromEmailLink) return;    // 새로고침 등으로 복원된 옛 세션 — 넘어간다
         try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 무시 */ }
+        if (cameFromEmailLink) history.replaceState(null, "", location.pathname);   // 표시를 주소에서 지운다 — 새로고침해도 다시 안 탄다
     }
 
     resolveBackendAccount(session.access_token);
@@ -55,79 +53,6 @@ async function resolveBackendAccount(token) {
     }
 }
 
-// 메뉴 패널 DOM을 처음 열릴 때 한 번만 만든다.
-function ensureMenu() {
-    if (menuModalEl) return menuModalEl;
-    menuModalEl = document.createElement("div");
-    menuModalEl.className = "menu-backdrop";
-    menuModalEl.innerHTML = `
-        <nav class="menu-panel">
-            <button class="menu-close" aria-label="닫기">&times;</button>
-            <div class="menu-items" id="menuItems"></div>
-        </nav>
-    `;
-    document.body.appendChild(menuModalEl);
-
-    // 배경 클릭하면 닫기
-    menuModalEl.addEventListener("click", (e) => {
-        if (e.target === menuModalEl) closeMenu();
-    });
-    menuModalEl.querySelector(".menu-close").addEventListener("click", closeMenu);
-
-    return menuModalEl;
-}
-
-
-// 로그인/회원가입은 헤더의 별도 버튼(#loginToggle)으로 옮겼기 때문에,
-// 이 메뉴에는 실제 로그인 여부와 무관하게 로그인 이후 항목만 상시로 보여준다.
-// 관리자 페이지는 메뉴에 두지 않는다 — 관리자는 /admin.html 로 직접 들어가고 ADMIN_TOKEN 으로 막는다.
-function renderMenuItems() {
-    const box = document.getElementById("menuItems");
-
-    box.innerHTML = `
-        <a class="menu-item" id="menuMypage" href="#">마이페이지</a>
-        <a class="menu-item" id="menuHistory" href="#">검색 및 대화 기록 저장소</a>
-        <a class="menu-item" id="menuLikes" href="#">좋아요 한 거주지</a>
-        <a class="menu-item" href="#" data-feature="원본 데이터 및 출처 안내">원본 데이터 및 출처 안내</a>
-    `;
-    box.querySelectorAll("a[data-feature]").forEach((link) => {
-        link.addEventListener("click", (e) => {
-            e.preventDefault();
-            openComingSoon(link.dataset.feature);
-        });
-    });
-    box.querySelector("#menuMypage").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        if (!isLoggedIn()) {
-            openAuthModal();
-            return;
-        }
-        openMypage();
-    });
-    box.querySelector("#menuHistory").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        openHistory();
-    });
-    box.querySelector("#menuLikes").addEventListener("click", (e) => {
-        e.preventDefault();
-        closeMenu();
-        openLikes();
-    });
-}
-
-export function openMenu() {
-    const el = ensureMenu();
-    renderMenuItems();
-    el.classList.add("is-open");
-}
-
-function closeMenu() {
-    if (!menuModalEl) return;
-    menuModalEl.classList.remove("is-open");
-}
-
 // 헤더 "로그인" 버튼을 누르면 뜨는 모달.
 // 실제 인증(비밀번호 확인, 구글 OAuth)은 Supabase SDK 가 처리한다 — 이 모달은
 // 그 UI만 띄우고, 로그인 성공 뒤처리(resolveBackendAccount)는 위쪽
@@ -148,25 +73,6 @@ function ensureAuthModal() {
     return authModalEl;
 }
 
-function renderLoggedInAuthModal(el) {
-    el.innerHTML = `
-        <div class="auth-modal">
-            <button class="auth-close" aria-label="닫기">&times;</button>
-            <div class="auth-section">
-                <h3 class="auth-title">로그인 중</h3>
-                <p class="auth-notice">아이디: <strong>${getAnonId()}</strong></p>
-                <button id="logoutBtn" class="auth-cta">로그아웃</button>
-            </div>
-        </div>
-    `;
-    el.querySelector(".auth-close").addEventListener("click", closeAuthModal);
-    el.querySelector("#logoutBtn").addEventListener("click", () => {
-        supabase.auth.signOut();
-        localStorage.setItem("lf-anon", crypto.randomUUID());
-        syncLoginToggle();
-        renderGuestAuthModal(el);
-    });
-}
 
 function startGoogleLogin() {
     // 지금 페이지로 그대로 돌아온다 — 복귀하면 onAuthStateChange(SIGNED_IN)가
@@ -270,84 +176,60 @@ function renderSignupAuthModal(el) {
             return;
         }
 
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        // 확인 메일의 링크가 이 주소로 돌아오게 한다. ?confirmed=1 은 onAuthStateChange 가
+        // "메일 링크로 돌아온 진짜 로그인"을 새로고침과 가르는 표시다(Supabase 의 Redirect URLs 에 이 주소가 있어야 먹는다)
+        const { data, error } = await supabase.auth.signUp({
+            email, password,
+            options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}?confirmed=1` },
+        });
         if (error) {
             errorEl.textContent = "회원가입에 실패했어요: " + error.message;
+            return;
+        }
+        // 이미 가입된 이메일이면 Supabase 는 오류 대신 identities 가 빈 가짜 사용자를 돌려준다(이메일 존재 여부를 감추려고).
+        // 그대로 두면 "메일을 보냈어요"가 뜨는데 메일은 안 온다
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+            errorEl.textContent = "이미 가입된 이메일이에요. 로그인해 주세요.";
             return;
         }
         if (!data.session) {
             // 프로젝트에 이메일 확인이 켜져 있으면 세션이 바로 안 생긴다 — 메일의 링크를
             // 눌러 돌아오면 그때 onAuthStateChange(SIGNED_IN)가 이어서 처리한다.
-            alert("가입 확인 메일을 보냈어요. 메일의 링크를 눌러 인증을 마치면 계속할 수 있어요.");
+            // 다른 기기에서 링크를 눌렀거나 돌아올 주소가 등록돼 있지 않으면 여기로 못 돌아오므로, 그다음 할 일을 같이 적는다
+            alert("가입 확인 메일을 보냈어요. 메일의 링크를 눌러 인증을 마치면 정보 입력으로 이어져요.\n"
+                + "이 화면으로 돌아오지 않으면, 로그인 화면에서 같은 이메일·비밀번호로 로그인해 주세요 — 정보 입력으로 이어집니다.");
             return;
         }
         // 세션이 바로 생기면 onAuthStateChange(SIGNED_IN)가 signup.html 로 자동으로 넘긴다.
     });
 }
 
-// 우상단 로그인 버튼의 표시 문구. 로그아웃은 계정을 지우는 게 아니라
-// 새 익명 id를 발급하는 것뿐이라(state.js), 로그인 폼과 별도 화면 없이 그 자리에서 처리한다.
+// 우상단 버튼 하나가 두 역할을 한다 — 로그아웃 상태면 "로그인"(모달), 로그인 상태면 "마이페이지"(mypage.html 로 이동).
+// 로그아웃은 마이페이지 안에 있다 — 지도 화면에서 실수로 누르던 것을 없앴다
 export function syncLoginToggle() {
     const btn = document.getElementById("loginToggle");
     if (!btn) return;
-    btn.textContent = isLoggedIn() ? "로그아웃" : "로그인";
+    const loggedIn = isLoggedIn();
+    btn.textContent = loggedIn ? "👤 마이페이지" : "로그인";
+    btn.classList.toggle("is-member", loggedIn);
 }
 
 export function handleLoginToggleClick() {
     if (isLoggedIn()) {
-        supabase.auth.signOut();
-        localStorage.setItem("lf-anon", crypto.randomUUID());
-        syncLoginToggle();
+        location.href = "mypage.html";
     } else {
         openAuthModal();
     }
 }
 
+// 로그인 모달. 로그인 상태에서는 부를 일이 없다 — 하트(reason.js) · 검색(search.js)이 isLoggedIn() 을 먼저 보고, 헤더 버튼은 마이페이지로 간다
 export function openAuthModal() {
     const el = ensureAuthModal();
-    if (isLoggedIn()) {
-        renderLoggedInAuthModal(el);
-    } else {
-        renderGuestAuthModal(el);
-    }
+    renderGuestAuthModal(el);
     el.classList.add("is-open");
 }
 
 function closeAuthModal() {
     if (!authModalEl) return;
     authModalEl.classList.remove("is-open");
-}
-
-// 아직 안 만든 화면으로 이동하려 할 때 보여주는 공용 안내창.
-// 페이지가 완성되면 그 항목의 버튼을 <a href="...html"> 로 되돌리고 이 함수 호출은 지우면 된다
-function ensureComingSoon() {
-    if (comingSoonEl) return comingSoonEl;
-
-    comingSoonEl = document.createElement("div");
-    comingSoonEl.className = "coming-soon-backdrop";
-    comingSoonEl.innerHTML = `
-        <div class="coming-soon-panel">
-            <button class="coming-soon-close" aria-label="닫기">&times;</button>
-            <p id="comingSoonText"></p>
-        </div>
-    `;
-    document.body.appendChild(comingSoonEl);
-
-    comingSoonEl.addEventListener("click", (e) => {
-        if (e.target === comingSoonEl) closeComingSoon();
-    });
-    comingSoonEl.querySelector(".coming-soon-close").addEventListener("click", closeComingSoon);
-
-    return comingSoonEl;
-}
-
-function openComingSoon(featureName) {
-    const el = ensureComingSoon();
-    el.querySelector("#comingSoonText").textContent = `"${featureName}" ⚙️준비 중`;
-    el.classList.add("is-open");
-}
-
-function closeComingSoon() {
-    if (!comingSoonEl) return;
-    comingSoonEl.classList.remove("is-open");
 }

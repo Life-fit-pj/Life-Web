@@ -409,7 +409,7 @@
   font-weight: 600;
 }
 
-/* 배경은 .coming-soon-backdrop(ui/menu.css)과 같은 검은 스크림을 쓴다.
+/* 배경은 검은 스크림을 쓴다.
    밝은 색 스크림은 밤 모드에서 화면이 하얗게 뜬다 */
 #typeResult {
   position: fixed;
