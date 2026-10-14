@@ -40,7 +40,9 @@
 }
 
 .reason-backdrop.is-open .reason-modal {
-  transform: translateY(0);
+  /* translateY(0) 이 아니라 none — transform 이 남아 있으면 안쪽의 position:fixed(로드뷰 크게 보기)가
+     화면이 아니라 이 모달 기준이 되어 모달 안에 갇힌다 */
+  transform: none;
 }
 
 .reason-close {
@@ -298,3 +300,33 @@
   height: 240px;
   margin: 4px 0 14px;
 }
+/* 로드뷰 크게 보기 — 모달 안 작은 칸을 화면 가득으로 키운다(reason.js toggleRoadviewZoom) */
+.rc-roadview-wrap { position: relative; }
+
+.rc-rv-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rc-rv-zoom:hover { background: var(--accent-fill); color: var(--accent-ink); }
+
+.rc-roadview-wrap.is-zoomed {
+  position: fixed;
+  inset: 0;
+  z-index: 9600;                 /* 추천 사유 모달(9500)보다 위 */
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.rc-roadview-wrap.is-zoomed .rc-roadview { height: 100%; }
+.rc-roadview-wrap.is-zoomed .rc-rv-zoom { top: 36px; right: 36px; }

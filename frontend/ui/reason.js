@@ -147,6 +147,8 @@ function bindLikeButton(el, item) {
 
 /** 탭 버튼 클릭에 맞춰 패널을 바꿔 보여준다 */
 function bindReasonTabs(el, item) {
+  el.querySelector("#rcRoadviewZoom")?.addEventListener("click", () => toggleRoadviewZoom());
+
   el.querySelectorAll(".rc-tab-head").forEach((head) => {
     head.addEventListener("click", () => {
       const name = head.dataset.tab;
@@ -187,6 +189,25 @@ function initRoadview(item) {
     roadviewInstance.setPanoId(panoId, position);
   });
 }
+
+
+/** 로드뷰를 화면 가득 키우거나 되돌린다. 크기가 바뀌면 relayout() 을 불러야 로드뷰가 새 크기로 다시 그린다 */
+function toggleRoadviewZoom(force) {
+  const wrap = document.querySelector(".rc-roadview-wrap");
+  const btn = document.getElementById("rcRoadviewZoom");
+  if (!wrap || !btn) return;
+  const on = wrap.classList.toggle("is-zoomed", force);
+  btn.textContent = on ? "✕ 닫기" : "⤢ 크게 보기";
+  btn.setAttribute("aria-label", on ? "로드뷰 작게 보기" : "로드뷰 크게 보기");
+  roadviewInstance?.relayout();
+}
+
+// 크게 본 상태에서 Esc 는 모달이 아니라 로드뷰만 먼저 줄인다
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !document.querySelector(".rc-roadview-wrap.is-zoomed")) return;
+  e.stopImmediatePropagation();
+  toggleRoadviewZoom(false);
+}, true);
 
 
 // 카드내용
@@ -280,7 +301,10 @@ function buildReasonCard(item, weights) {
         </div>
 
         <div class="rc-tab-panel" data-tab-panel="roadview">
-          <div id="rcRoadview" class="rc-roadview"></div>
+          <div class="rc-roadview-wrap">
+            <div id="rcRoadview" class="rc-roadview"></div>
+            <button type="button" id="rcRoadviewZoom" class="rc-rv-zoom" aria-label="로드뷰 크게 보기">⤢ 크게 보기</button>
+          </div>
         </div>
       </div>
 
