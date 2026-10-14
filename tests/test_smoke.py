@@ -22,6 +22,8 @@ MEMORY = {"budget_manwon": 30000, "deal_type": "전세", "commute": None, "prior
 
 def fake_engine(request: httpx.Request) -> httpx.Response:
     calls.append((request.method, request.url.path))
+    if request.url.path == "/chat":
+        return httpx.Response(200, json={"answer": "응암제3동이 나아요", "memory": "예산 3억 · 전세"})
     if request.url.path == "/auth/me":
         if request.headers.get("authorization") == "Bearer good-token":
             return httpx.Response(200, json={"customer_id": "C001", "persona": {}})
@@ -103,3 +105,18 @@ def test_장기_메모리는_토큰의_주인_것만_보인다(client):
     assert r.status_code == 200 and r.json() == MEMORY
     assert client.delete("/api/memory", headers={"Authorization": "Bearer good-token"}).json() == {"ok": True}
     assert ("DELETE", "/memory/C001") in calls
+
+
+def test_조건_하나_지우기는_칸과_값을_엔진에_넘긴다(client, monkeypatch):
+    seen = []
+    monkeypatch.setattr(engine, "_call", lambda method, path, **kw: seen.append((method, path, kw.get("params"))))
+    monkeypatch.setattr(quota, "member_id", lambda request: "C001")
+    client.delete("/api/memory", params={"field": "avoid", "value": "언덕"})
+    client.delete("/api/memory")
+    assert seen == [("DELETE", "/memory/C001", {"field": "avoid", "value": "언덕"}), ("DELETE", "/memory/C001", {})]
+
+
+def test_채팅_답에_반영한_기억이_같이_온다(client):
+    body = client.post("/api/chat", json={"question": "어디가 나아요?"}).json()
+    assert body["answer"] == "응암제3동이 나아요"
+    assert body["memory"] == "예산 3억 · 전세"

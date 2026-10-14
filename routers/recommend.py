@@ -232,7 +232,7 @@ def region_explain_api(body: RegionRequest):
 def chat_api(body: ChatRequest, request: Request):
     """추천 결과에 대한 후속 질문에 답한다."""
     remaining = quota.consume(request)["remaining"]
-    answer = get_chat_answer(
+    out = get_chat_answer(
         body.question,
         regions=body.regions,
         weights=body.weights,
@@ -241,11 +241,12 @@ def chat_api(body: ChatRequest, request: Request):
         # 로그아웃한 사람이 남의 회원 번호를 적어 보내 그 회원 기준의 답을 받을 수 있다
         anon_id=quota.member_id(request),
     )
+    answer = out["answer"]
 
     if body.anonId and quota.own(request, body.anonId):
         save_chat(body.anonId, body.question, answer)
 
-    return {"answer": answer, "remaining": remaining}
+    return {"answer": answer, "memory": out.get("memory", ""), "remaining": remaining}
 
 
 @router.get("/quota")

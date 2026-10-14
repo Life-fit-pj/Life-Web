@@ -227,12 +227,12 @@ def get_region_explain(gu, dong, query="", weights=None, scores=None, housing=No
 
 
 def get_chat_answer(question, regions=None, weights=None, history=None, anon_id=None):
-    """추천 결과에 대한 후속 질문에 답한다. anon_id 는 엔진의 좋아요·닮은 회원 도구가 읽는다 — 로그인하면 회원 번호다."""
-    out = _call("POST", "/chat", json={
+    """추천 결과에 대한 후속 질문에 답한다. anon_id 는 엔진의 좋아요·닮은 회원 도구가 읽는다 — 로그인하면 회원 번호다.
+    {"answer": 답, "memory": 이번 답에 실은 기억 한 줄(없으면 빈 글자)} 을 돌려준다."""
+    return _call("POST", "/chat", json={
         "question": question, "regions": regions, "weights": weights, "history": history,
         "anon_id": anon_id,
     })
-    return out["answer"]
 
 
 # ── 회원/설문 ─────────────────────────────────────
@@ -317,9 +317,10 @@ def get_memory(customer_id):
     return _call("GET", f"/memory/{_seg(customer_id)}")
 
 
-def delete_memory(customer_id):
-    """마이페이지 > AI가 기억한 선호 > 모두 지우기."""
-    return _call("DELETE", f"/memory/{_seg(customer_id)}")
+def delete_memory(customer_id, field=None, value=None):
+    """field 가 없으면 모두 지우기(마이페이지). 있으면 그 조건 하나만(채팅창 띠의 ✕)."""
+    params = {k: v for k, v in {"field": field, "value": value}.items() if v is not None}
+    return _call("DELETE", f"/memory/{_seg(customer_id)}", params=params)
 
 
 # ── 관리자 ────────────────────────────────────────

@@ -140,9 +140,10 @@ export async function getMemory() {
   return getJSON("/api/memory", await authHeaders());
 }
 
-/** AI가 기억한 선호 모두 지우기 */
-export async function deleteMemory() {
-  return deleteJSON("/api/memory", {}, await authHeaders());
+/** AI가 기억한 선호 지우기. field 를 주면 그 조건 하나만(목록 칸은 value 하나만), 안 주면 모두 */
+export async function deleteMemory(field, value) {
+  const q = field ? "?" + new URLSearchParams(value == null ? { field } : { field, value }) : "";
+  return deleteJSON("/api/memory" + q, {}, await authHeaders());
 }
 
 /** Authorization 헤더 조립. Supabase 세션의 access_token 을 그대로 싣는다 */
