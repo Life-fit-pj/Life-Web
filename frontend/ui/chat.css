@@ -176,3 +176,64 @@
   cursor: default;
 }
 
+
+
+/* AI가 기억하는 조건 띠 (머리 바로 아래) */
+.chat-memory {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.chat-memory[hidden] { display: none; }
+
+.chat-memory-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.chat-memory-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chat-memory-chip button {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chat-memory-chip button:hover { color: var(--ink); }
+
+/* 답 아래 "기억한 조건 반영" 표시 */
+.chat-msg.memo {
+  align-self: flex-start;
+  margin-top: -6px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+}
+
+.chat-memory-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+}

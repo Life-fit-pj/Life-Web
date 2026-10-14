@@ -1,5 +1,5 @@
-import { postChat, getQuota } from "../lib/api.js";
-import { state, getAnonId } from "../lib/state.js";
+import { postChat, getQuota, getMemory, deleteMemory } from "../lib/api.js";
+import { state, getAnonId, isLoggedIn } from "../lib/state.js";
 import { escapeAndFormat } from "../lib/format.js";
 
 
@@ -12,6 +12,7 @@ let chatHistory = [];
 function openChat() {
   document.getElementById("chatPanel").classList.add("open");
   getQuota().then(renderQuota).catch(() => {});
+  loadMemoryStrip();
   setTimeout(() => document.getElementById("chatInput").focus(), 300);
 }
 
@@ -30,6 +31,60 @@ function renderQuota({ limit, remaining, member }) {
   document.getElementById("chatInput").placeholder = empty
     ? (member ? "오늘 질문을 다 썼어요. 내일 다시 물어봐 주세요" : "로그인하면 하루 20번까지 물어볼 수 있어요")
     : "궁금한 점을 입력하세요";
+}
+
+
+/** 기억 -> 띠에 놓을 조건 [[칸, 값, 보이는 글]]. 목록 칸은 값 하나가 조건 하나다 */
+function memoryChips(m) {
+  const won = (v) => (v >= 10000 ? `${Math.floor(v / 10000)}억 ${v % 10000 ? (v % 10000).toLocaleString() + "만원" : ""}` : `${v.toLocaleString()}만원`).trim();
+  const chips = [];
+  if (m.budget_manwon) chips.push(["budget_manwon", null, `예산 ${won(m.budget_manwon)}`]);
+  if (m.deal_type) chips.push(["deal_type", null, m.deal_type]);
+  if (m.commute) chips.push(["commute", null, `통근 ${m.commute}`]);
+  (m.priorities || []).forEach((p) => chips.push(["priorities", p, `중요 ${p}`]));
+  (m.avoid || []).forEach((a) => chips.push(["avoid", a, `피함 ${a}`]));
+  return chips;
+}
+
+
+/** 채팅창 위 "기억하는 조건" 띠. 손님은 숨기고, 회원은 기억이 없어도 띠를 보여 기억한다는 걸 알린다 */
+async function loadMemoryStrip() {
+  const strip = document.getElementById("chatMemory");
+  if (!isLoggedIn()) { strip.hidden = true; return; }
+  let chips = [];
+  try { chips = memoryChips((await getMemory()) || {}); } catch (err) { console.error(err); }
+  strip.hidden = false;
+  strip.replaceChildren();
+
+  const label = document.createElement("span");
+  label.className = "chat-memory-label";
+  label.textContent = "기억하는 조건";
+  strip.appendChild(label);
+
+  if (!chips.length) {
+    const empty = document.createElement("span");
+    empty.className = "chat-memory-empty";
+    empty.textContent = "예산·통근지·피하고 싶은 것을 말하면 기억해 둘게요";
+    strip.appendChild(empty);
+    return;
+  }
+
+  for (const [field, value, text] of chips) {
+    const chip = document.createElement("span");
+    chip.className = "chat-memory-chip";
+    chip.textContent = text;
+    const x = document.createElement("button");
+    x.type = "button";
+    x.textContent = "✕";
+    x.setAttribute("aria-label", `${text} 잊기`);
+    x.addEventListener("click", async () => {
+      x.disabled = true;
+      try { await deleteMemory(field, value); } catch (err) { console.error(err); }
+      loadMemoryStrip();
+    });
+    chip.appendChild(x);
+    strip.appendChild(chip);
+  }
 }
 
 
@@ -110,6 +165,11 @@ async function sendChat() {
     const data = await postChat(question, state.lastResult?.topRegions, state.lastResult?.weights, getAnonId(), chatHistory);
     loading.remove();
     addChatMsg(data.answer || "답을 만들지 못했어요.", "bot");
+    // 이번 답이 기억한 조건을 보고 만든 것이면 말풍선 아래에 밝힌다 — 말하지 않은 조건으로 답하면 사용자가 헷갈린다
+    if (data.answer && data.memory) addChatMsg(`↳ 기억한 조건 반영: ${data.memory}`, "memo");
+    // 엔진은 답을 보낸 뒤에 질문에서 선호를 뽑아 저장한다(Claude 1번, 몇 초). 그만큼 기다렸다 띠를 다시 읽는다
+    // ponytail: 고정 대기라 저장이 더 늦으면 다음 답 때 보인다. 정확히 하려면 저장 결과를 답과 같이 돌려줘야 한다
+    setTimeout(loadMemoryStrip, 5000);
     if (data.answer) {
       chatHistory.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
     }

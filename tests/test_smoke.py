@@ -11,14 +11,25 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
-from services import engine
+from services import engine, quota
 
 # 엔진이 받은 요청을 기록해 두고 정해 둔 응답을 돌려준다
 calls = []
 
 
+MEMORY = {"budget_manwon": 30000, "deal_type": "전세", "commute": None, "priorities": ["교육"], "avoid": []}
+
+
 def fake_engine(request: httpx.Request) -> httpx.Response:
     calls.append((request.method, request.url.path))
+    if request.url.path == "/chat":
+        return httpx.Response(200, json={"answer": "응암제3동이 나아요", "memory": "예산 3억 · 전세"})
+    if request.url.path == "/auth/me":
+        if request.headers.get("authorization") == "Bearer good-token":
+            return httpx.Response(200, json={"customer_id": "C001", "persona": {}})
+        return httpx.Response(401, json={"detail": "토큰이 틀렸다"})
+    if request.url.path == "/memory/C001":
+        return httpx.Response(200, json={"ok": True} if request.method == "DELETE" else MEMORY)
     if request.url.path == "/recommend":
         return httpx.Response(200, json=[
             {"name": "강남구 대치1동", "total": 91.2, "scores": {}, "counts": {"학원": 120}},
@@ -30,6 +41,7 @@ def fake_engine(request: httpx.Request) -> httpx.Response:
 @pytest.fixture
 def client(monkeypatch):
     calls.clear()
+    monkeypatch.setattr(quota, "_members", {})       # 앞 테스트가 확인해 둔 토큰을 지운다
     monkeypatch.setattr(engine, "_client",
                         httpx.Client(base_url="http://engine", transport=httpx.MockTransport(fake_engine)))
     return TestClient(app)
@@ -82,3 +94,29 @@ def test_관리자_API는_토큰이_없으면_401(client):
 def test_경로_조각의_슬래시는_인코딩된다():
     # "../admin/members" 가 엔진의 다른 경로로 풀리던 문제(2026-10-05)가 되살아나지 않게
     assert engine._seg("../admin/members") == "..%2Fadmin%2Fmembers"
+
+
+def test_장기_메모리는_토큰의_주인_것만_보인다(client):
+    assert client.get("/api/memory").status_code == 401
+    assert client.get("/api/memory", headers={"Authorization": "Bearer bad-token"}).status_code == 401
+    assert ("GET", "/memory/C001") not in calls
+
+    r = client.get("/api/memory", headers={"Authorization": "Bearer good-token"})
+    assert r.status_code == 200 and r.json() == MEMORY
+    assert client.delete("/api/memory", headers={"Authorization": "Bearer good-token"}).json() == {"ok": True}
+    assert ("DELETE", "/memory/C001") in calls
+
+
+def test_조건_하나_지우기는_칸과_값을_엔진에_넘긴다(client, monkeypatch):
+    seen = []
+    monkeypatch.setattr(engine, "_call", lambda method, path, **kw: seen.append((method, path, kw.get("params"))))
+    monkeypatch.setattr(quota, "member_id", lambda request: "C001")
+    client.delete("/api/memory", params={"field": "avoid", "value": "언덕"})
+    client.delete("/api/memory")
+    assert seen == [("DELETE", "/memory/C001", {"field": "avoid", "value": "언덕"}), ("DELETE", "/memory/C001", {})]
+
+
+def test_채팅_답에_반영한_기억이_같이_온다(client):
+    body = client.post("/api/chat", json={"question": "어디가 나아요?"}).json()
+    assert body["answer"] == "응암제3동이 나아요"
+    assert body["memory"] == "예산 3억 · 전세"
