@@ -220,3 +220,10 @@ __marimo__/
 .serena
 .headroom_wrap_marker.json
 *.db
+# 개인 도구 설정·상태
+*.stackdump
+.claude/settings.local.json
+.claude/.headroom_*
+.claude/skills/
+.impeccable/
+PRODUCT.md

@@ -16,7 +16,7 @@ import { nextSeq, isLatest, getAnonId, isLoggedIn } from "../lib/state.js";
 import { renderResult } from "./result.js";
 import { handleLoginToggleClick, syncLoginToggle, openAuthModal } from "./menu.js";
 import { openSources } from "./sources.js";
-import { showTypeCard, firstPayload } from "./lifetype.js";
+import { showTypeCard, firstPayload, clearType } from "./lifetype.js";
 
 
 // 배경에 떠다닐 단어들.
@@ -364,6 +364,14 @@ async function runLifeType(query) {
 
     status.textContent = "";
 
+    // 키워드를 하나도 안 고르고 문장만 썼으면 1차가 읽을 게 없다(낱말 사전이라 "학원"도 교육으로 못 읽는다).
+    // 빈 카드를 보여 주지 않고 문장을 이해하는 2차(LLM)로 바로 간다
+    if (!t.picks?.length) {
+      clearType();
+      await runPredict(query);
+      return;
+    }
+
     showTypeCard(t, {
       // 카드가 이 두 개를 눌렀을 때 부른다.
       // 2차 결과는 성공 여부(true/false)로 돌려줘야 카드가 닫을지 정한다
@@ -552,7 +560,7 @@ function runSurveyIfPending() {
  * 회원가입은 마쳤지만 설문은 건너뛴 채 돌아왔으면 검색 화면을 보여주지 않고
  * 첫 화면의 "직접 설정할게요"(skipSearch)를 눌렀을 때와 똑같은 메인 화면(지도+슬라이더
  * 패널, 기본값 그대로)으로 넘어간다. 분석은 자동으로 돌리지 않는다 — 사용자가 슬라이더를
- * 조정한 뒤 직접 [AI 분석 실행]을 누르는 게 skipSearch 흐름과 같은 동작이다
+ * 조정한 뒤 직접 [이 조건으로 다시 찾기]를 누르는 게 skipSearch 흐름과 같은 동작이다
  *
  * @returns 건너뛰고 온 길이면 true
  */
@@ -590,6 +598,8 @@ function bindEvents() {
       .join(" ");
 
     if (!combined) { input.focus(); return; }
+    // 2차 추천은 회원만 된다(runPredict). 1차 카드까지 보고 나서 막히면 헛걸음이라 검색 전에 묻는다
+    if (!isLoggedIn()) { openAuthModal(); return; }
     runLifeType(combined);
   };
 

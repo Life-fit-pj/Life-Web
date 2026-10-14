@@ -95,7 +95,7 @@
   </div>
 
   <!-- 채팅 패널. 버튼을 누르면 오른쪽에서 열린다 -->
-  <button id="chatToggle" title="추천에 대해 물어보기">💬</button>
+  <button id="chatToggle" title="추천에 대해 물어보기">💬 결과에 대해 묻기</button>
 
   <div id="chatPanel">
     <div class="chat-head">
@@ -103,6 +103,9 @@
       <span class="chat-quota" id="chatQuota"></span>
       <button id="chatClose" aria-label="닫기">&times;</button>
     </div>
+
+    <!-- AI가 기억하는 조건. 회원이고 기억이 있을 때만 보인다. ✕ 로 하나씩 지운다 -->
+    <div class="chat-memory" id="chatMemory" hidden></div>
 
     <!-- 주고받은 말이 쌓이는 곳 -->
     <div class="chat-body" id="chatBody">
@@ -136,7 +139,7 @@
     <div class="top-search">
       <span class="ts-icon">🔍</span>
       <input id="topSearchInput" type="text"
-             placeholder="단어를 누르거나, 원하는 동네를 직접 적어보세요" autocomplete="off">
+             placeholder="새로 찾기 : 원하는 동네를 문장으로 적어 보세요" autocomplete="off">
       <button id="topSearchBtn">검색</button>
     </div>
     <p id="topSearchStatus" class="ts-status"></p>
@@ -150,6 +153,10 @@
     <div class="panel-top">
       <button type="button" id="sourcesLink" class="link-icon" title="이용 안내 · 데이터 출처" aria-label="이용 안내 · 데이터 출처">i</button>
     </div>
+  <!-- 슬라이더만 스크롤하고 아래 버튼은 늘 보이게 둘로 나눈다. i 는 스크롤 영역 밖에 둬야 귀퉁이가 안 잘린다 -->
+  <div class="ctrl-scroll">
+    <!-- 화면에 찾는 길이 셋(위 검색 · 이 패널 · 💬)이라 이 패널이 무엇을 하는지 먼저 밝힌다 -->
+    <p class="ctrl-intro"><strong>조건 직접 조정</strong>지금 결과를 슬라이더로 다듬어 다시 찾아요</p>
     <h2>🏠 건축 (Architecture)</h2>
     <div class="weight-row">
       <div class="weight-top">
@@ -280,8 +287,10 @@
       <input type="range" id="culture" min="1" max="5" value="3" oninput="document.getElementById('cultVal').innerText = this.value + ' 점'">
     </div>
 
-    <!-- 실행 버튼 및 로딩 스피너 -->
-    <button class="run-btn" id="runBtn">AI 분석 실행</button>
+  </div>
+
+    <!-- 실행 버튼 및 로딩 스피너. 슬라이더 값으로 바로 채점한다(LLM 을 안 탄다) — "AI 분석" 이라 부르지 않는다 -->
+    <button class="run-btn" id="runBtn">이 조건으로 다시 찾기</button>
     <div class="loader" id="loading" style="display: none;"></div>
 
   </div>
@@ -302,11 +311,11 @@
 
     <!-- 5개 지역이 들어가는 스크롤 영역 -->
     <div class="rank-scroll" id="resTopRegions">
-      <div class="list-item"><div class="li-main"><span class="rank">1</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
-      <div class="list-item"><div class="li-main"><span class="rank">2</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
-      <div class="list-item"><div class="li-main"><span class="rank">3</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
-      <div class="list-item"><div class="li-main"><span class="rank">4</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
-      <div class="list-item"><div class="li-main"><span class="rank">5</span><div class="list-name">분석 버튼을 눌러주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">1</span><div class="list-name">위에서 검색하거나 조건을 맞춰 찾아 주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">2</span><div class="list-name">위에서 검색하거나 조건을 맞춰 찾아 주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">3</span><div class="list-name">위에서 검색하거나 조건을 맞춰 찾아 주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">4</span><div class="list-name">위에서 검색하거나 조건을 맞춰 찾아 주세요</div></div></div>
+      <div class="list-item"><div class="li-main"><span class="rank">5</span><div class="list-name">위에서 검색하거나 조건을 맞춰 찾아 주세요</div></div></div>
     </div>
 
     <!-- 평면도 — 가구 구성·면적에 맞는 LH 공공주택 도면 3~4장. 동네와는 무관하다 -->

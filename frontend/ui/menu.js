@@ -18,6 +18,13 @@ let sawFirstAuthEvent = false;
 supabase.auth.onAuthStateChange((event, session) => {
     const isFirst = !sawFirstAuthEvent;
     sawFirstAuthEvent = true;
+
+    // 세션이 끊겼는데(만료·다른 탭 로그아웃) 회원 번호가 남아 있으면 화면은 회원, 서버는 손님으로 갈린다 —
+    // 로그인 확인을 통과해 검색하고는 401·손님 한도를 맞는다. 세션이 없으면 손님 번호로 되돌린다(mypage.html 로그아웃과 같은 규칙)
+    if (!session && isLoggedIn()) {
+        localStorage.setItem("lf-anon", crypto.randomUUID());
+        syncLoginToggle();
+    }
     if (event !== "SIGNED_IN" || !session) return;
 
     if (isFirst) {

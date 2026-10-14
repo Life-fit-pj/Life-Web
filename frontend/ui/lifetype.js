@@ -24,7 +24,9 @@ export function firstPayload() {
   if (!t) return {};
 
   return {
-    firstWeights: t.weights || null,
+    // 키워드 말고 직접 쓴 문장이 있으면 1차 가중치로 덮지 않는다 — 낱말 사전보다 LLM 이 문장을 잘 읽는다
+    // ("애들 학원 보내기 좋은 곳" 이 교육 3.1 로 읽혀 교육 약한 동네가 나오던 문제, 2026-10-14)
+    firstWeights: t.freeText ? null : (t.weights || null),
     firstSpots: (t.spots || []).map((s) => ({ gu: s.gu, dong: s.dong })),
     typeName: t.typeName || "",
     housePicks: t.housePicks || null,      // 집 조건 키워드("방이 많은" 등). 평면도를 고를 때 쓴다
@@ -54,6 +56,12 @@ function noSpotReason(t) {
 }
 
 
+/** 1차를 건너뛸 때 지난 검색의 1차 결과가 2차에 섞이지 않게 비운다 */
+export function clearType() {
+  state.lastType = null;
+}
+
+
 export function closeTypeCard() {
   document.getElementById("typeResult")?.classList.remove("is-open");
 }
@@ -76,7 +84,8 @@ export function showTypeCard(t, { onContinue, onSkip }) {
   // weak 면 이름을 단정하지 않는다. 축이 2개도 안 찼다는 뜻이다
   const enough = t.enough && !t.weak;
   const hint = enough ? "" :
-    `<p class="tr-hint">키워드를 ${t.minPick}개 이상 고르면 더 정확해요 (지금 ${t.picked}개)</p>`;
+    `<p class="tr-hint">키워드를 ${t.minPick}개 이상 고르면 더 정확해요 (지금 ${t.picked}개)
+       <button type="button" id="trPickMore" class="tr-btn-sub">키워드 더 고르기</button></p>`;
 
   const lines = (t.lines || [])
     .map((l) => `<div class="tr-line-row"><span class="tr-line">${l}</span></div>`)
@@ -101,7 +110,7 @@ export function showTypeCard(t, { onContinue, onSkip }) {
       ${spots ? `
         <div class="tr-spots-head">
           <span>이런 동네가 어울려요</span>
-          <em>예산은 아직 반영 전이에요</em>
+          <em>예산은 다음 단계에서 맞춰 드려요</em>
         </div>
         <div class="tr-spots">${spots}</div>`
         : `<p class="tr-nodata">${noSpotReason(t)}</p>`}
@@ -136,6 +145,9 @@ export function showTypeCard(t, { onContinue, onSkip }) {
       desc.textContent = "잠시 후 다시 눌러 주세요";
     }
   });
+
+  // 카드가 키워드 화면을 덮고 있어 힌트만으로는 고를 수가 없다. 카드를 닫아 뒤의 키워드 화면으로 돌려보낸다
+  document.getElementById("trPickMore")?.addEventListener("click", closeTypeCard);
 
   document.getElementById("trSkip").addEventListener("click", () => {
     closeTypeCard();
