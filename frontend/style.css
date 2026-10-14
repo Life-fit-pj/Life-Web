@@ -524,3 +524,39 @@ input[type=range]::-moz-range-thumb {
   color: var(--text-muted);
   opacity: 1;
 }
+
+
+/* ==========================================
+   7. 결과가 나왔을 때 — 새 결과라는 걸 알아채게 한다
+   ========================================== */
+/* 1위 점수: 살짝 커졌다 돌아온다 */
+#resScore.is-fresh { animation: score-pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes score-pop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* TOP 5 목록: 1위부터 차례로 올라온다 */
+.li-enter {
+  animation: li-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@keyframes li-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 지도 순위 배지: 위에서 떨어지듯 나타난다 */
+.map-badge {
+  animation: badge-drop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(150ms + var(--i, 0) * 90ms);
+}
+@keyframes badge-drop {
+  from { opacity: 0; transform: translateY(-12px) scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #resScore.is-fresh, .li-enter, .map-badge { animation: none; }
+}

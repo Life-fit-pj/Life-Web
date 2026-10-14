@@ -147,14 +147,14 @@
   
   <!-- 좌측 조건 설정 패널 -->
   <div class="panel ctrl-panel">
-  <!-- 슬라이더만 스크롤하고 아래 버튼은 늘 보이게 둘로 나눈다 -->
-  <div class="ctrl-scroll">
 
     <!-- 1. 건축 정보. 오른쪽 귀퉁이의 둥근 i 는 ui/sources.js 의 출처 모달을 연다(search.js 가 연결) —
          패널이 길어 아래에 두면 안 보인다. 글자가 없으니 title 로 뜻을 단다 -->
     <div class="panel-top">
       <button type="button" id="sourcesLink" class="link-icon" title="이용 안내 · 데이터 출처" aria-label="이용 안내 · 데이터 출처">i</button>
     </div>
+  <!-- 슬라이더만 스크롤하고 아래 버튼은 늘 보이게 둘로 나눈다. i 는 스크롤 영역 밖에 둬야 귀퉁이가 안 잘린다 -->
+  <div class="ctrl-scroll">
     <!-- 화면에 찾는 길이 셋(위 검색 · 이 패널 · 💬)이라 이 패널이 무엇을 하는지 먼저 밝힌다 -->
     <p class="ctrl-intro"><strong>조건 직접 조정</strong>지금 결과를 슬라이더로 다듬어 다시 찾아요</p>
     <h2>🏠 건축 (Architecture)</h2>

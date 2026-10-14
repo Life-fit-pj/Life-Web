@@ -69,6 +69,7 @@ export function renderResult(data) {
   if (elScore) {
     elScore.innerHTML =
       `${data.score ?? "—"} <span style="font-size:16px; color:var(--muted, #888);">/ 100</span>`;
+    replay(elScore, "is-fresh");
   }
 
   // ② 추천 TOP 5 리스트
@@ -79,6 +80,14 @@ export function renderResult(data) {
 
   // ④ LH 평면도 — 가구 구성에 맞는 구조 3~4장
   renderFloorplans(data.floorplans, data.floorplanNote, data.floorplanMode);
+}
+
+
+/** 같은 요소에 애니메이션을 다시 건다 — 클래스를 뗐다 붙이기만 하면 브라우저가 처음부터 안 돌린다 */
+function replay(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
 }
 
 
@@ -95,9 +104,10 @@ function updateTopRegionsList(regions, dropped) {
 
   container.innerHTML = ''; // 기존 문구 삭제
 
-  regions.forEach((item) => {
+  regions.forEach((item, i) => {
     const div = document.createElement('div');
-    div.className = 'list-item';
+    div.className = 'list-item li-enter';
+    div.style.setProperty('--i', i);     // 1위부터 차례로 들어온다(style.css .li-enter)
     div.style.cursor = 'pointer';
 
     // 1차에서도 나왔던 동네에 표시를 달아 준다

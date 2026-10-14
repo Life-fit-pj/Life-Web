@@ -92,8 +92,9 @@ function addMarkerAndOverlay(item, latLng, bounds, weights) {
     openReasonModal(item, weights);
   });
 
+  // map-badge: 결과가 바뀐 걸 알아채게 순위대로 떨어지듯 나타난다(style.css)
   const overlayContent = `
-    <div style="
+    <div class="map-badge" style="--i: ${item.rank - 1};
       padding: 5px 12px;
       background: #111827;
       color: #ffffff;
