@@ -244,6 +244,41 @@
     }
     .btn-yes { background: var(--primary); color: var(--bg); }
     .btn-no  { background: var(--surface-2); color: var(--text); }
+
+    /* ### 폰 — 같은 카드를 다섯 단계로 나눠 한 번에 하나씩 ###
+       웹은 지금처럼 전부 보인다. 단계를 고르는 일은 아래 스크립트의 STEPS 가 한다 */
+    .step-head, .step-nav { display: none; }
+
+    @media (max-width: 768px) {
+      body { padding: 24px 16px 40px; }
+      h1 { font-size: 22px; }
+      .lead { margin-bottom: 16px; }
+      .card { padding: 18px 16px; }
+      /* 16px 보다 작으면 아이폰이 입력할 때 화면을 확대한다 */
+      .sq-item input, .sq-item select { min-height: 44px; font-size: 16px; }
+
+      .step-head { display: block; margin-bottom: 14px; }
+      .step-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+      .step-bar i { height: 5px; border-radius: 3px; background: var(--line); }
+      .step-bar i.on { background: var(--primary); }
+      .step-name { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+
+      #surveyForm .card { display: none; }
+      #surveyForm .card.is-step { display: block; }
+
+      .step-nav { display: flex; gap: 8px; margin-top: 18px; }
+      .step-nav button {
+        min-height: 48px; font-family: inherit; font-size: 15px; font-weight: 700;
+        border: none; border-radius: 10px; cursor: pointer;
+      }
+      #stepPrev { flex: 0 0 96px; background: var(--surface-2); color: var(--text); }
+      #stepPrev:disabled { opacity: 0.45; cursor: default; }
+      #stepNext { flex: 1; background: var(--primary); color: var(--bg); }
+      #surveyForm.last-step #stepNext { display: none; }
+      #surveyForm.last-step #stepPrev { flex: 1; }
+      #surveyForm:not(.last-step) .btn-submit { display: none; }
+      .actions { margin-top: 10px; }
+    }
   </style>
 </head>
 <body>
@@ -253,6 +288,12 @@
   <div class="brand">LIFE<i>,</i>FIT</div>
   <h1>나만의 맞춤 동네 찾기 🏡</h1>
   <p class="lead">상세한 라이프스타일 분석을 위해 아래 질문들에 답해 주세요. (건너뛰기 가능)</p>
+
+  <!-- 폰에서만 보인다 — 지금 몇 번째 단계인지 -->
+  <div class="step-head" aria-live="polite">
+    <div class="step-bar" id="stepBar"><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="step-name" id="stepName"></p>
+  </div>
 
   <form id="surveyForm">
 
@@ -386,6 +427,12 @@
       </div>
     </div>
 
+    <!-- 폰에서만 보인다 — 단계 넘기기. 마지막 단계에서는 "다음" 대신 아래 완료 버튼이 나온다 -->
+    <div class="step-nav">
+      <button type="button" id="stepPrev">이전</button>
+      <button type="button" id="stepNext">다음</button>
+    </div>
+
     <div class="actions">
       <button type="submit" class="btn-submit">완료하고 동네 추천받기</button>
       <button type="button" id="surveySkip" class="btn-skip">건너뛰기</button>
@@ -414,6 +461,7 @@
 <script src="lib/counter.js"></script>
 <script type="module">
 import { signup, getGuDong } from "./lib/api.js";
+import { isPhone } from "./lib/screen.js";
 
 /* =========================================================
    설문 답변 → persona 칸
@@ -449,10 +497,6 @@ if (typeof mountCounter === "function") {      // counter.js 를 못 불러왔�
 }
 
 const STORAGE_KEY = "lifefit-survey";
-// search.js 가 같은 키를 읽어 "검색 화면(searchScreen) 대신 지도 화면을 바로 보여줄지" 정한다.
-// 회원가입은 이미 끝난 상태에서 설문만 건너뛰는 것이므로, 처음 보는 사람이 보는
-// 키워드 고르는 첫 화면을 또 보여줄 이유가 없다
-const SKIP_TO_MAP_KEY = "lifefit-skip-map";
 const MIN_CHARS = 5;
 
 const form = document.getElementById("surveyForm");
@@ -552,6 +596,19 @@ function meaningfulLength(value) {
 }
 
 
+/** 최소 글자 수를 못 넘긴 칸에 빨간 테두리를 달고 그중 첫 칸을 돌려준다. 다 넘겼으면 null.
+ *  "완료"와 폰의 "다음"이 같이 쓴다 */
+function markShort(inputs) {
+  let firstBad = null;
+  inputs.forEach((input) => {
+    const ok = meaningfulLength(input.value) >= MIN_CHARS;
+    input.classList.toggle("error", !ok);
+    if (!ok && !firstBad) firstBad = input;
+  });
+  return firstBad;
+}
+
+
 /** 답변을 persona 칸으로 묶는다.
  *
  *  질문 라벨은 붙이지 않는다. 붙이면 모든 회원이 똑같은 라벨 문장을
@@ -578,6 +635,9 @@ const submitBtn = form.querySelector(".btn-submit");
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
+  // 폰의 중간 단계에서 Enter 를 누르면 "완료"가 아니라 "다음"으로 받는다
+  if (isPhone() && !form.classList.contains("last-step")) { document.getElementById("stepNext").click(); return; }
+
   if (submitBtn.disabled) return;   // 응답 오는 동안 중복 클릭 방지
 
   const badBasic = firstMissingBasicInfo();
@@ -588,13 +648,7 @@ form.addEventListener("submit", async (e) => {
   }
 
   // ① 모든 칸이 최소 글자 수를 넘겼는지 (기본정보 카드는 뺀다 — 저건 이미 위에서 봤다)
-  let firstBad = null;
-
-  form.querySelectorAll(".card:not(#basicInfoCard) .sq-item input").forEach((input) => {
-    const ok = meaningfulLength(input.value) >= MIN_CHARS;
-    input.classList.toggle("error", !ok);
-    if (!ok && !firstBad) firstBad = input;
-  });
+  const firstBad = markShort(form.querySelectorAll(".card:not(#basicInfoCard) .sq-item input"));
 
   if (firstBad) {
     alert(`정확한 분석을 위해 각 항목을 ${MIN_CHARS}글자 이상 적어주세요. (특수문자 제외)`);
@@ -650,7 +704,6 @@ btnSkipYes.addEventListener("click", async () => {
   }
 
   sessionStorage.removeItem(STORAGE_KEY);   // 이전에 쓰다 만 답이 남아 있을 수 있다
-  sessionStorage.setItem(SKIP_TO_MAP_KEY, "1");
 
   btnSkipYes.disabled = true;
   btnSkipNo.disabled = true;
@@ -672,6 +725,60 @@ btnSkipYes.addEventListener("click", async () => {
 skipConfirm.addEventListener("click", (e) => {
   if (e.target === skipConfirm && !btnSkipYes.disabled) skipConfirm.classList.remove("is-open");
 });
+
+
+/* =========================================================
+   폰 — 단계 나누기
+   카드 여덟 장을 다섯 단계로 묶어 한 번에 한 단계만 보여 준다.
+   모양(숨기기)은 768px 이하에서만 CSS 가 바꾼다 — 웹에서는 is-step 이 붙어도 모든 카드가 그대로 보인다
+   cards 의 숫자는 위에서부터 카드 순서(0 = 기본정보). 카드를 더하거나 빼면 여기도 고친다
+   ========================================================= */
+const STEPS = [
+  { name: "기본 정보",     cards: [0] },
+  { name: "일과 운동",     cards: [1, 2] },
+  { name: "여가와 여행",   cards: [3, 4] },
+  { name: "식생활과 가족", cards: [5, 6] },
+  { name: "자라 온 동네",  cards: [7] },
+];
+const cards = Array.from(form.querySelectorAll(".card"));
+let step = 0;
+
+function showStep(n) {
+  step = Math.max(0, Math.min(STEPS.length - 1, n));
+  cards.forEach((c, i) => c.classList.toggle("is-step", STEPS[step].cards.includes(i)));
+  document.querySelectorAll("#stepBar i").forEach((b, i) => b.classList.toggle("on", i <= step));
+  document.getElementById("stepName").textContent = `${step + 1}/${STEPS.length} · ${STEPS[step].name}`;
+  document.getElementById("stepPrev").disabled = step === 0;
+  form.classList.toggle("last-step", step === STEPS.length - 1);
+}
+
+/** 지금 단계의 칸이 다 찼는지. 마지막에 한꺼번에 막히지 않게 단계마다 본다(규칙은 "완료"와 같다) */
+function stepIsFilled() {
+  if (step === 0) {
+    const bad = firstMissingBasicInfo();
+    if (bad) { alert("기본정보를 먼저 채워 주세요."); bad.focus(); return false; }
+    return true;
+  }
+  const inputs = STEPS[step].cards.flatMap((i) => Array.from(cards[i].querySelectorAll(".sq-item input")));
+  const bad = markShort(inputs);
+  if (bad) {
+    alert(`정확한 분석을 위해 각 항목을 ${MIN_CHARS}글자 이상 적어주세요. (특수문자 제외)`);
+    bad.focus();
+    return false;
+  }
+  return true;
+}
+
+document.getElementById("stepNext").addEventListener("click", () => {
+  if (!stepIsFilled()) return;
+  showStep(step + 1);
+  window.scrollTo({ top: 0 });
+});
+document.getElementById("stepPrev").addEventListener("click", () => {
+  showStep(step - 1);
+  window.scrollTo({ top: 0 });
+});
+showStep(0);
 </script>
 
 </body>

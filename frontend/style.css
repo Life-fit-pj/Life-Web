@@ -502,19 +502,6 @@ input[type=range]::-moz-range-thumb {
   .rank-panel { width: 270px; right: 16px; }
 }
 
-@media (max-width: 768px) {
-  body { overflow: auto; }
-  #map { position: relative; height: 45vh; min-height: 300px; }
-  .header { position: relative; padding: 16px; background: var(--paper); }
-  .ctrl-panel, .rank-panel {
-    position: relative;
-    top: auto; left: auto; right: auto;
-    width: calc(100% - 32px);
-    margin: 12px 16px;
-    max-height: none;
-  }
-}
-
 
 /* 입력칸 안내 문구.
    opacity 를 1 로 두는 이유 — 파이어폭스가 기본으로 흐리게 만든다 */

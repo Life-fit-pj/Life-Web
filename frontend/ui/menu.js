@@ -54,6 +54,8 @@ async function resolveBackendAccount(token) {
         const { customerId } = await authLogin(token);
         localStorage.setItem("lf-anon", customerId);
         syncLoginToggle();
+        // 이 페이지 안에서 로그인이 끝났다고 알린다 — 랜딩에서 맡긴 검색어가 기다리고 있으면 search.js 가 이어서 돌린다
+        window.dispatchEvent(new Event("lifefit:login"));
         if (authModalEl?.classList.contains("is-open")) closeAuthModal();
     } catch (err) {
         console.error("로그인 처리 실패", err);

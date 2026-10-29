@@ -102,6 +102,14 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
 - `frontend/` — 빌드 단계도, 프레임워크도 없습니다. `index.html`이 `main.js` 하나만 모듈로
   불러오고 나머지는 `import`가 끌고 옵니다. `lib/`는 공용(서버 호출·공유 상태·문자열 다듬기),
   `ui/`는 화면 단위입니다.
+- `frontend/landing.html` — 첫 페이지(`/`). 맨 아래 **1차 테스트 칸**(키워드 고르기)이 있고,
+  그 동작은 `ui/landing-test.js`, 모양은 `test.css` 입니다. 랜딩은 `main.js` 와 무관하게
+  자기 모듈(`ui/landing-test.js`)을 따로 불러옵니다.
+- **폰 화면** — "폰"은 폭 **768px 이하** 한 가지입니다. JS 는 `lib/screen.js` 의 `isPhone()`
+  하나로 묻고, CSS 는 같은 숫자를 `@media (max-width: 768px)` 에 적습니다(`test.css` ·
+  `mobile.css` · `signup.html` · `mypage.html`). 지도 화면의 폰 규칙은 **`mobile.css` 한 파일**에만
+  두고, 시트를 여닫는 동작은 `ui/mobile.js` 가 합니다. 요소를 폰용으로 새로 만들지 않고 같은
+  요소의 자리·모양만 바꿉니다.
 - `frontend/admin.html` — **일체형 단일 페이지**입니다(HTML+CSS+JS가 한 파일).
   왼쪽 내비게이션으로 네 화면을 오갑니다: **대시보드**(집계·차트), **회원**(목록+상세),
   **행정동**(목록+지표 12개), **시스템**(상태·캐시·수정 이력). 토큰은 `prompt()`가 아니라
@@ -113,8 +121,10 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
   `:not([data-theme="light"])`를 걸어 둡니다. 한쪽만 고치면 둘 중 하나가 어긋납니다.
   **저장은 처음 값과 달라진 칸만 보냅니다**(`collectPatch`) — 전부 보내면 페르소나를
   안 고쳤어도 벡터를 다시 만들고, 수정 이력에 "26칸 고침"만 남아 무엇을 바꿨는지 알 수 없습니다.
-- `frontend/signup.html` — 역시 **일체형 단일 페이지**입니다(HTML+CSS+JS가 한 파일). 첫 화면과 공유하는 코드가 없어서 나누면 파일만 늘어납니다. 서버에 저장하는 기능이
-  붙어 `lib/api.js`를 쓰게 되면 그때 `<script type="module">`로 바꾸면 됩니다.
+- `frontend/signup.html` — 역시 **일체형 단일 페이지**입니다(HTML+CSS+JS가 한 파일). 첫 화면과 공유하는 코드가 없어서 나누면 파일만 늘어납니다.
+  스크립트는 `<script type="module">` 이라 `lib/api.js` · `lib/screen.js` 를 import 합니다.
+  폰(768px 이하)에서는 카드 여덟 장을 다섯 단계로 나눠 한 번에 하나씩 보여 줍니다(파일 끝의 `STEPS`) —
+  카드를 더하거나 빼면 `STEPS` 의 카드 번호도 고칩니다.
 
 ### 화면 흐름 — 1차와 2차
 
@@ -122,8 +132,15 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
 
 | | 부르는 API | LLM | 담당 파일 |
 |---|---|---|---|
-| **1차** 유형 판정 | `/api/lifetype` | ✗ (즉시) | `ui/search.js` → `ui/lifetype.js` |
+| 키워드 고르기 | `/api/lifetype/keywords` | ✗ | 랜딩 테스트 칸 — `ui/landing-test.js` |
+| **1차** 유형 판정 | `/api/lifetype` | ✗ (즉시) | `ui/search.js` `runPendingQuery()` → `ui/lifetype.js` |
 | **2차** 추천 | `/api/predict` | ✓ (3~6초) | `ui/search.js` `runPredict()` |
+
+랜딩과 지도 화면은 다른 페이지라 변수를 나눠 쓸 수 없습니다. 랜딩의 "찾기"는 검색어를
+`sessionStorage` 의 **`lifefit-pending-query`** 에 맡기고 `index.html` 로 넘어가고, `search.js` 가
+그것을 꺼내 1차를 돌립니다. 키 이름은 `landing-test.js` · `search.js` 두 곳이 글자까지 같아야 합니다.
+로그인이 안 됐으면 1차 전에 로그인 창을 띄우고, 이메일 로그인이 끝나면 `menu.js` 가 보내는
+`lifefit:login` 신호를 받아 이어서 돕니다.
 
 1차가 LLM을 안 쓰는 이유는 "즉시 나오는 맛보기"여야 키워드를 바꿔 가며 여러 번 눌러 보기
 때문입니다. 지역 선정은 검색이 아니라 채점이라(427개 동이 전부 지표 점수를 가짐) 가중치만
@@ -143,8 +160,9 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
   `firstTypeName`, `droppedFromFirst`, `floorplanPath`, `fallback`, `explanation`,
   `weights`, `housing`.
 - `POST /api/lifetype` — 요청 `{ query }`. 응답은 유형 판정 결과 전체 + `spots`(동네 2곳) +
-  `dataStatus`. `GET /api/lifetype/keywords`는 첫 화면에 뿌릴 키워드를 줍니다 —
-  프론트에 하드코딩하면 `services/lifetype.py`와 어긋나므로 반드시 서버에서 받으세요.
+  `dataStatus`. `GET /api/lifetype/keywords`는 랜딩 테스트 칸에 뿌릴 키워드를 줍니다 —
+  프론트에 하드코딩하면 `services/lifetype.py`와 어긋나므로 반드시 서버에서 받으세요
+  (`ui/landing-test.js` 의 `FLOAT_WORDS` 는 서버가 안 될 때만 쓰는 예비 목록입니다).
 - `POST /api/region` — 요청 `{ gu, dong }`, 지도 핀 클릭 시 인근 시설 개수/항목을 반환합니다.
   427개 동 전체 점수를 다시 계산하지 않도록 `/api/predict`와 의도적으로 분리되어 있습니다.
 - `POST /api/region/explain` — 동네별 개별 LLM 설명. 시설 정보는 즉시 나오지만 설명은 3~5초
@@ -231,6 +249,20 @@ FastAPI 서버(8000번 포트)를 호출 → 응답을 재구성해 JSON으로 �
 
 **모달 여는 클래스는 `.is-open`입니다.** 메뉴·로그인·추천 사유·1차 유형 카드가 전부 이
 관례를 씁니다. `front-ds-v2`는 `.show`를 쓰므로 코드를 옮길 때 바꿔야 합니다.
+폰의 아래 시트(조건 패널·평면도)는 모달이 아니라 웹 패널을 옮긴 것이라 `.is-sheet-open` 을 따로 씁니다.
+
+**랜딩은 지도 화면용 `style.css` 를 같이 불러옵니다.** 그 안의 `body { overflow: hidden }`
+(지도 화면은 페이지가 움직이면 안 됨)이 랜딩에도 걸려, 9/30 처음 만들 때부터 휠 스크롤이
+안 됐습니다. 랜딩은 `body.landing { overflow-y: auto }` 로 풉니다. `style.css` 의 `body`
+규칙을 바꿀 때는 랜딩도 같이 확인하세요.
+
+**`mobile.css` 는 `index.html` 이 맨 마지막에 불러야 합니다.** 같은 요소에 웹 규칙과 폰 규칙이
+겹치면 나중에 읽은 쪽이 이기기 때문입니다. 새 CSS 를 더할 때는 `mobile.css` **위에** 넣으세요.
+
+**폰 시트 안의 버튼이 가려지지 않는지는 눌러 봐야 압니다.** 평면도 시트는 TOP 5 패널 안에
+있어서, 패널에 `z-index` 숫자를 주면 시트가 패널에 갇혀 어두운 막 밑에 깔립니다(그래서
+`mobile.css` 의 `.rank-panel` 은 `z-index: auto`). 늘 아래에 붙어 있는 채팅 입력창은 시트가
+열린 동안 숨깁니다(`body:has(.is-sheet-open) #chatPanel`). 화면에 보이는 것과 손가락이 닿는 것은 다릅니다.
 
 ## 보안 주의사항
 
