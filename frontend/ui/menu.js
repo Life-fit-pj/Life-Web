@@ -15,6 +15,12 @@ let authModalEl = null;
 const OAUTH_PENDING_KEY = "lifefit-oauth-pending";
 let sawFirstAuthEvent = false;
 
+// 구글에서 돌아오는 중인가. 돌아온 뒤 서버 확인(가입한 회원인가 · 로그인) 두 번이 끝날 때까지 참이다.
+// 이 동안 로그인 창은 입력칸 대신 "확인 중"을 보여 준다(openAuthModal) — 확인이 끝나기 전에 입력칸을 보면 두 번 로그인하게 된다
+let authPending = false;
+try { authPending = sessionStorage.getItem(OAUTH_PENDING_KEY) === "1"; } catch { /* 무시 */ }
+let authWaitTimer = null;
+
 supabase.auth.onAuthStateChange((event, session) => {
     const isFirst = !sawFirstAuthEvent;
     sawFirstAuthEvent = true;
@@ -25,6 +31,9 @@ supabase.auth.onAuthStateChange((event, session) => {
         localStorage.setItem("lf-anon", crypto.randomUUID());
         syncLoginToggle();
     }
+    // 구글에서 돌아왔는데 세션이 없다 — 구글 화면에서 취소했다. 확인 중을 끝내고 로그인 창으로 되돌린다
+    // (돌아온 경우 Supabase 는 세션을 먼저 저장한 뒤 첫 이벤트를 보내므로, 성공했다면 여기서 세션이 있다)
+    if (authPending && !session) endAuthWait("");
     if (event !== "SIGNED_IN" || !session) return;
 
     if (isFirst) {
@@ -48,17 +57,20 @@ async function resolveBackendAccount(token) {
         const { signedUp } = await getSignedUp(token);
         if (!signedUp) {
             sessionStorage.setItem("lifefit-pending-token", token);
+            stopAuthWait();                      // 확인은 끝났다 — 표시를 지워야 가입 뒤 페이지에서 "확인 중"이 다시 안 뜬다
             location.href = "signup.html";
             return;
         }
         const { customerId } = await authLogin(token);
         localStorage.setItem("lf-anon", customerId);
         syncLoginToggle();
-        // 이 페이지 안에서 로그인이 끝났다고 알린다 — 랜딩에서 맡긴 검색어가 기다리고 있으면 search.js 가 이어서 돌린다
+        stopAuthWait();
+        // 로그인이 끝났다고 알린다 — 맡겨 둔 검색어가 있으면 랜딩(landing-test.js) · 지도 화면(search.js)이 이어서 돈다
         window.dispatchEvent(new Event("lifefit:login"));
         if (authModalEl?.classList.contains("is-open")) closeAuthModal();
     } catch (err) {
         console.error("로그인 처리 실패", err);
+        endAuthWait("로그인을 마무리하지 못했어요. 잠시 후 다시 시도해 주세요.");
     }
 }
 
@@ -83,15 +95,57 @@ function ensureAuthModal() {
 }
 
 
-function startGoogleLogin() {
+async function startGoogleLogin(e) {
+    const btn = e.currentTarget, label = btn.textContent;
+    // 구글로 넘어가기까지 1~2초 걸린다. 그동안 버튼을 막아 두 번 누르지 않게 한다
+    btn.disabled = true;
+    btn.textContent = "Google로 이동하는 중…";
     // 지금 페이지로 그대로 돌아온다 — 복귀하면 onAuthStateChange(SIGNED_IN)가
     // resolveBackendAccount 를 불러 로그인/회원가입 뎁스 이동까지 알아서 한다.
     // 복귀 후 첫 이벤트를 "진짜 로그인"으로 인식시키는 표시.
     try { sessionStorage.setItem(OAUTH_PENDING_KEY, "1"); } catch { /* 무시 */ }
-    supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: window.location.origin + window.location.pathname },
     });
+    // 구글로 못 넘어갔다(네트워크 등) — 버튼을 되돌리고 구글 표시도 지운다(남기면 새로고침 때 "확인 중"이 뜬다)
+    if (error) {
+        console.error("구글 로그인 시작 실패", error);
+        stopAuthWait();
+        btn.disabled = false;
+        btn.textContent = label;
+    }
+}
+
+/** 구글에서 돌아와 서버 확인을 기다리는 동안 로그인 창에 보여 주는 화면 — 입력칸이 없어 다시 로그인할 수 없다 */
+function renderAuthWaiting(el) {
+    el.innerHTML = `
+        <div class="auth-modal">
+            <div class="auth-section">
+                <div class="auth-spinner"></div>
+                <p class="auth-notice">구글 로그인을 확인하고 있어요</p>
+            </div>
+        </div>
+    `;
+    // 서버가 끝내 답하지 않아도 이 화면이 영원히 남지 않게
+    clearTimeout(authWaitTimer);
+    authWaitTimer = setTimeout(() => endAuthWait("로그인 확인이 늦어지고 있어요. 다시 시도해 주세요."), 20000);
+}
+
+/** 확인 중 상태를 끝낸다 — 구글 표시까지 지운다(남기면 다음 페이지에서 "확인 중"이 다시 뜬다). 화면은 건드리지 않는다 */
+function stopAuthWait() {
+    authPending = false;
+    clearTimeout(authWaitTimer);
+    try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 무시 */ }
+}
+
+/** 확인이 안 됐을 때(구글에서 취소 · 서버 실패 · 너무 늦음) — 로그인 창이 열려 있으면 입력칸으로 되돌리고 이유를 적는다.
+ *  이메일 로그인의 서버 실패도 여기로 온다 — 입력칸을 새로 그리면 "로그인 확인 중…"으로 막아 둔 버튼도 풀린다 */
+function endAuthWait(message) {
+    stopAuthWait();
+    if (!authModalEl?.classList.contains("is-open")) return;
+    renderGuestAuthModal(authModalEl);
+    if (message) authModalEl.querySelector("#loginError").textContent = message;
 }
 
 function renderGuestAuthModal(el) {
@@ -125,11 +179,20 @@ function renderGuestAuthModal(el) {
         const email = el.querySelector("#loginEmailInput").value.trim();
         const password = el.querySelector("#loginPwInput").value;
         const errorEl = el.querySelector("#loginError");
+        const submitBtn = e.currentTarget.querySelector('button[type="submit"]');
+        if (submitBtn.disabled) return;           // 확인하는 동안 Enter 를 또 눌러도 한 번만
         errorEl.textContent = "";
+        // 비밀번호 확인 뒤에도 서버 확인 두 번이 남아 있다 — 창이 닫힐 때까지 버튼을 막아 둔다
+        submitBtn.disabled = true;
+        submitBtn.textContent = "로그인 확인 중…";
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         // 성공하면 onAuthStateChange(SIGNED_IN)가 이어서 처리한다(모달 닫기까지 포함) —
         // 여기서는 실패만 보여주면 된다.
-        if (error) errorEl.textContent = "이메일 또는 비밀번호가 맞지 않아요.";
+        if (error) {
+            errorEl.textContent = "이메일 또는 비밀번호가 맞지 않아요.";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "로그인";
+        }
     });
 
     el.querySelector("#forgotPwBtn").addEventListener("click", async () => {
@@ -234,9 +297,14 @@ export function handleLoginToggleClick() {
 // 로그인 모달. 로그인 상태에서는 부를 일이 없다 — 하트(reason.js) · 검색(search.js)이 isLoggedIn() 을 먼저 보고, 헤더 버튼은 마이페이지로 간다
 export function openAuthModal() {
     const el = ensureAuthModal();
-    renderGuestAuthModal(el);
+    // 구글에서 돌아오는 중이면 입력칸 대신 "확인 중" — 누가 불러도 두 번 로그인하게 두지 않는다
+    if (authPending) renderAuthWaiting(el);
+    else renderGuestAuthModal(el);
     el.classList.add("is-open");
 }
+
+// 구글에서 돌아온 페이지면 열리자마자 "확인 중"을 띄운다. 확인이 끝나면 resolveBackendAccount 가 닫는다
+if (authPending) openAuthModal();
 
 function closeAuthModal() {
     if (!authModalEl) return;

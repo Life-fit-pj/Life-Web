@@ -5,9 +5,10 @@
    보여 준다. 1차는 LLM 을 안 타서 즉시 나오므로 키워드를 바꿔 가며
    여러 번 눌러 볼 수 있다 (판정 로직은 services/lifetype.py 참고).
 
-   카드에서 '보기' 를 누르면 search.js 가 넘겨준 onContinue 가 2차를 돌린다.
-   여기서 직접 부르지 않는 이유는 search.js ↔ lifetype.js 가 서로를
-   import 하는 고리를 만들지 않기 위해서다
+   카드는 랜딩 테스트 칸(ui/landing-test.js)이 띄운다. '5곳 보기' 를 누르면 랜딩이 넘겨준 onContinue 가
+   5곳(2차)을 받아 온다 — 그동안 카드가 "탐색 중"을 보여 주고, 다 받으면 지도 화면으로 넘어간다.
+   여기서 직접 부르지 않는 이유는 카드가 로그인 · 2차 · 화면 이동을 몰라도 되게 하기 위해서다.
+   지도 화면(search.js)은 카드를 띄우지 않는다 — 넘겨받은 1차 결과를 기억해(rememberType) 2차 요청에 싣는다(firstPayload)
    ========================================================= */
 
 import { state } from "../lib/state.js";
@@ -56,9 +57,9 @@ function noSpotReason(t) {
 }
 
 
-/** 1차를 건너뛸 때 지난 검색의 1차 결과가 2차에 섞이지 않게 비운다 */
-export function clearType() {
-  state.lastType = null;
+/** 랜딩에서 넘어온 1차 결과를 2차에 싣도록 기억한다. 없으면(null) 비운다 — 지난 검색의 1차가 2차에 섞이지 않게 */
+export function rememberType(t) {
+  state.lastType = t || null;
 }
 
 
@@ -146,8 +147,8 @@ export function showTypeCard(t, { onContinue, onSkip }) {
     }
   });
 
-  // 키워드를 고르는 칸은 이제 랜딩 맨 아래에 있다 — 그리로 돌려보낸다
-  document.getElementById("trPickMore")?.addEventListener("click", () => { location.href = "/#test"; });
+  // 키워드를 고르는 칸은 랜딩 맨 아래에 있다 — 카드를 닫고 그리로
+  document.getElementById("trPickMore")?.addEventListener("click", () => { closeTypeCard(); location.href = "/#test"; });
 
   document.getElementById("trSkip").addEventListener("click", () => {
     closeTypeCard();
