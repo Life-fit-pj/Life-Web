@@ -5,10 +5,10 @@
    보여 준다. 1차는 LLM 을 안 타서 즉시 나오므로 키워드를 바꿔 가며
    여러 번 눌러 볼 수 있다 (판정 로직은 services/lifetype.py 참고).
 
-   카드는 랜딩 테스트 칸(ui/landing-test.js)이 띄운다. '5곳 보기' 를 누르면 무엇을 할지는
-   부르는 쪽이 넘겨준 onContinue 가 정한다(로그인했으면 지도 화면으로, 아니면 로그인 창부터).
-   2차(5곳)는 지도 화면의 search.js 가 돌리고, 이 파일은 1차 결과를 들고 있다가 넘긴다(firstPayload).
-   search.js ↔ lifetype.js 가 서로를 import 하는 고리는 만들지 않는다
+   카드는 랜딩 테스트 칸(ui/landing-test.js)이 먼저 띄운다. '5곳 보기' 를 누르면 무엇을 할지는
+   부르는 쪽이 넘겨준 onContinue 가 정한다 — 랜딩은 지도 화면으로 넘기고(손님은 로그인 창부터),
+   지도 화면(search.js)은 같은 카드를 다시 띄워 '5곳 보기' 를 이어서 누른다. 그래서 "탐색 중"이 끊기지 않고
+   결과가 나오면 카드가 걷힌다. search.js ↔ lifetype.js 가 서로를 import 하는 고리는 만들지 않는다
    ========================================================= */
 
 import { state } from "../lib/state.js";
@@ -57,9 +57,9 @@ function noSpotReason(t) {
 }
 
 
-/** 랜딩에서 넘어온 1차 결과를 2차에 싣도록 기억한다. 없으면(null) 비운다 — 지난 검색의 1차가 섞이지 않게 */
-export function rememberType(t) {
-  state.lastType = t || null;
+/** 1차를 건너뛸 때 지난 검색의 1차 결과가 2차에 섞이지 않게 비운다 */
+export function clearType() {
+  state.lastType = null;
 }
 
 

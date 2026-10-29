@@ -41,6 +41,7 @@
   <link rel="stylesheet" href="ui/chat.css">
   <link rel="stylesheet" href="ui/menu.css">
   <link rel="stylesheet" href="ui/sources.css">
+  <link rel="stylesheet" href="ui/lifetype.css">
   <link rel="stylesheet" href="mobile.css">
 
     <!-- 제목용 폰트. 둥글고 친근해 "집" 이라는 주제와 맞는다 -->
@@ -56,6 +57,9 @@
 </head>
 <body>
   
+  <!-- 1차 유형 카드. 랜딩에서 '5곳 보기'를 누르고 오면 같은 카드가 "탐색 중"으로 이어서 뜨고, 결과가 나오면 걷힌다(ui/lifetype.js) -->
+  <div id="typeResult"></div>
+
   <!-- 결과 화면 우측 상단 버튼 하나 — 로그아웃 상태면 "로그인", 로그인 상태면 "마이페이지"(menu.js 의 syncLoginToggle) -->
   <div id="topActions">
     <button id="loginToggle">로그인</button>

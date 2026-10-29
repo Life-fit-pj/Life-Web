@@ -16,7 +16,7 @@ import { nextSeq, isLatest, getAnonId, isLoggedIn } from "../lib/state.js";
 import { renderResult } from "./result.js";
 import { handleLoginToggleClick, syncLoginToggle, openAuthModal } from "./menu.js";
 import { openSources } from "./sources.js";
-import { firstPayload, rememberType } from "./lifetype.js";
+import { showTypeCard, firstPayload, clearType } from "./lifetype.js";
 
 
 // signup.html 이 설문 답을 넣어 두는 자리. 키 이름을 바꾸면 양쪽 다 고쳐야 한다
@@ -225,6 +225,8 @@ function runSurveyIfPending() {
 
 /**
  * 랜딩에서 맡긴 검색어와 1차 결과가 있으면 2차를 돌린다.
+ * 1차 결과가 있으면 랜딩에서 본 유형 카드를 다시 띄우고 '5곳 보기' 를 누른다 — 카드가 "탐색 중"을 보여 주다가
+ * 결과가 나오면 걷힌다(lifetype.js 의 원래 동작). 문장만 왔으면(1차 없음) 카드 없이 바로 2차
  *
  * 보통은 랜딩에서 로그인까지 마치고 온다. 로그인이 풀려 있으면 여기서 로그인 창부터 —
  * 구글에서 돌아오는 중이면 로그인 창이 입력칸 대신 "확인 중"을 보여 준다(menu.js).
@@ -238,8 +240,9 @@ function runPendingQuery() {
 
   fillTopSearch(p.query);
   const go = () => {
-    rememberType(p.type);            // 1차 결과 — firstPayload() 가 2차 요청에 싣는다
-    runPredict(p.query);
+    if (!p.type) { clearType(); runPredict(p.query); return; }
+    showTypeCard(p.type, { onContinue: () => runPredict(p.query), onSkip: () => {} });
+    document.getElementById("trContinue")?.click();
   };
   if (isLoggedIn()) { go(); return; }
 

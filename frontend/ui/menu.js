@@ -57,14 +57,14 @@ async function resolveBackendAccount(token) {
         const { signedUp } = await getSignedUp(token);
         if (!signedUp) {
             sessionStorage.setItem("lifefit-pending-token", token);
+            stopAuthWait();                      // 확인은 끝났다 — 표시를 지워야 가입 뒤 페이지에서 "확인 중"이 다시 안 뜬다
             location.href = "signup.html";
             return;
         }
         const { customerId } = await authLogin(token);
         localStorage.setItem("lf-anon", customerId);
         syncLoginToggle();
-        authPending = false;
-        clearTimeout(authWaitTimer);
+        stopAuthWait();
         // 로그인이 끝났다고 알린다 — 맡겨 둔 검색어가 있으면 랜딩(landing-test.js) · 지도 화면(search.js)이 이어서 돈다
         window.dispatchEvent(new Event("lifefit:login"));
         if (authModalEl?.classList.contains("is-open")) closeAuthModal();
@@ -124,12 +124,17 @@ function renderAuthWaiting(el) {
     authWaitTimer = setTimeout(() => endAuthWait("로그인 확인이 늦어지고 있어요. 다시 시도해 주세요."), 20000);
 }
 
-/** 확인 중을 끝낸다(구글에서 취소 · 서버 실패). 로그인 창이 열려 있으면 입력칸으로 되돌리고 이유를 적는다 */
-function endAuthWait(message) {
-    if (!authPending) return;
+/** 확인 중 상태를 끝낸다 — 구글 표시까지 지운다(남기면 다음 페이지에서 "확인 중"이 다시 뜬다). 화면은 건드리지 않는다 */
+function stopAuthWait() {
     authPending = false;
     clearTimeout(authWaitTimer);
     try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 무시 */ }
+}
+
+/** 확인이 안 됐을 때(구글에서 취소 · 서버 실패 · 너무 늦음) — 로그인 창이 열려 있으면 입력칸으로 되돌리고 이유를 적는다 */
+function endAuthWait(message) {
+    if (!authPending) return;
+    stopAuthWait();
     if (!authModalEl?.classList.contains("is-open")) return;
     renderGuestAuthModal(authModalEl);
     if (message) authModalEl.querySelector("#loginError").textContent = message;

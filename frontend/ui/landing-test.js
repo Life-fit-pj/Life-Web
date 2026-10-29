@@ -4,7 +4,8 @@
    예전 index.html 첫 화면(search.js 의 떠다니는 말 부분)을 옮겼다.
    "찾기"를 누르면 1차(LLM 없이 즉시)를 여기서 돌려 유형 카드를 랜딩 위에 띄운다(ui/lifetype.js).
    카드의 '5곳 보기' 를 누르면 검색어와 1차 결과를 sessionStorage 에 맡기고 —
-   로그인했으면 지도 화면(search.js)으로 가서 5곳을 보고, 아니면 로그인 창부터. 로그인이 끝나면(lifefit:login) 지도 화면으로
+   로그인했으면 지도 화면(search.js)으로, 아니면 로그인 창부터. 로그인이 끝나면(lifefit:login) 지도 화면으로.
+   지도 화면은 같은 카드를 "탐색 중"으로 이어서 띄우고 결과가 나오면 걷는다
    ========================================================= */
 
 import { getLifeTypeKeywords, postLifeType } from "../lib/api.js";
@@ -267,17 +268,22 @@ async function submit() {
   // 키워드 없이 문장만 썼거나 1차가 실패했으면 카드에 보여 줄 게 없다 — 문장을 읽는 2차로 바로 간다
   if (!t?.picks?.length) { goSecond(query, null); return; }
 
-  showTypeCard(t, {
-    onContinue: () => { goSecond(query, t); return true; },
-    onSkip: () => {},
-  });
+  showTypeCard(t, { onContinue: () => goSecond(query, t), onSkip: () => {} });
 }
 
-/** 5곳(2차)은 지도 화면이 돌린다. 검색어와 1차 결과를 맡기고, 로그인했으면 넘어가고 아니면 로그인 창부터 */
+/**
+ * 5곳(2차)은 지도 화면이 돌린다. 검색어와 1차 결과를 맡기고, 로그인했으면 넘어가고 아니면 로그인 창부터.
+ * 카드의 onContinue 로도 쓴다 — 넘어갈 때는 끝나지 않는 약속을 돌려줘 카드가 "탐색 중"인 채로 남고
+ * (지도 화면이 같은 카드를 이어서 띄운다), 로그인 창을 열 때는 true 를 돌려줘 카드를 닫는다
+ */
 function goSecond(query, type) {
   try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ query, type })); } catch { /* 막혀 있으면 그냥 넘어간다 */ }
-  if (isLoggedIn()) location.href = "index.html";
-  else openAuthModal();
+  if (isLoggedIn()) {
+    location.href = "index.html";
+    return new Promise(() => {});
+  }
+  openAuthModal();
+  return true;
 }
 
 
