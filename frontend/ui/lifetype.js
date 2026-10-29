@@ -146,8 +146,8 @@ export function showTypeCard(t, { onContinue, onSkip }) {
     }
   });
 
-  // 카드가 키워드 화면을 덮고 있어 힌트만으로는 고를 수가 없다. 카드를 닫아 뒤의 키워드 화면으로 돌려보낸다
-  document.getElementById("trPickMore")?.addEventListener("click", closeTypeCard);
+  // 키워드를 고르는 칸은 이제 랜딩 맨 아래에 있다 — 그리로 돌려보낸다
+  document.getElementById("trPickMore")?.addEventListener("click", () => { location.href = "/#test"; });
 
   document.getElementById("trSkip").addEventListener("click", () => {
     closeTypeCard();
