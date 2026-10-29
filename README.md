@@ -62,7 +62,7 @@ py -m uvicorn main:app --reload --port 5000
 
 | 단계 | 하는 일 | API | LLM |
 |---|---|---|---|
-| **1차** | 떠다니는 키워드를 누르거나 문장을 적으면 라이프스타일 유형과 어울리는 동네 2곳 | `/api/lifetype` | ✗ 즉시 |
+| **1차** | 랜딩 맨 아래 테스트 칸에서 떠다니는 키워드를 누르거나 문장을 적고 "찾기" → 지도 화면에서 라이프스타일 유형과 어울리는 동네 2곳 | `/api/lifetype` | ✗ 즉시 |
 | **2차** | **내게 맞는 동네 5곳 보기** → 7개 지표 가중치를 슬라이더에 반영하고 지도를 채움 | `/api/predict` | ✓ 3~6초 |
 
 1차가 LLM을 안 쓰는 이유는 키워드를 바꿔 가며 여러 번 눌러 보게 하기 위해서입니다. 2차로 넘어갈 때
@@ -72,7 +72,13 @@ py -m uvicorn main:app --reload --port 5000
 ### 다른 시작 방법
 
 - **회원가입 설문** — 로그인 → 회원가입 → 15문항 설문. 제출하면 계정과 persona가 저장되고 곧바로 2차 추천을 돌립니다.
-- **슬라이더 직접 조절** — "직접 설정할게요" → 슬라이더·건물유형·거래유형·예산을 정하고 **AI 분석 실행**. 예산 감점은 웹이 아니라 **엔진**이 합니다.
+- **슬라이더 직접 조절** — "직접 설정할게요" → 슬라이더·건물유형·거래유형·예산을 정하고 **이 조건으로 다시 찾기**. 예산 감점은 웹이 아니라 **엔진**이 합니다.
+
+### 폰 화면
+
+폭 **768px 이하**를 폰으로 봅니다. 지도 화면은 같은 요소를 자리만 바꿉니다 — 위에는 검색창,
+조건 패널과 평면도는 아래에서 올라오는 시트, TOP 5 는 지도 아래 옆으로 넘기는 카드, 채팅은 맨 아래 입력창.
+회원가입 설문은 다섯 단계로 나눠 한 번에 하나씩 보여 줍니다.
 
 ### 결과 화면
 
@@ -111,7 +117,7 @@ py -m uvicorn main:app --reload --port 5000
 | 메서드 | 경로 | 하는 일 | LLM |
 |---|---|---|---|
 | POST | `/api/lifetype` | 1차 유형 판정 + 어울리는 동네 2곳 | ✗ |
-| GET | `/api/lifetype/keywords` | 첫 화면 키워드 목록 | ✗ |
+| GET | `/api/lifetype/keywords` | 랜딩 테스트 칸의 키워드 목록 | ✗ |
 | POST | `/api/predict` | 2차 추천 TOP 5 | ✓ |
 | POST | `/api/region` | 행정동 하나의 시설 정보 (핀 클릭) | ✗ |
 | POST | `/api/region/explain` | 행정동 하나의 설명 | ✓ |
@@ -164,12 +170,15 @@ Life-Web/
 │   ├── floorplan.py       LH 평면도 선택
 │   └── quota.py           LLM 요청 하루 한도
 ├── frontend/            빌드 단계 없음. index.html이 main.js 하나만 모듈로 불러온다
-│   ├── index.html · main.js · style.css · search.css
+│   ├── landing.html       첫 페이지(/) — 맨 아래 1차 테스트 칸 (test.css · ui/landing-test.js)
+│   ├── index.html · main.js · style.css · search.css   지도 화면
+│   ├── mobile.css         지도 화면의 폰 규칙 전부 (index.html 이 맨 마지막에 불러온다)
 │   ├── signup.html        회원가입 설문 (HTML+CSS+JS 일체형)
+│   ├── mypage.html · reset-password.html
 │   ├── admin.html         관리자 페이지 (일체형)
-│   ├── lib/               api · state · format · supabaseClient
-│   └── ui/                search · lifetype · deal · map · result · reason · chat
-│                          · menu · mypage · likes · history
+│   ├── lib/               api · state · format · supabaseClient · counter · screen(폰 기준 폭 768px)
+│   └── ui/                landing-test · search · lifetype · deal · map · result · reason
+│                          · chat · menu · sources · mobile
 └── data/
     ├── 동_좌표.csv          427개 행정동 위경도
     └── LH평면도/            평면도 목록 CSV + 이미지

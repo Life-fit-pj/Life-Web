@@ -68,5 +68,6 @@ API, Key 등 민감정보가 포함된 데이터는 .env파일에서 별도로 �
   1차 유형 판정, 유형에 맞는 동네 매칭, LH 평면도 선택을 맡는다.
 - `frontend/` — 빌드 단계·프레임워크 없음. `index.html`이 `main.js` 하나만 모듈로 불러오고
   나머지는 ES 모듈 import로 연결된다. `lib/`는 공용(서버 호출·상태·문자열 다듬기), `ui/`는
-  화면 단위.
+  화면 단위. 첫 페이지 `landing.html` 은 자기 모듈 `ui/landing-test.js` 를 따로 불러온다(1차 테스트 칸).
+  "폰"은 폭 768px 이하 하나 — JS 는 `lib/screen.js` 의 `isPhone()`, 지도 화면의 폰 CSS 는 `mobile.css` 한 파일.
 
