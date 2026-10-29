@@ -2,13 +2,16 @@
    landing-test.js — 랜딩 맨 아래 1차 테스트 칸
 
    예전 index.html 첫 화면(search.js 의 떠다니는 말 부분)을 옮겼다.
-   여기서는 말을 고르고 검색어를 만드는 데까지만 한다. "찾기"를 누르면 검색어를
-   sessionStorage 에 맡기고 index.html 로 넘어간다 — 유형 카드 · 로그인 · 2차 추천은
-   지금처럼 index.html(search.js · lifetype.js)이 한다. 로직을 두 벌 두지 않는다
+   "찾기"를 누르면 1차(LLM 없이 즉시)를 여기서 돌려 유형 카드를 랜딩 위에 띄운다(ui/lifetype.js).
+   카드의 '5곳 보기' 를 누르면 검색어와 1차 결과를 sessionStorage 에 맡기고 —
+   로그인했으면 지도 화면(search.js)으로 가서 5곳을 보고, 아니면 로그인 창부터. 로그인이 끝나면(lifefit:login) 지도 화면으로
    ========================================================= */
 
-import { getLifeTypeKeywords } from "../lib/api.js";
+import { getLifeTypeKeywords, postLifeType } from "../lib/api.js";
 import { isPhone } from "../lib/screen.js";
+import { isLoggedIn } from "../lib/state.js";
+import { showTypeCard } from "./lifetype.js";
+import { openAuthModal } from "./menu.js";
 
 // 서버(services/lifetype.py)가 진짜 목록을 준다. 못 받으면 이 예비를 쓴다 — search.js 에 있던 것
 let FLOAT_WORDS = [
@@ -25,7 +28,7 @@ let FLOAT_WORDS = [
 ];
 let MIN_PICK = 3;
 
-// index.html(search.js)이 읽는 자리. 키 이름을 바꾸면 양쪽 다 고친다
+// index.html(search.js)이 읽는 자리. 키 이름을 바꾸면 양쪽 다 고친다. 담는 것은 { query: 검색어, type: 1차 결과 }
 const PENDING_KEY = "lifefit-pending-query";
 
 const PULL_RADIUS = 140;    // 마우스가 이 거리(px) 안에 오면 끌려온다(웹만)
@@ -248,13 +251,33 @@ function updatePickCount() {
 
 /* ---------- 찾기 · 직접 설정 ---------- */
 
-function submit() {
-  const input = $("searchInput");
+/** "찾기" — 1차를 여기서 돌려 유형 카드를 띄운다. LLM 을 안 타서 즉시 나온다 */
+async function submit() {
+  const input = $("searchInput"), btn = $("searchBtn");
   const query = [...picks, input.value.trim()].filter(Boolean).join(" ");
   if (!query) { input.focus(); return; }
-  // 유형 카드 · 로그인 확인은 index.html 이 한다. 검색어만 맡기고 넘어간다
-  try { sessionStorage.setItem(PENDING_KEY, query); } catch { /* 막혀 있으면 그냥 넘어간다 */ }
-  location.href = "index.html";
+  if (btn.disabled) return;                 // Enter 를 연달아 눌러도 한 번만
+
+  btn.disabled = true;
+  let t = null;
+  try { t = await postLifeType(query); }
+  catch (err) { console.error("[landing-test] 1차 판정 실패", err); }
+  finally { btn.disabled = false; }
+
+  // 키워드 없이 문장만 썼거나 1차가 실패했으면 카드에 보여 줄 게 없다 — 문장을 읽는 2차로 바로 간다
+  if (!t?.picks?.length) { goSecond(query, null); return; }
+
+  showTypeCard(t, {
+    onContinue: () => { goSecond(query, t); return true; },
+    onSkip: () => {},
+  });
+}
+
+/** 5곳(2차)은 지도 화면이 돌린다. 검색어와 1차 결과를 맡기고, 로그인했으면 넘어가고 아니면 로그인 창부터 */
+function goSecond(query, type) {
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ query, type })); } catch { /* 막혀 있으면 그냥 넘어간다 */ }
+  if (isLoggedIn()) location.href = "index.html";
+  else openAuthModal();
 }
 
 
@@ -284,6 +307,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("searchInput").addEventListener("input", updatePickCount);
   $("searchBox").addEventListener("click", () => $("searchInput").focus());
   $("skipSearch").addEventListener("click", () => { location.href = "index.html"; });
+
+  // 로그인이 끝나면(이 페이지에서 이메일로 · 구글에서 돌아와) 맡겨 둔 검색어를 들고 지도 화면으로
+  window.addEventListener("lifefit:login", () => {
+    let pending = null;
+    try { pending = sessionStorage.getItem(PENDING_KEY); } catch { /* 무시 */ }
+    if (pending) location.href = "index.html";
+  });
 
   // 말 상자의 크기가 바뀌면 다시 놓는다 — 웹 ↔ 폰뿐 아니라 폰 안에서 폭만 바뀌어도(안 그러면 상자 밖 말이 잘려 안 보인다).
   // 창을 끄는 동안 계속 불리므로 멈추고 0.15초 뒤 한 번만
