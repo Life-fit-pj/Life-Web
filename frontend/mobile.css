@@ -109,6 +109,7 @@
     background: var(--navy); color: var(--paper); font-size: 13px;
   }
   .list-item:first-child .rank { background: var(--accent-fill); color: var(--accent-ink); }
+  .li-city { display: none; }               /* 좁은 카드에서 동 이름이 잘리지 않게 "서울특별시"를 뗀다(웹 목록은 그대로) */
   .list-name { flex: 1; min-width: 0; font-size: 16px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .li-score { display: block; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--amber); }
   .li-actions { display: flex; gap: 8px; }

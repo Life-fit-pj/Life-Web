@@ -122,7 +122,7 @@ function updateTopRegionsList(regions, dropped) {
     div.innerHTML = `
       <div class="li-main">
         <span class="rank">${item.rank}</span>
-        <div class="list-name">${item.name}</div>
+        <div class="list-name">${item.name.replace('서울특별시 ', '<span class="li-city">서울특별시 </span>')}</div>
         ${mark}
         <span class="li-score">${Math.round(item.score ?? 0)}</span>
       </div>
