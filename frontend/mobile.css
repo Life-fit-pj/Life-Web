@@ -152,9 +152,8 @@
   #chatPanel:not(.open) .chat-body { display: none; }
   #chatPanel:not(.open) .chat-input { border-top: none; }
   #chatInput { height: 44px; font-size: 15px; }
-  /* 시트 · 유형 카드가 열려 있으면 입력창을 숨긴다 — 늘 맨 아래(z 8500)라 시트 아래쪽 버튼을 덮는다 */
-  body:has(.is-sheet-open) #chatPanel,
-  body:has(#typeResult.is-open) #chatPanel { visibility: hidden; }
+  /* 시트가 열려 있으면 입력창을 숨긴다 — 늘 맨 아래(z 8500)라 시트 아래쪽 버튼을 덮는다 */
+  body:has(.is-sheet-open) #chatPanel { visibility: hidden; }
 
   /* ---- 가운데 창 → 아래에서 올라오는 시트 (유형 카드 · 로그인 창은 랜딩에서도 쓰여 각자의 CSS 에 있다) ---- */
   .reason-backdrop { align-items: flex-end; padding: 0; }

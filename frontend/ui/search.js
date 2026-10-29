@@ -4,8 +4,9 @@
    흐름은 두 단계다.
      1차  랜딩 맨 아래 테스트 칸(ui/landing-test.js)이 /api/lifetype 을 불러 유형 카드를 랜딩 위에 띄운다.
           LLM 을 안 타서 즉시 나오고, 로그인하지 않아도 볼 수 있다
-     2차  카드에서 '5곳 보기' 를 누르면(손님은 로그인을 마치면) 검색어와 1차 결과를 sessionStorage 에 맡기고
-          이 화면으로 온다. 여기서 /api/predict 로 보낸다 — LLM 이 7개 지표 가중치를 만들고 결과를 그린다
+     2차  카드에서 '5곳 보기' 를 누르면 랜딩이 카드의 "탐색 중"을 보여 주며 /api/predict 를 부르고,
+          다 받으면 결과를 sessionStorage 에 맡기고 이 화면으로 온다 — 여기서는 받은 것을 바로 그린다(showResult).
+          문장만 썼거나 회원가입하고 왔으면 이 화면이 /api/predict 를 부른다(runPredict)
 
    상단 검색창은 1차를 건너뛰고 곧바로 2차로 간다 —
    이미 결과를 보고 있는 사람에게 유형 카드를 다시 띄울 이유가 없다
@@ -16,13 +17,14 @@ import { nextSeq, isLatest, getAnonId, isLoggedIn } from "../lib/state.js";
 import { renderResult } from "./result.js";
 import { handleLoginToggleClick, syncLoginToggle, openAuthModal } from "./menu.js";
 import { openSources } from "./sources.js";
-import { showTypeCard, firstPayload, clearType } from "./lifetype.js";
+import { firstPayload, rememberType } from "./lifetype.js";
 
 
 // signup.html 이 설문 답을 넣어 두는 자리. 키 이름을 바꾸면 양쪽 다 고쳐야 한다
 const SURVEY_KEY = "lifefit-survey";
 
-// 랜딩 테스트 칸(ui/landing-test.js)이 검색어를 맡겨 두는 자리. 키 이름을 바꾸면 양쪽 다 고친다. 담는 것은 { query: 검색어, type: 1차 결과 }
+// 랜딩 테스트 칸(ui/landing-test.js)이 맡겨 두는 자리. 키 이름을 바꾸면 양쪽 다 고친다.
+// 담는 것: { query, data }(5곳까지 받은 결과) · { query, type }(1차 결과) · { query }(문장만)
 const PENDING_KEY = "lifefit-pending-query";
 
 // 서버가 준 한국어 지표명 → 슬라이더 id
@@ -109,13 +111,7 @@ async function runPredict(query) {
     if (!isLatest(seq)) return false;     // 오래된 응답은 버린다
 
     stopSteps();
-    applyWeights(data.weights);            // 슬라이더에 반영
-    applyHousing(data.housing);            // "건축" 패널에 반영 — 가격 언급 없었으면 아무 일도 안 함
-    renderResult(data);                    // 같은 응답으로 결과 화면 채우기
-    fillTopSearch(query);                  // 상단 검색창에도 검색어를 남긴다
-
-    // 무엇을 읽었는지 알려 준다
-    if (status) status.textContent = topLabel(data.weights) + " 조건으로 찾았어요";
+    showResult(data, query);
     return true;
 
   } catch (err) {
@@ -132,6 +128,19 @@ async function runPredict(query) {
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+
+/** 2차 응답을 화면에 그린다. runPredict 와, 랜딩에서 5곳까지 받아 온 경우(runPendingQuery)가 같이 쓴다 */
+function showResult(data, query) {
+  applyWeights(data.weights);            // 슬라이더에 반영
+  applyHousing(data.housing);            // "건축" 패널에 반영 — 가격 언급 없었으면 아무 일도 안 함
+  renderResult(data);                    // 같은 응답으로 결과 화면 채우기
+  fillTopSearch(query);                  // 상단 검색창에도 검색어를 남긴다
+
+  // 무엇을 읽었는지 알려 준다
+  const status = statusEl();
+  if (status) status.textContent = topLabel(data.weights) + " 조건으로 찾았어요";
 }
 
 
@@ -224,12 +233,11 @@ function runSurveyIfPending() {
 }
 
 /**
- * 랜딩에서 맡긴 검색어와 1차 결과가 있으면 2차를 돌린다.
- * 1차 결과가 있으면 랜딩에서 본 유형 카드를 다시 띄우고 '5곳 보기' 를 누른다 — 카드가 "탐색 중"을 보여 주다가
- * 결과가 나오면 걷힌다(lifetype.js 의 원래 동작). 문장만 왔으면(1차 없음) 카드 없이 바로 2차
+ * 랜딩에서 맡긴 것이 있으면 이어서 한다.
+ *   { query, data } — 랜딩 카드가 "탐색 중"을 보여 주며 5곳까지 받아 왔다. 바로 그린다
+ *   { query, type } · { query } — 아직 5곳을 안 받았다(문장만 썼거나 · 회원가입하고 왔다). 여기서 2차를 돌린다
  *
- * 보통은 랜딩에서 로그인까지 마치고 온다. 로그인이 풀려 있으면 여기서 로그인 창부터 —
- * 구글에서 돌아오는 중이면 로그인 창이 입력칸 대신 "확인 중"을 보여 준다(menu.js).
+ * 로그인이 풀려 있으면 로그인 창부터 — 구글에서 돌아오는 중이면 로그인 창이 입력칸 대신 "확인 중"을 보여 준다(menu.js).
  * 로그인이 끝나면 menu.js 가 "lifefit:login" 을 알린다 — 그때 이어서 돈다
  */
 function runPendingQuery() {
@@ -238,11 +246,12 @@ function runPendingQuery() {
   let p;
   try { p = JSON.parse(raw); } catch { return; }
 
+  if (p.data) { showResult(p.data, p.query); return; }
+
   fillTopSearch(p.query);
   const go = () => {
-    if (!p.type) { clearType(); runPredict(p.query); return; }
-    showTypeCard(p.type, { onContinue: () => runPredict(p.query), onSkip: () => {} });
-    document.getElementById("trContinue")?.click();
+    rememberType(p.type);            // 1차 결과(있으면) — firstPayload() 가 2차 요청에 싣는다
+    runPredict(p.query);
   };
   if (isLoggedIn()) { go(); return; }
 
@@ -295,6 +304,7 @@ function bindTopSearch() {
 
     const q = input.value.trim();
     if (!q) { input.focus(); return; }
+    rememberType(null);     // 지난 1차 결과(가중치 · 동네)를 새 검색에 싣지 않는다 — 안 비우면 옛 가중치로 순위가 나온다
     runPredict(q);
   };
 

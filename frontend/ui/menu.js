@@ -95,18 +95,26 @@ function ensureAuthModal() {
 }
 
 
-function startGoogleLogin(e) {
+async function startGoogleLogin(e) {
+    const btn = e.currentTarget, label = btn.textContent;
     // 구글로 넘어가기까지 1~2초 걸린다. 그동안 버튼을 막아 두 번 누르지 않게 한다
-    e.currentTarget.disabled = true;
-    e.currentTarget.textContent = "Google로 이동하는 중…";
+    btn.disabled = true;
+    btn.textContent = "Google로 이동하는 중…";
     // 지금 페이지로 그대로 돌아온다 — 복귀하면 onAuthStateChange(SIGNED_IN)가
     // resolveBackendAccount 를 불러 로그인/회원가입 뎁스 이동까지 알아서 한다.
     // 복귀 후 첫 이벤트를 "진짜 로그인"으로 인식시키는 표시.
     try { sessionStorage.setItem(OAUTH_PENDING_KEY, "1"); } catch { /* 무시 */ }
-    supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: window.location.origin + window.location.pathname },
     });
+    // 구글로 못 넘어갔다(네트워크 등) — 버튼을 되돌리고 구글 표시도 지운다(남기면 새로고침 때 "확인 중"이 뜬다)
+    if (error) {
+        console.error("구글 로그인 시작 실패", error);
+        stopAuthWait();
+        btn.disabled = false;
+        btn.textContent = label;
+    }
 }
 
 /** 구글에서 돌아와 서버 확인을 기다리는 동안 로그인 창에 보여 주는 화면 — 입력칸이 없어 다시 로그인할 수 없다 */
@@ -131,9 +139,9 @@ function stopAuthWait() {
     try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch { /* 무시 */ }
 }
 
-/** 확인이 안 됐을 때(구글에서 취소 · 서버 실패 · 너무 늦음) — 로그인 창이 열려 있으면 입력칸으로 되돌리고 이유를 적는다 */
+/** 확인이 안 됐을 때(구글에서 취소 · 서버 실패 · 너무 늦음) — 로그인 창이 열려 있으면 입력칸으로 되돌리고 이유를 적는다.
+ *  이메일 로그인의 서버 실패도 여기로 온다 — 입력칸을 새로 그리면 "로그인 확인 중…"으로 막아 둔 버튼도 풀린다 */
 function endAuthWait(message) {
-    if (!authPending) return;
     stopAuthWait();
     if (!authModalEl?.classList.contains("is-open")) return;
     renderGuestAuthModal(authModalEl);
