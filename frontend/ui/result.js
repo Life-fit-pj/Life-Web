@@ -3,6 +3,9 @@ import { state, nextSeq, isLatest, getAnonId } from "../lib/state.js";
 import { currentDeal, isPriceAny } from "./deal.js";
 import { renderKakaoMapMarkers, panToRegion } from "./map.js";
 import { initChatWithResult } from "./chat.js";
+import { openReasonModal } from "./reason.js";
+
+
 
 
 // 2. [이 조건으로 다시 찾기] 버튼 클릭 시 실행되는 메인 함수
@@ -115,16 +118,24 @@ function updateTopRegionsList(regions, dropped) {
       ? '<span class="li-from-first" title="1차 유형에서도 추천된 동네">1차</span>'
       : '';
 
+    // 점수와 "자세히 보기"는 폰 카드에서만 보인다(mobile.css). 웹 목록은 지금 그대로
     div.innerHTML = `
       <div class="li-main">
         <span class="rank">${item.rank}</span>
         <div class="list-name">${item.name}</div>
         ${mark}
+        <span class="li-score">${Math.round(item.score ?? 0)}</span>
       </div>
+      <div class="li-actions"><button type="button" class="li-detail">자세히 보기</button></div>
     `;
 
     // 리스트 클릭 시 해당 행정동의 실제 지오코딩 위치로 지도 이동. 사유 패널은 핀을 눌렀을 때만 연다
     div.addEventListener('click', () => panToRegion(item));
+    // 폰에서는 핀이 작아 누르기 어렵다 — 카드의 "자세히 보기"로 같은 사유 패널을 연다
+    div.querySelector('.li-detail').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openReasonModal(item, state.lastResult?.weights);
+    });
 
     container.appendChild(div);
   });

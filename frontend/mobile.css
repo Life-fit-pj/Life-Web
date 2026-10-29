@@ -1,0 +1,164 @@
+/* =========================================================
+   mobile.css — 지도 화면(index.html)의 폰 규칙은 이 파일 하나에만 둔다
+
+   웹 규칙(style.css · result.css · chat.css · menu.css · reason.css · search.css)은 손대지 않는다.
+   요소는 한 벌뿐이다 — 검색창 · 조건 패널 · TOP 5 · 평면도 · 채팅 입력창을 폰용으로 새로 만들지 않고
+   놓는 자리와 모양만 바꾼다. 폰에서 패널을 "여는" 동작은 ui/mobile.js 가 한다
+     조건 패널   왼쪽 패널   → 아래에서 올라오는 시트
+     TOP 5       오른쪽 패널 → 지도 아래 옆으로 넘기는 카드
+     평면도      오른쪽 패널 안 → 시트
+     채팅        오른쪽 패널 → 아래에 붙어 있는 입력창(누르면 펼쳐진다)
+   ========================================================= */
+
+/* 폰에서만 보이는 버튼 — 웹에서는 숨긴다(어두운 막은 HTML 의 hidden 이 숨긴다) */
+.ts-tune, .sheet-close, .fp-open, .li-detail, .li-score { display: none; }
+
+@media (max-width: 768px) {
+  :root { --composer-h: 76px; }
+
+  /* ---- 위: 제목은 숨기고 검색창을 위에 가득 ---- */
+  .header { padding: 12px 84px 0 16px; background: none; }
+  .header-brand { display: none; }
+  .top-search { height: 52px; padding: 0 4px 0 14px; background: var(--surface); border: none; box-shadow: var(--shadow); }
+  #topSearchBtn { padding: 8px 12px; }
+  .ts-tune {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 40px; height: 40px; border: none; border-radius: 20px;
+    background: var(--surface-2); color: var(--text); cursor: pointer;
+  }
+  .ts-tune svg { width: 20px; height: 20px; }
+  #topActions { top: 12px; right: 16px; }
+  #loginToggle { min-width: 0; height: 52px; padding: 0 14px; }
+  /* 로그인 뒤 "👤 마이페이지" — 폰에서는 사람 표시만 남긴다 */
+  #loginToggle.is-member { width: 52px; padding: 0; font-size: 0; }
+  #loginToggle.is-member::before { content: "👤"; font-size: 20px; }
+
+  /* ---- 조건 패널 → 시트 ---- */
+  .ctrl-panel {
+    position: fixed; z-index: 60;
+    top: auto; left: 0; right: 0; bottom: 0;
+    width: auto; max-height: 82vh;
+    padding: 16px 20px 16px;
+    border-radius: 22px 22px 0 0;
+    background: var(--paper);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    transform: translateY(105%);
+    transition: transform 0.35s ease;
+  }
+  .ctrl-panel.is-sheet-open { transform: none; }
+  .panel-top { justify-content: space-between; margin: 0 0 6px; }
+  .sheet-close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border: none; border-radius: 50%;
+    background: var(--surface-2); color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer;
+  }
+  .wlabel { font-size: 14px; }
+  .seg-btn { padding: 10px 0; font-size: 14px; }
+  select#bldgType { height: 44px; font-size: 14px; }
+  input[type=range] { height: 6px; margin: 10px 0; }
+  input[type=range]::-webkit-slider-thumb { width: 24px; height: 24px; }
+  .run-btn { padding: 14px; font-size: 15px; border-radius: 14px; }
+
+  /* 시트가 열리면 뒤를 어둡게 */
+  .sheet-scrim { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(28, 26, 32, 0.42); }
+  .sheet-scrim[hidden] { display: none; }
+
+  /* ---- TOP 5 → 지도 아래 옆으로 넘기는 카드 ---- */
+  .rank-panel {
+    top: auto; left: 0; right: 0; bottom: var(--composer-h);
+    width: auto; max-height: none;
+    padding: 0 0 8px;
+    overflow: visible;
+    background: none; border: none; box-shadow: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    /* 숫자를 주면 이 패널이 "봉투"가 되어, 안에 든 평면도 시트(60)가 봉투 밖 어두운 막(55) 밑에 깔린다 */
+    z-index: auto;
+  }
+  .main-score-box { display: none; }
+  .rank-head { display: flex; align-items: center; justify-content: space-between; padding: 0 16px; margin-bottom: 8px; }
+  .rank-head > span { padding: 5px 10px; border-radius: 999px; background: var(--card); font-size: 11.5px; }
+  .fp-open {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 34px; padding: 0 12px; border: none; border-radius: 17px;
+    background: var(--navy); color: var(--paper); font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .fp-open[hidden] { display: none; }
+  .rank-scroll {
+    flex-direction: row; gap: 12px;
+    max-height: none; margin: 0;
+    padding: 0 16px 4px;
+    overflow-x: auto; overflow-y: visible;
+    scroll-snap-type: x mandatory; scroll-padding: 0 16px;
+    scrollbar-width: none;
+  }
+  .rank-scroll::-webkit-scrollbar { display: none; }
+  .list-item {
+    flex: 0 0 calc(100% - 56px);
+    scroll-snap-align: start;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+  }
+  .list-item.active, .list-item:hover { background: var(--paper); }
+  .li-main { gap: 12px; }
+  .rank {
+    width: 28px; height: 28px; border-radius: 50%; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--navy); color: var(--paper); font-size: 13px;
+  }
+  .list-item:first-child .rank { background: var(--accent-fill); color: var(--accent-ink); }
+  .list-name { flex: 1; min-width: 0; font-size: 16px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .li-score { display: block; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; color: var(--amber); }
+  .li-actions { display: flex; gap: 8px; }
+  .li-detail {
+    display: block; flex: 1; height: 42px;
+    border: none; border-radius: 12px;
+    background: var(--navy); color: var(--paper);
+    font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .li-dropped { display: none; }            /* 좁은 카드 줄에 끼우면 카드처럼 보인다 — 폰에서는 생략 */
+
+  /* ---- 평면도 → 시트 ---- */
+  .floorplan-area {
+    position: fixed; z-index: 60;
+    left: 0; right: 0; bottom: 0;
+    max-height: 82vh; overflow-y: auto;
+    padding: 16px 16px 20px;
+    border-top: none; border-radius: 22px 22px 0 0;
+    background: var(--paper);
+    box-shadow: 0 -10px 30px rgba(52, 78, 65, 0.14);
+    transform: translateY(105%);
+    transition: transform 0.35s ease;
+  }
+  .floorplan-area.is-sheet-open { transform: none; }
+  .floorplan-area h4 { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+  .floorplan-area h4 .sheet-close { margin-left: auto; }
+
+  /* ---- 채팅 → 아래에 붙은 입력창. 누르면 같은 패널이 펼쳐진다 ---- */
+  #chatToggle { display: none; }
+  #chatPanel {
+    top: auto; left: 0; right: 0; bottom: 0;
+    width: auto; height: var(--composer-h);
+    border-left: none; border-radius: 20px 20px 0 0;
+    transform: none;
+    transition: height 0.35s ease;
+  }
+  #chatPanel.open { height: 86vh; }
+  #chatPanel:not(.open) .chat-head,
+  #chatPanel:not(.open) .chat-memory,
+  #chatPanel:not(.open) .chat-body { display: none; }
+  #chatPanel:not(.open) .chat-input { border-top: none; }
+  #chatInput { height: 44px; font-size: 15px; }
+  /* 시트 · 유형 카드가 열려 있으면 입력창을 숨긴다 — 늘 맨 아래(z 8500)라 시트 아래쪽 버튼을 덮는다 */
+  body:has(.is-sheet-open) #chatPanel,
+  body:has(#typeResult.is-open) #chatPanel { visibility: hidden; }
+
+  /* ---- 가운데 창들 → 아래에서 올라오는 시트 ---- */
+  .reason-backdrop, #typeResult, .auth-backdrop { align-items: flex-end; padding: 0; }
+  .reason-modal, .tr-card, .auth-modal {
+    width: 100%; max-width: none; max-height: 88vh;
+    border-radius: 22px 22px 0 0;
+  }
+}

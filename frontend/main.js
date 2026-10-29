@@ -11,6 +11,7 @@ import "./ui/result.js";
 import "./ui/menu.js";
 import "./ui/lifetype.js";
 import "./ui/search.js";
+import "./ui/mobile.js";
 
 import { runSimulation } from "./ui/result.js";
 
