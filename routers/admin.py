@@ -34,14 +34,14 @@ from services.engine import (
 # Life-Web/.env 를 읽는다 (main.py 가 어느 위치에서 실행되든 경로가 고정되도록)
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "dev-admin-token")
-ADMIN_WRITE_ENABLED = os.environ.get("ADMIN_WRITE_ENABLED", "1") == "1"
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")                                # 없으면 관리자 화면을 아예 닫는다(기본값으로 열리지 않게)
+ADMIN_WRITE_ENABLED = os.environ.get("ADMIN_WRITE_ENABLED", "0") == "1"        # 없으면 쓰기를 잠근다
 
 
 def check_admin(authorization: str = Header(None)):
     """헤더의 Bearer 토큰이 ADMIN_TOKEN 과 같은지 본다. 로그인이 아니라 정해진 값 하나만 확인한다."""
     token = (authorization or "").removeprefix("Bearer ").strip()
-    if not secrets.compare_digest(token, ADMIN_TOKEN):
+    if not ADMIN_TOKEN or not secrets.compare_digest(token, ADMIN_TOKEN):
         raise HTTPException(401, "관리자 토큰이 맞지 않는다")
 
 

@@ -93,6 +93,15 @@ def test_관리자_API는_토큰이_없으면_401(client):
     assert calls == []
 
 
+def test_관리자_토큰이_설정_안_됐으면_아무_토큰도_안_받는다(client, monkeypatch):
+    # 전에는 ADMIN_TOKEN 이 없으면 "dev-admin-token" 으로 열렸다(2026-11-15 까지)
+    from routers import admin
+    monkeypatch.setattr(admin, "ADMIN_TOKEN", "")
+    for token in ("", "dev-admin-token"):
+        assert client.get("/api/admin/members", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    assert calls == []
+
+
 def test_경로_조각의_슬래시는_인코딩된다():
     # "../admin/members" 가 엔진의 다른 경로로 풀리던 문제(2026-10-05)가 되살아나지 않게
     assert engine._seg("../admin/members") == "..%2Fadmin%2Fmembers"
