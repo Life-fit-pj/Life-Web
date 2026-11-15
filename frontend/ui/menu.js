@@ -189,7 +189,10 @@ function renderGuestAuthModal(el) {
         // 성공하면 onAuthStateChange(SIGNED_IN)가 이어서 처리한다(모달 닫기까지 포함) —
         // 여기서는 실패만 보여주면 된다.
         if (error) {
-            errorEl.textContent = "이메일 또는 비밀번호가 맞지 않아요.";
+            // 가입 확인 메일의 링크를 아직 안 눌렀으면 Supabase 가 email_not_confirmed 를 준다 — 비밀번호가 틀렸다고 하면 헤맨다
+            errorEl.textContent = error.code === "email_not_confirmed"
+                ? "가입 확인 메일의 링크를 먼저 눌러 주세요. 안 보이면 스팸함도 확인해 주세요."
+                : "이메일 또는 비밀번호가 맞지 않아요.";
             submitBtn.disabled = false;
             submitBtn.textContent = "로그인";
         }
