@@ -1,11 +1,11 @@
 """AI 질문 한도. Claude 를 부르는 요청(검색어 추천·후속 질문)을 하루 몇 번까지만 받는다.
 
 로그인한 회원은 customer_id 로, 아니면 접속 IP 로 센다. 회원 여부는 프론트가 보내는
-Supabase 토큰을 엔진(/auth/login)에 물어 확인한다 — anonId 는 브라우저가 마음대로 바꿀 수
-있어서 믿지 않는다.
+Supabase 토큰을 엔진(/auth/me)에 요청마다 물어 확인한다 — anonId 는 브라우저가 마음대로 바꿀 수
+있어서 믿지 않는다. 확인한 결과는 그 요청 안에서만 쓰고 기억하지 않는다(_resolve_who).
 
 # ponytail: 서버 메모리 사전이라 재시작하면 0 으로 돌아가고 서버를 여러 대 띄우면 따로 센다.
-#           지난 날짜·만료 토큰도 안 지운다. 인스턴스가 늘거나 메모리가 문제되면 DB(또는 Redis)로 옮긴다.
+#           지난 날짜도 안 지운다. 인스턴스가 늘거나 메모리가 문제되면 DB(또는 Redis)로 옮긴다.
 """
 
 import datetime
@@ -23,8 +23,6 @@ MEMBER_ID = re.compile(r"C\d+")      # 회원 번호의 모양. 엔진 app/tools
 
 _lock = threading.Lock()
 _counts: dict[tuple, int] = {}      # (날짜, 주체) -> 오늘 쓴 횟수
-_members: dict[str, str | None] = {}  # 토큰 -> customer_id. 같은 토큰으로 매번 엔진을 부르지 않는다
-_personas: dict[str, dict] = {}       # 토큰 -> 가입 설문 글(엔진 /auth/me 의 persona). 평면도가 읽는다 — 토큰 확인과 한 왕복으로 받아 둔다
 
 
 def _client_ip(request: Request) -> str:
@@ -47,46 +45,27 @@ def _who(request: Request) -> tuple[str, int]:
 
 
 def _resolve_who(request: Request) -> tuple[str, int]:
-    """_who 의 몸. 토큰을 엔진에 물어 확인한다 — 요청당 한 번만 불린다"""
+    """_who 의 몸. 토큰을 엔진에 물어 확인한다 — 요청당 한 번만 불린다.
+
+    확인한 결과를 요청 너머로 기억하지 않는다(2026-11-15). 전에는 토큰 → 회원 번호를 웹을 다시 띄울 때까지 기억해서,
+    로그아웃했거나 1시간이 지나 끝난 토큰으로도 기록 · 좋아요 · AI 기억을 읽고 지울 수 있었다
+    """
     token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
     if token:
-        member = _members.get(token)
-        if member is None:
-            # /auth/me 는 /auth/login 과 같은 확인(토큰 → 회원 번호)을 하고 가입 설문 글까지 준다 — 둘을 따로 부르면
-            # 회원 검색 한 번에 엔진 왕복이 하나 는다(2026-10-09 까지 그랬다). 글은 관리자 수정 때만 바뀌므로 토큰마다 한 번이면 된다
-            try:
-                me = get_me(token)
-            except Exception:
-                me = None           # 만료·위조 토큰이면 엔진이 401 을 준다 — 이번 요청만 손님으로 센다
-            member = me["customer_id"] if me else None
-            # 확인된 회원만 기억한다. 실패(엔진이 잠깐 멈춤 · 아직 가입 전)까지 기억하면 그 토큰은 웹을 다시 띄울 때까지
-            # 손님으로 굳는다 — 로그인해 있는데 한도가 5번이 되고, 자기 기록 · 좋아요도 못 본다
-            if member:
-                remember(token, me)
-        if member:
-            return f"member:{member}", MEMBER_DAILY_LIMIT
+        try:
+            me = get_me(token)      # 토큰 확인 + 회원 번호 + 가입 설문 글(평면도가 읽는다)을 엔진 한 번에
+        except Exception:
+            me = None               # 만료·위조 토큰이면 엔진이 401 을 준다 — 이번 요청만 손님으로 센다
+        if me:
+            request.state.quota_persona = me.get("persona") or {}
+            return f"member:{me['customer_id']}", MEMBER_DAILY_LIMIT
     return f"ip:{_client_ip(request)}", GUEST_DAILY_LIMIT
-
-
-def remember(token: str, me: dict) -> None:
-    """엔진 /auth/me 가 준 본인 정보를 토큰 캐시에 적는다. 마이페이지(/api/auth/me)도 받은 것을 여기 적어 둔다 —
-    안 적으면 이어서 누르는 탭(기록 · 좋아요 · 기억)이 같은 확인을 엔진에 한 번 더 묻는다"""
-    _members[token] = me["customer_id"]
-    _personas[token] = me.get("persona") or {}
 
 
 def persona(request: Request) -> dict:
     """토큰으로 확인한 회원의 가입 설문 글(칸 이름 → 글). 손님이면 빈 사전. 평면도가 가구 구성을 읽는 데 쓴다"""
-    _who(request)                      # 아직 확인 전이면 여기서 확인한다(요청당 한 번)
-    token = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
-    return _personas.get(token, {}) if _members.get(token) else {}
-
-
-def forget_member(customer_id: str) -> None:
-    """관리자가 회원 글을 고쳤을 때 — 그 회원의 토큰 캐시를 비워 다음 요청이 새 글을 받게 한다"""
-    for token in [t for t, m in _members.items() if m == customer_id]:
-        _members.pop(token, None)
-        _personas.pop(token, None)
+    _who(request)                      # 아직 확인 전이면 여기서 확인한다(요청당 한 번) — 글은 그때 같이 받아 둔다
+    return getattr(request.state, "quota_persona", {})
 
 
 def member_id(request: Request) -> str | None:

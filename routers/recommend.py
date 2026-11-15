@@ -91,8 +91,9 @@ class ChatRequest(BaseModel):
 def _member_persona_text(request: Request) -> str:
     """로그인한 회원이면 저장된 가입 설문 글 중 다섯 칸. 손님이거나 못 받으면 빈 글.
 
-    글은 quota 가 토큰을 확인할 때 같이 받아 둔 것이다(엔진 /auth/me, 토큰마다 한 번) — 여기서 엔진을 다시 부르지 않는다.
-    못 받았으면(만료 토큰 · 엔진 꺼짐) 평면도를 못 고르는 게 아니라 가구 구성을 모르는 것뿐이므로 빈 글로 간다"""
+    글은 quota 가 토큰을 확인할 때 같이 받아 둔 것이다(엔진 /auth/me, 요청마다 한 번) — 여기서 엔진을 다시 부르지 않는다.
+    못 받았으면(만료 토큰 · 엔진 꺼짐) 평면도를 못 고르는 게 아니라 가구 구성을 모르는 것뿐이므로 빈 글로 간다
+    """
     persona = quota.persona(request)
     # 엔진 app/core/config.py 의 CHUNK_COLUMNS 에 있는 이름만. 저장소가 둘이라 import 못 하니 이름을 지어내지 않게 거기를 보고 적는다.
     # 평면도가 읽는 낱말이 흩어져 있다 — 가족은 family, "운동기구"는 sports, "악기·피아노"(취미 답 h1 도 여기)는 arts,
