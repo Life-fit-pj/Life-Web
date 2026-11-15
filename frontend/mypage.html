@@ -440,6 +440,7 @@ async function start() {
     showGate(`로그인 후 볼 수 있어요. <a href="index.html">첫 화면</a>에서 로그인해 주세요.`);
     return;
   }
+  showGate("불러오는 중...");      // 서버 답을 기다리는 동안 빈 화면 대신
   try {
     [me, gudong] = await Promise.all([getMe(), getGuDong().catch(() => ({}))]);
   } catch (err) {
@@ -456,6 +457,7 @@ async function start() {
   renderBasic(me.customer);
   renderStory(me.persona);
   if (!EDIT_ENABLED) lockForms();
+  $("gate").hidden = true;
   $("app").hidden = false;
   const first = location.hash.slice(1);
   showView(["basic", "story", "history", "likes", "memory"].includes(first) ? first : "basic");

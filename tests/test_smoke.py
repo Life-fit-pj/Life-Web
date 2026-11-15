@@ -15,6 +15,7 @@ from services import engine, quota
 
 # 엔진이 받은 요청을 기록해 두고 정해 둔 응답을 돌려준다
 calls = []
+VALID = set()          # 가짜 엔진이 받아 주는 로그인 토큰. 테스트마다 good-token 하나로 시작한다
 
 
 MEMORY = {"budget_manwon": 30000, "deal_type": "전세", "commute": None, "priorities": ["교육"], "avoid": []}
@@ -25,7 +26,7 @@ def fake_engine(request: httpx.Request) -> httpx.Response:
     if request.url.path == "/chat":
         return httpx.Response(200, json={"answer": "응암제3동이 나아요", "memory": "예산 3억 · 전세"})
     if request.url.path == "/auth/me":
-        if request.headers.get("authorization") == "Bearer good-token":
+        if request.headers.get("authorization", "").removeprefix("Bearer ") in VALID:
             return httpx.Response(200, json={"customer_id": "C001", "persona": {}})
         return httpx.Response(401, json={"detail": "토큰이 틀렸다"})
     if request.url.path == "/memory/C001":
@@ -41,7 +42,8 @@ def fake_engine(request: httpx.Request) -> httpx.Response:
 @pytest.fixture
 def client(monkeypatch):
     calls.clear()
-    monkeypatch.setattr(quota, "_members", {})       # 앞 테스트가 확인해 둔 토큰을 지운다
+    VALID.clear()
+    VALID.add("good-token")
     monkeypatch.setattr(engine, "_client",
                         httpx.Client(base_url="http://engine", transport=httpx.MockTransport(fake_engine)))
     return TestClient(app)
@@ -120,3 +122,11 @@ def test_채팅_답에_반영한_기억이_같이_온다(client):
     body = client.post("/api/chat", json={"question": "어디가 나아요?"}).json()
     assert body["answer"] == "응암제3동이 나아요"
     assert body["memory"] == "예산 3억 · 전세"
+
+
+def test_엔진이_거절한_토큰은_곧바로_막힌다(client):
+    # 웹이 토큰 확인 결과를 기억하던 때(2026-11-15 까지)는 로그아웃 · 만료 뒤에도 웹을 다시 띄울 때까지 통과했다
+    H = {"Authorization": "Bearer good-token"}
+    assert client.get("/api/memory", headers=H).status_code == 200
+    VALID.discard("good-token")                       # 로그아웃했다 · 1시간이 지났다 — 엔진이 거절한다
+    assert client.get("/api/memory", headers=H).status_code == 401
