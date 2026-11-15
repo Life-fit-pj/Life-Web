@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from main import app
 from services import engine, quota
+from services.floorplan import PLANS, find_floorplans
 
 # 엔진이 받은 요청을 기록해 두고 정해 둔 응답을 돌려준다
 calls = []
@@ -93,6 +94,15 @@ def test_관리자_API는_토큰이_없으면_401(client):
     assert calls == []
 
 
+def test_관리자_토큰이_설정_안_됐으면_아무_토큰도_안_받는다(client, monkeypatch):
+    # 전에는 ADMIN_TOKEN 이 없으면 "dev-admin-token" 으로 열렸다(2026-11-15 까지)
+    from routers import admin
+    monkeypatch.setattr(admin, "ADMIN_TOKEN", "")
+    for token in ("", "dev-admin-token"):
+        assert client.get("/api/admin/members", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    assert calls == []
+
+
 def test_경로_조각의_슬래시는_인코딩된다():
     # "../admin/members" 가 엔진의 다른 경로로 풀리던 문제(2026-10-05)가 되살아나지 않게
     assert engine._seg("../admin/members") == "..%2Fadmin%2Fmembers"
@@ -130,3 +140,12 @@ def test_엔진이_거절한_토큰은_곧바로_막힌다(client):
     assert client.get("/api/memory", headers=H).status_code == 200
     VALID.discard("good-token")                       # 로그아웃했다 · 1시간이 지났다 — 엔진이 거절한다
     assert client.get("/api/memory", headers=H).status_code == 401
+
+
+@pytest.mark.parametrize("area, text, picks", [(59, "아이 둘이랑 조용한 동네", None), (46, "신혼부부", None), (59, "", ["방이 많은"])])
+def test_평면도_넉_장의_설명이_서로_다르고_지역은_안_보인다(area, text, picks):
+    # 같은 구조가 많아 넉 장의 설명이 글자까지 같던 것(이슈 14) — 겹치면 배치 A · B 로 가른다.
+    # 단지(지역) 이름은 일부러 안 보인다 — 서울을 검색했는데 다른 지역 도면이 왜 뜨냐는 질문이 나온다
+    captions = [p["caption"] for p in find_floorplans(area, text, picks)["plans"]]
+    assert len(set(captions)) == len(captions), captions
+    assert not any(plan["사업지구"] in c for plan in PLANS for c in captions), captions

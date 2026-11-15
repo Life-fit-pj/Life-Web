@@ -139,7 +139,7 @@ def _caption(plan: dict) -> str:
     for k in ("알파룸", "드레스룸", "팬트리"):
         if plan[k]:
             parts.append(k)
-    return " · ".join(parts) + f" — 전용 {plan['전용면적']:.0f}㎡"      # 어느 단지인지는 안 적는다. 동네와 무관한 공공주택 도면이라 뜻이 없다
+    return " · ".join(parts) + f" — 전용 {plan['전용면적']:.0f}㎡"      # 겹칠 때는 find_floorplans 가 배치 A · B 로만 가른다
 
 
 def find_floorplans(area: float, text: str = "", house_picks: list | None = None, n: int = 4) -> dict:
@@ -188,9 +188,14 @@ def find_floorplans(area: float, text: str = "", house_picks: list | None = None
         note = "입력한 면적 근처에서 방이 넉넉한 구조를 골랐어요"
     if not AREA_MIN <= area <= AREA_MAX:
         note += f" (자료가 {AREA_MIN}~{AREA_MAX}㎡ 까지라 가장 가까운 것을 골랐어요)"
+    # 223장 중 같은 구조(방 3 · 욕실 2 · 59㎡ 등)가 많아 넉 장의 글이 글자까지 같을 때가 흔하다(이슈 14).
+    # 넉 장을 가르는 것은 단지 이름뿐인데 겹칠 때만 배치 A · B · C · D 를 붙인다
+    captions = [_caption(p) for p in top]
+    if len(set(captions)) < len(captions):
+        captions = [f"{c} · 배치 {chr(ord('A') + i)}" for i, c in enumerate(captions)]
     return {
-        "plans": [{"path": p["path"], "caption": _caption(p),
-                   "tags": {k: p[k] for k in INT_COLUMNS}} for p in top],
+        "plans": [{"path": p["path"], "caption": c,
+                   "tags": {k: p[k] for k in INT_COLUMNS}} for p, c in zip(top, captions)],
         "note": note,
         "mode": "layout" if wanted["known"] else "area",
     }

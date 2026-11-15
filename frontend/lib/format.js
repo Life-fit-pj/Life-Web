@@ -6,7 +6,7 @@
 /** LLM 이 만든 글을 화면에 넣기 전에 다듬는다 */
 export function escapeAndFormat(text) {
   return text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")   // 태그 주입 방지
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;")   // 태그 · 속성(data-gu="…") 주입 방지
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
     .trim()
     .replace(/\n/g, "<br>");
