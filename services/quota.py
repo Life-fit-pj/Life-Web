@@ -62,11 +62,17 @@ def _resolve_who(request: Request) -> tuple[str, int]:
             # 확인된 회원만 기억한다. 실패(엔진이 잠깐 멈춤 · 아직 가입 전)까지 기억하면 그 토큰은 웹을 다시 띄울 때까지
             # 손님으로 굳는다 — 로그인해 있는데 한도가 5번이 되고, 자기 기록 · 좋아요도 못 본다
             if member:
-                _members[token] = member
-                _personas[token] = me.get("persona") or {}
+                remember(token, me)
         if member:
             return f"member:{member}", MEMBER_DAILY_LIMIT
     return f"ip:{_client_ip(request)}", GUEST_DAILY_LIMIT
+
+
+def remember(token: str, me: dict) -> None:
+    """엔진 /auth/me 가 준 본인 정보를 토큰 캐시에 적는다. 마이페이지(/api/auth/me)도 받은 것을 여기 적어 둔다 —
+    안 적으면 이어서 누르는 탭(기록 · 좋아요 · 기억)이 같은 확인을 엔진에 한 번 더 묻는다"""
+    _members[token] = me["customer_id"]
+    _personas[token] = me.get("persona") or {}
 
 
 def persona(request: Request) -> dict:
