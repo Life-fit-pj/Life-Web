@@ -14,7 +14,6 @@ import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
-from services import quota
 from services.engine import auth_login, get_me, signed_up, signup as engine_signup
 from services.persona_type import profile as survey_profile, answers_to_persona
 
@@ -101,5 +100,4 @@ def me(token: str = Depends(_bearer_token)):
     found = _or_401(get_me, token)
     if found is None:
         raise HTTPException(404, "가입된 계정이 아니다")
-    quota.remember(token, found)       # 탭(기록 · 좋아요 · 기억)이 같은 확인을 엔진에 다시 안 묻게
     return found
